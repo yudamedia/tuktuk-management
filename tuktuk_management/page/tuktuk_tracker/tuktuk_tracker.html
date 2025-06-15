@@ -1,0 +1,60 @@
+<div class="tuktuk-tracker-page">
+    <div class="page-head flex">
+      <div class="flex page-head-content">
+        <h1 class="ellipsis title-text">TukTuk Tracker</h1>
+      </div>
+      <div class="page-actions flex">
+        <div class="btn-group">
+          <button class="btn btn-refresh btn-default btn-sm">
+            <i class="fa fa-refresh"></i> Refresh
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <div class="tuktuk-filter-area margin-bottom">
+      <div class="row">
+        <div class="col-md-2">
+          <div class="form-group">
+            <label>Filter by Status</label>
+            <select class="form-control status-filter">
+              <option value="All">All Tuktuks</option>
+              <option value="Available">Available</option>
+              <option value="Assigned">Assigned</option>
+              <option value="Charging">Charging</option>
+              <option value="Maintenance">Maintenance</option>
+            </select>
+          </div>
+        </div>
+        <div class="col-md-2">
+          <div class="form-group">
+            <label>Filter by Battery</label>
+            <select class="form-control battery-filter">
+              <option value="All">All Levels</option>
+              <option value="Low">Low Battery (≤20%)</option>
+              <option value="Medium">Medium Battery (21-70%)</option>
+              <option value="High">High Battery (>70%)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="tuktuk-tracker-container">
+      <div class="row">
+        <div class="col-md-8">
+          <div class="tuktuk-map-container" style="height: 600px;">
+            <!-- Map will be rendered here -->
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="tuktuk-list-container">
+            <div class="tuktuk-list-header">
+              <h4>TukTuk Fleet Status</h4>
+            </div>
+            <div class="tuktuk-list"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>

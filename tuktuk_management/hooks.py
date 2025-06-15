@@ -1,244 +1,155 @@
+# ~/frappe-bench/apps/tuktuk_management/tuktuk_management/hooks.py
 app_name = "tuktuk_management"
 app_title = "Tuktuk Management"
 app_publisher = "Yuda Media"
-app_description = "Sunny Tuktuk Management"
+app_description = "Sunny Tuktuk Management System"
 app_email = "yuda@graphicshop.co.ke"
-app_license = "mit"
+app_license = "MIT"
 
-# Apps
-# ------------------
+app_include_css = [
+    "/assets/tuktuk_management/css/tuktuk_management.css",
+    "https://unpkg.com/leaflet@1.7.1/dist/leaflet.css",
+    "https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.74.4/dist/L.Control.Locate.min.css"
+]
 
-# required_apps = []
+app_include_js = [
+    "https://unpkg.com/leaflet@1.7.1/dist/leaflet.js",
+    "https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.74.4/dist/L.Control.Locate.min.js",
+    "/assets/tuktuk_management/js/tuktuk_management.js",
+    "/assets/tuktuk_management/js/tuktuk_tracker.js"
+]
 
-# Each item in the list will be shown as an app in the apps page
-# add_to_apps_screen = [
-# 	{
-# 		"name": "tuktuk_management",
-# 		"logo": "/assets/tuktuk_management/logo.png",
-# 		"title": "Tuktuk Management",
-# 		"route": "/tuktuk_management",
-# 		"has_permission": "tuktuk_management.api.permission.has_app_permission"
-# 	}
-# ]
+app_icon = "octicon octicon-file-directory"
+app_color = "blue"
 
-# Includes in <head>
-# ------------------
+# Whitelisted Methods - Critical for form operations
+whitelisted_methods = [
+    "tuktuk_management.api.tuktuk.get_tuktuk_for_rental",
+    "tuktuk_management.api.tuktuk.start_rental",
+    "tuktuk_management.api.tuktuk.send_mpesa_payment",
+    "tuktuk_management.api.telematics.update_vehicle_status",
+    "tuktuk_management.api.telematics.update_from_device",
+    "tuktuk_management.api.telematics.update_location",
+    "tuktuk_management.api.telematics.update_battery",
+    "tuktuk_management.api.telematics.get_status"
+]
 
-# include js, css files in header of desk.html
-# app_include_css = "/assets/tuktuk_management/css/tuktuk_management.css"
-# app_include_js = "/assets/tuktuk_management/js/tuktuk_management.js"
-
-# include js, css files in header of web template
-# web_include_css = "/assets/tuktuk_management/css/tuktuk_management.css"
-# web_include_js = "/assets/tuktuk_management/js/tuktuk_management.js"
-
-# include custom scss in every website theme (without file extension ".scss")
-# website_theme_scss = "tuktuk_management/public/scss/website"
-
-# include js, css files in header of web form
-# webform_include_js = {"doctype": "public/js/doctype.js"}
-# webform_include_css = {"doctype": "public/css/doctype.css"}
-
-# include js in page
-# page_js = {"page" : "public/js/file.js"}
-
-# include js in doctype views
-# doctype_js = {"doctype" : "public/js/doctype.js"}
-# doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
-# doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
-# doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
-
-# Svg Icons
-# ------------------
-# include app icons in desk
-# app_include_icons = "tuktuk_management/public/icons.svg"
-
-# Home Pages
-# ----------
-
-# application home page (will override Website Settings)
-# home_page = "login"
-
-# website user home page (by Role)
-# role_home_page = {
-# 	"Role": "home_page"
-# }
-
-# Generators
-# ----------
-
-# automatically create page for each record of this doctype
-# website_generators = ["Web Page"]
-
-# Jinja
-# ----------
-
-# add methods and filters to jinja environment
-# jinja = {
-# 	"methods": "tuktuk_management.utils.jinja_methods",
-# 	"filters": "tuktuk_management.utils.jinja_filters"
-# }
-
-# Installation
-# ------------
-
-# before_install = "tuktuk_management.install.before_install"
-# after_install = "tuktuk_management.install.after_install"
-
-# Uninstallation
-# ------------
-
-# before_uninstall = "tuktuk_management.uninstall.before_uninstall"
-# after_uninstall = "tuktuk_management.uninstall.after_uninstall"
-
-# Integration Setup
-# ------------------
-# To set up dependencies/integrations with other apps
-# Name of the app being installed is passed as an argument
-
-# before_app_install = "tuktuk_management.utils.before_app_install"
-# after_app_install = "tuktuk_management.utils.after_app_install"
-
-# Integration Cleanup
-# -------------------
-# To clean up dependencies/integrations with other apps
-# Name of the app being uninstalled is passed as an argument
-
-# before_app_uninstall = "tuktuk_management.utils.before_app_uninstall"
-# after_app_uninstall = "tuktuk_management.utils.after_app_uninstall"
-
-# Desk Notifications
-# ------------------
-# See frappe.core.notifications.get_notification_config
-
-# notification_config = "tuktuk_management.notifications.get_notification_config"
-
-# Permissions
-# -----------
-# Permissions evaluated in scripted ways
-
-# permission_query_conditions = {
-# 	"Event": "frappe.desk.doctype.event.event.get_permission_query_conditions",
-# }
-#
-# has_permission = {
-# 	"Event": "frappe.desk.doctype.event.event.has_permission",
-# }
-
-# DocType Class
-# ---------------
-# Override standard doctype classes
-
-# override_doctype_class = {
-# 	"ToDo": "custom_app.overrides.CustomToDo"
-# }
+# Override whitelisted methods to ensure core Frappe functions work
+override_whitelisted_methods = {
+    "frappe.desk.form.save.savedocs": "frappe.desk.form.save.savedocs",
+    "frappe.desk.form.load.getdoctype": "frappe.desk.form.load.getdoctype",
+    "frappe.desk.form.load.getdoc": "frappe.desk.form.load.getdoc",
+    "frappe.desk.form.utils.validate_link": "frappe.desk.form.utils.validate_link",
+    "frappe.desk.search.search_link": "frappe.desk.search.search_link",
+    "frappe.desk.reportview.get": "frappe.desk.reportview.get",
+    "frappe.client.get": "frappe.client.get",
+    "frappe.client.get_list": "frappe.client.get_list",
+    "frappe.client.save": "frappe.client.save",
+    "frappe.client.submit": "frappe.client.submit",
+    "frappe.client.cancel": "frappe.client.cancel",
+    "frappe.client.delete": "frappe.client.delete"
+}
 
 # Document Events
-# ---------------
-# Hook on document methods and events
-
-# doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
-# }
+doc_events = {
+    "TukTuk Transaction": {
+        "after_insert": "tuktuk_management.api.tuktuk.handle_mpesa_payment"
+    },
+    "TukTuk Driver": {
+        "validate": "tuktuk_management.api.tuktuk.validate_driver",
+        "on_update": "tuktuk_management.api.tuktuk.handle_driver_update"
+    },
+    "TukTuk Vehicle": {
+        "validate": "tuktuk_management.api.tuktuk.validate_vehicle",
+        "on_update": "tuktuk_management.api.tuktuk.handle_vehicle_status_change"
+    }
+}
 
 # Scheduled Tasks
-# ---------------
+scheduler_events = {
+    "cron": {
+        # Reset daily targets at midnight
+        "0 0 * * *": [
+            "tuktuk_management.api.tuktuk.reset_daily_targets",
+            "tuktuk_management.api.tuktuk.end_operating_hours"
+        ],
+        # Check for operating hours at 6 AM
+        "0 6 * * *": [
+            "tuktuk_management.api.tuktuk.start_operating_hours"
+        ],
+        # Update vehicle statuses every 5 minutes
+        "*/5 * * * *": [
+            "tuktuk_management.api.telematics.update_all_vehicle_statuses"
+        ]
+    },
+    "hourly": [
+        "tuktuk_management.api.tuktuk.check_battery_levels"
+    ]
+}
 
-# scheduler_events = {
-# 	"all": [
-# 		"tuktuk_management.tasks.all"
-# 	],
-# 	"daily": [
-# 		"tuktuk_management.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"tuktuk_management.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"tuktuk_management.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"tuktuk_management.tasks.monthly"
-# 	],
-# }
+# Installation
+after_install = "tuktuk_management.setup.install.after_install"
 
-# Testing
-# -------
+# Client Scripts
+doctype_js = {
+    "TukTuk Vehicle": "public/js/tuktuk_vehicle.js",
+    "TukTuk Driver": "public/js/tuktuk_driver.js"
+}
 
-# before_tests = "tuktuk_management.install.before_tests"
+doctype_list_js = {
+    "TukTuk Vehicle": "public/js/tuktuk_vehicle_list.js",
+    "TukTuk Driver": "public/js/tuktuk_driver_list.js",
+    "TukTuk Transaction": "public/js/tuktuk_transaction_list.js",
+    "TukTuk Rental": "public/js/tuktuk_rental_list.js",
+    "TukTuk Daily Report": "public/js/tuktuk_daily_report_list.js"
+}
 
-# Overriding Methods
-# ------------------------------
-#
-# override_whitelisted_methods = {
-# 	"frappe.desk.doctype.event.event.get_events": "tuktuk_management.event.get_events"
-# }
-#
-# each overriding function accepts a `data` argument;
-# generated from the base implementation of the doctype dashboard,
-# along with any modifications made in other Frappe apps
-# override_doctype_dashboards = {
-# 	"Task": "tuktuk_management.task.get_dashboard_data"
-# }
+# Boot session - ensures proper initialization
+boot_session = "tuktuk_management.boot.boot_session"
 
-# exempt linked doctypes from being automatically cancelled
-#
-# auto_cancel_exempted_doctypes = ["Auto Repeat"]
+translate_app = True
 
-# Ignore links to specified DocTypes when deleting documents
-# -----------------------------------------------------------
+fixtures = [
+    {
+        "doctype": "Workspace",
+        "filters": [
+            [
+                "name",
+                "in",
+                ["Tuktuk Management"]
+            ]
+        ]
+    },
+    {
+        "doctype": "Dashboard Chart",
+        "filters": [
+            [
+                "name",
+                "in",
+                ["Daily Revenue", "Target Achievement Rate"]
+            ]
+        ]
+    }
+]
 
-# ignore_links_on_delete = ["Communication", "ToDo"]
+reports = [
+    {
+        "doctype": "Report",
+        "is_standard": "Yes",
+        "name": "Driver Performance Report",
+        "report_name": "Driver Performance Report",
+        "report_type": "Script Report",
+        "ref_doctype": "TukTuk Driver"
+    }
+]
 
-# Request Events
-# ----------------
-# before_request = ["tuktuk_management.utils.before_request"]
-# after_request = ["tuktuk_management.utils.after_request"]
+# Standard includes for web forms and pages
+standard_portal_menu_items = [
+    {"title": "Driver Dashboard", "route": "/driver-dashboard", "reference_doctype": "TukTuk Driver"}
+]
 
-# Job Events
-# ----------
-# before_job = ["tuktuk_management.utils.before_job"]
-# after_job = ["tuktuk_management.utils.after_job"]
-
-# User Data Protection
-# --------------------
-
-# user_data_fields = [
-# 	{
-# 		"doctype": "{doctype_1}",
-# 		"filter_by": "{filter_by}",
-# 		"redact_fields": ["{field_1}", "{field_2}"],
-# 		"partial": 1,
-# 	},
-# 	{
-# 		"doctype": "{doctype_2}",
-# 		"filter_by": "{filter_by}",
-# 		"partial": 1,
-# 	},
-# 	{
-# 		"doctype": "{doctype_3}",
-# 		"strict": False,
-# 	},
-# 	{
-# 		"doctype": "{doctype_4}"
-# 	}
-# ]
-
-# Authentication and authorization
-# --------------------------------
-
-# auth_hooks = [
-# 	"tuktuk_management.auth.validate"
-# ]
-
-# Automatically update python controller files with type annotations for this app.
-# export_python_type_annotations = True
-
-# default_log_clearing_doctypes = {
-# 	"Logging DocType Name": 30  # days to retain logs
-# }
-
+# Website context for portal pages
+website_context = {
+    "favicon": "/assets/tuktuk_management/images/favicon.ico",
+    "splash_image": "/assets/tuktuk_management/images/tuktuk-logo.png"
+}

@@ -1,0 +1,79 @@
+/* Create file: tuktuk_management/tuktuk_management/page/tuktuk_tracker/tuktuk_tracker.css */
+
+.tuktuk-tracker-container {
+    padding: 15px;
+}
+
+.tuktuk-map-container {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.tuktuk-list-container {
+    height: 600px;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.tuktuk-list-header {
+    padding: 10px;
+    background-color: #f8f8f8;
+    border-bottom: 1px solid #ddd;
+}
+
+.tuktuk-list-item {
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+}
+
+.tuktuk-list-item:hover {
+    background-color: #f5f5f5;
+}
+
+.tuktuk-marker {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    background-color: #fff;
+    border-radius: 50%;
+    font-weight: bold;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+}
+
+.tuktuk-marker.red {
+    border: 3px solid #d9534f;
+}
+
+.tuktuk-marker.orange {
+    border: 3px solid #f0ad4e;
+}
+
+.tuktuk-marker.green {
+    border: 3px solid #5cb85c;
+}
+
+.tuktuk-marker span {
+    font-size: 12px;
+}
+
+.tuktuk-popup {
+    min-width: 200px;
+}
+
+.tuktuk-popup h4 {
+    margin-top: 0;
+    margin-bottom: 10px;
+}
+
+.tuktuk-popup-actions {
+    margin-top: 10px;
+    text-align: right;
+}
+
+.battery-indicator i {
+    margin-right: 5px;
+}

@@ -4,3 +4,12 @@
 
 [post_model_sync]
 # Patches added in this section will be executed after doctypes are migrated
+
+# Commented out patches - can be re-enabled later if needed
+# tuktuk_management.patches.create_workspace
+# tuktuk_management.patches.remove_tuktuk_id_format  
+# tuktuk_management.patches.update_mpesa_account_validation
+
+# Active patches for fixing permissions and settings access
+# tuktuk_management.patches.fix_permissions
+tuktuk_management.patches.fix_settings_access

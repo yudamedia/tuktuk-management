@@ -1,0 +1,237 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format:TUK-885-{tuktuk_id}",
+ "creation": "2024-11-26 12:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "general_details_tab",
+  "general_section",
+  "tuktuk_id",
+  "tuktuk_chasis",
+  "battery_level",
+  "column_break_rrvo",
+  "tuktuk_make",
+  "tuktuk_colour",
+  "status",
+  "paybill_account_tab",
+  "paybill_account_number_section",
+  "mpesa_account",
+  "rental_rates_tab",
+  "rental_rate_initial",
+  "column_break_fgzv",
+  "rental_rate_hourly",
+  "telematics_tab",
+  "telematics_section",
+  "telematics_device_model",
+  "device_id",
+  "device_imei",
+  "last_reported",
+  "column_break_telemetry",
+  "current_location",
+  "last_battery_reading",
+  "sim_section",
+  "sim_provider",
+  "sim_serial",
+  "column_break_qncg",
+  "sim_number",
+  "sim_puk1"
+ ],
+ "fields": [
+  {
+   "description": "Tuktuk Call Number",
+   "fieldname": "tuktuk_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "TukTuk ID",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "description": "Mpesa account number (digits only)",
+   "fieldname": "mpesa_account",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Mpesa Account Number"
+  },
+  {
+   "default": "Available",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Available\nAssigned\nCharging\nMaintenance"
+  },
+  {
+   "default": "100",
+   "fieldname": "battery_level",
+   "fieldtype": "Percent",
+   "label": "Battery Level"
+  },
+  {
+   "fieldname": "rental_rate_initial",
+   "fieldtype": "Currency",
+   "label": "Rental Rate (First 2 Hours)"
+  },
+  {
+   "fieldname": "rental_rate_hourly",
+   "fieldtype": "Currency",
+   "label": "Rental Rate (Per Hour After)"
+  },
+  {
+   "fieldname": "column_break_rrvo",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "tuktuk_make",
+   "fieldtype": "Data",
+   "label": "Tuktuk Make"
+  },
+  {
+   "fieldname": "tuktuk_colour",
+   "fieldtype": "Data",
+   "label": "Tuktuk Colour"
+  },
+  {
+   "fieldname": "general_section",
+   "fieldtype": "Section Break",
+   "label": "General"
+  },
+  {
+   "fieldname": "paybill_account_tab",
+   "fieldtype": "Tab Break",
+   "label": "MPesa Paybill Account "
+  },
+  {
+   "fieldname": "paybill_account_number_section",
+   "fieldtype": "Section Break",
+   "label": "Paybill Account Number"
+  },
+  {
+   "fieldname": "rental_rates_tab",
+   "fieldtype": "Tab Break",
+   "label": "Rental Rates"
+  },
+  {
+   "fieldname": "column_break_fgzv",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "general_details_tab",
+   "fieldtype": "Tab Break",
+   "label": "General Details"
+  },
+  {
+   "fieldname": "telematics_tab",
+   "fieldtype": "Tab Break",
+   "label": "Telematics"
+  },
+  {
+   "fieldname": "telematics_section",
+   "fieldtype": "Section Break",
+   "label": "Telematics Device"
+  },
+  {
+   "description": "The OB number (e.g., OB3538970116)",
+   "fieldname": "device_id",
+   "fieldtype": "Data",
+   "label": "Device ID"
+  },
+  {
+   "fieldname": "sim_number",
+   "fieldtype": "Data",
+   "label": "SIM Card Number"
+  },
+  {
+   "fieldname": "last_reported",
+   "fieldtype": "Datetime",
+   "label": "Last Reported",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_telemetry",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "last_battery_reading",
+   "fieldtype": "Percent",
+   "label": "Last Battery Reading",
+   "read_only": 1
+  },
+  {
+   "default": "F902-EUR",
+   "description": "Telematic device model",
+   "fieldname": "telematics_device_model",
+   "fieldtype": "Data",
+   "label": "Device Model"
+  },
+  {
+   "description": "15-digit IMEI number",
+   "fieldname": "device_imei",
+   "fieldtype": "Data",
+   "label": "Device IMEI",
+   "unique": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "sim_section",
+   "fieldtype": "Section Break",
+   "label": "SIM Card Details"
+  },
+  {
+   "default": "Telkom Kenya",
+   "fieldname": "sim_provider",
+   "fieldtype": "Data",
+   "label": "SIM Provider"
+  },
+  {
+   "fieldname": "sim_serial",
+   "fieldtype": "Data",
+   "label": "SIM Serial Number"
+  },
+  {
+   "description": "PIN Unblocking Key",
+   "fieldname": "sim_puk1",
+   "fieldtype": "Data",
+   "label": "SIM PUK1"
+  },
+  {
+   "fieldname": "column_break_qncg",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "tuktuk_chasis",
+   "fieldtype": "Data",
+   "label": "Chasis Number"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-04-15 15:04:43.641088",
+ "modified_by": "Administrator",
+ "module": "Tuktuk Management",
+ "name": "TukTuk Vehicle",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Driver"
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

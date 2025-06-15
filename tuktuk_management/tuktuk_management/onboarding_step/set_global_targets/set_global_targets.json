@@ -1,0 +1,21 @@
+{
+ "action": "Update Settings",
+ "action_label": "Set Global Target",
+ "creation": "2024-11-30 07:54:29.998241",
+ "description": "The global target setting is two fold. \n\nGlobal Targets is the amount of money that a Tuktuk Driver is supposed to generate a day. Driver's who meet this target within the global operating hours, receive 100% of the customer payment. Target's not met during globel operating hours roll over to the next day. Three consecutive days of target misses results in the driver being terminated. ",
+ "docstatus": 0,
+ "doctype": "Onboarding Step",
+ "idx": 0,
+ "is_complete": 0,
+ "is_single": 1,
+ "is_skipped": 0,
+ "modified": "2024-11-30 08:02:50.023835",
+ "modified_by": "Administrator",
+ "name": "Set Global Targets",
+ "owner": "Administrator",
+ "reference_document": "TukTuk Settings",
+ "show_form_tour": 0,
+ "show_full_form": 0,
+ "title": "Set Global Targets",
+ "validate_action": 0
+}

@@ -1,0 +1,29 @@
+{
+ "allow_roles": [
+  {
+   "role": "Tuktuk Manager"
+  }
+ ],
+ "creation": "2024-11-30 08:03:16.674100",
+ "docstatus": 0,
+ "doctype": "Module Onboarding",
+ "documentation_url": "#",
+ "idx": 0,
+ "is_complete": 0,
+ "modified": "2024-11-30 08:44:07.718982",
+ "modified_by": "Administrator",
+ "module": "Tuktuk Management",
+ "name": "Tuktuk Management",
+ "owner": "Administrator",
+ "steps": [
+  {
+   "step": "Set Operating Times"
+  },
+  {
+   "step": "Set Global Targets"
+  }
+ ],
+ "subtitle": "Drivers, Tuktuks and Payments",
+ "success_message": "You're ready to start",
+ "title": "Sunny Tuktuk"
+}

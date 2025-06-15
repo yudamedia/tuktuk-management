@@ -1,0 +1,21 @@
+{
+ "action": "Update Settings",
+ "action_label": "Set Operating Hours",
+ "creation": "2024-11-30 07:52:42.068587",
+ "description": "The operating hours are the times of the day that the system will listen in for payments to the Paybill, calculate driver revenue share and track daily target goal. The default time is set for 06:00AM to 00:00AM (midnght)",
+ "docstatus": 0,
+ "doctype": "Onboarding Step",
+ "idx": 0,
+ "is_complete": 0,
+ "is_single": 1,
+ "is_skipped": 0,
+ "modified": "2024-11-30 07:52:42.068587",
+ "modified_by": "Administrator",
+ "name": "Set Operating Times",
+ "owner": "Administrator",
+ "reference_document": "TukTuk Settings",
+ "show_form_tour": 0,
+ "show_full_form": 0,
+ "title": "Operating Hours",
+ "validate_action": 0
+}
