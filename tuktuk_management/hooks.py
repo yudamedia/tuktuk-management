@@ -8,13 +8,13 @@ app_license = "MIT"
 
 app_include_css = [
     "/assets/tuktuk_management/css/tuktuk_management.css",
-    "https://unpkg.com/leaflet@1.7.1/dist/leaflet.css",
-    "https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.74.4/dist/L.Control.Locate.min.css"
+    # "https://unpkg.com/leaflet@1.7.1/dist/leaflet.css",
+    # "https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.74.4/dist/L.Control.Locate.min.css"
 ]
 
 app_include_js = [
-    "https://unpkg.com/leaflet@1.7.1/dist/leaflet.js",
-    "https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.74.4/dist/L.Control.Locate.min.js",
+    # "https://unpkg.com/leaflet@1.7.1/dist/leaflet.js",
+    # "https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.74.4/dist/L.Control.Locate.min.js",
     "/assets/tuktuk_management/js/tuktuk_management.js",
     "/assets/tuktuk_management/js/tuktuk_tracker.js"
 ]
@@ -35,20 +35,20 @@ whitelisted_methods = [
 ]
 
 # Override whitelisted methods to ensure core Frappe functions work
-override_whitelisted_methods = {
-    "frappe.desk.form.save.savedocs": "frappe.desk.form.save.savedocs",
-    "frappe.desk.form.load.getdoctype": "frappe.desk.form.load.getdoctype",
-    "frappe.desk.form.load.getdoc": "frappe.desk.form.load.getdoc",
-    "frappe.desk.form.utils.validate_link": "frappe.desk.form.utils.validate_link",
-    "frappe.desk.search.search_link": "frappe.desk.search.search_link",
-    "frappe.desk.reportview.get": "frappe.desk.reportview.get",
-    "frappe.client.get": "frappe.client.get",
-    "frappe.client.get_list": "frappe.client.get_list",
-    "frappe.client.save": "frappe.client.save",
-    "frappe.client.submit": "frappe.client.submit",
-    "frappe.client.cancel": "frappe.client.cancel",
-    "frappe.client.delete": "frappe.client.delete"
-}
+# override_whitelisted_methods = {
+#     "frappe.desk.form.save.savedocs": "frappe.desk.form.save.savedocs",
+#     "frappe.desk.form.load.getdoctype": "frappe.desk.form.load.getdoctype",
+#     "frappe.desk.form.load.getdoc": "frappe.desk.form.load.getdoc",
+#     "frappe.desk.form.utils.validate_link": "frappe.desk.form.utils.validate_link",
+#     "frappe.desk.search.search_link": "frappe.desk.search.search_link",
+#     "frappe.desk.reportview.get": "frappe.desk.reportview.get",
+#     "frappe.client.get": "frappe.client.get",
+#     "frappe.client.get_list": "frappe.client.get_list",
+#     "frappe.client.save": "frappe.client.save",
+#     "frappe.client.submit": "frappe.client.submit",
+#     "frappe.client.cancel": "frappe.client.cancel",
+#     "frappe.client.delete": "frappe.client.delete"
+# }
 
 # Document Events
 doc_events = {

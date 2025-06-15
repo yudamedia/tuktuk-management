@@ -3,67 +3,40 @@ import frappe
 
 def boot_session(bootinfo):
     """
-    Called during boot to set up session data and ensure proper whitelisting
+    Simple boot session setup without complex whitelisting
     """
     if frappe.session.user == "Guest":
         return
     
-    # Add Tuktuk Management specific boot data
+    # Basic boot info
     bootinfo.tuktuk_management = {
         "version": "1.0.0",
         "initialized": True
     }
     
-    # Ensure user has proper permissions
-    user = frappe.get_doc("User", frappe.session.user)
-    
-    # Add Tuktuk Manager role to System Managers automatically
-    if "System Manager" in [role.role for role in user.roles]:
-        if not any(role.role == "Tuktuk Manager" for role in user.roles):
+    # Simple role assignment for System Managers
+    try:
+        user = frappe.get_doc("User", frappe.session.user)
+        user_roles = [role.role for role in user.roles]
+        
+        # Only add Tuktuk Manager role if user is System Manager
+        if "System Manager" in user_roles and "Tuktuk Manager" not in user_roles:
             user.append("roles", {"role": "Tuktuk Manager"})
             user.save(ignore_permissions=True)
+    except Exception as e:
+        # Don't fail boot if role assignment fails
+        frappe.log_error(f"Boot role assignment error: {str(e)}")
     
-    # Set boot info for roles
-    bootinfo.user_roles = [role.role for role in user.roles]
-    
-    # Ensure core Frappe methods are whitelisted for this session
-    ensure_core_methods_whitelisted()
-    
-    # Add TukTuk settings to boot if accessible
+    # Basic settings
     try:
         settings = frappe.get_single("TukTuk Settings")
         bootinfo.tuktuk_settings = {
             "operating_hours_start": settings.operating_hours_start,
-            "operating_hours_end": settings.operating_hours_end,
-            "system_active": getattr(settings, 'system_active', True)
+            "operating_hours_end": settings.operating_hours_end
         }
     except Exception:
-        # If settings don't exist or can't be accessed, use defaults
+        # Provide defaults if settings don't exist
         bootinfo.tuktuk_settings = {
             "operating_hours_start": "06:00:00",
-            "operating_hours_end": "00:00:00",
-            "system_active": True
+            "operating_hours_end": "00:00:00"
         }
-
-def ensure_core_methods_whitelisted():
-    """Ensure core Frappe methods are available"""
-    try:
-        # Get the current whitelisted methods
-        if not hasattr(frappe.local, 'whitelisted_methods'):
-            frappe.local.whitelisted_methods = set()
-        
-        # Add essential methods
-        essential_methods = [
-            "frappe.desk.form.save.savedocs",
-            "frappe.desk.form.load.getdoctype", 
-            "frappe.desk.form.load.getdoc",
-            "frappe.client.get",
-            "frappe.client.save",
-            "frappe.client.get_list"
-        ]
-        
-        for method in essential_methods:
-            frappe.local.whitelisted_methods.add(method)
-            
-    except Exception as e:
-        frappe.log_error(f"Error ensuring core methods whitelisted: {str(e)}")

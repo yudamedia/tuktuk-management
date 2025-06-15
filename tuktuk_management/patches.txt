@@ -12,4 +12,4 @@
 
 # Active patches for fixing permissions and settings access
 # tuktuk_management.patches.fix_permissions
-tuktuk_management.patches.fix_settings_access
+# tuktuk_management.patches.fix_settings_access
