@@ -2,15 +2,15 @@
 
 A comprehensive ERPNext 15 application for managing electric tuktuks, drivers, payments, and operations in Diani Beach, Kenya.
 
-## 🚀 Overview
+## Overview
 
 Sunny TukTuk is a fleet management system designed for 21 battery-powered, solar-charged tuktuks operating as taxis in the Diani Beach area. The system handles everything from driver assignments and daily targets to Mpesa payment processing and battery management.
 
-## 🏗️ System Architecture
+## System Architecture
 
 ### Core Components
 
-- **Fleet Management**: Track and manage 21 electric tuktuks
+- **Fleet Management**: Track and manage electric tuktuks
 - **Driver Management**: Comprehensive driver profiles and performance tracking
 - **Payment Processing**: Automatic Mpesa integration with revenue splitting
 - **Battery Management**: Monitor charging cycles and optimize fleet availability
@@ -19,30 +19,30 @@ Sunny TukTuk is a fleet management system designed for 21 battery-powered, solar
 
 ### Key Features
 
-#### 💰 Dynamic Revenue Sharing
+#### Dynamic Revenue Sharing
 - **Pre-Target**: 50% to driver, 50% towards daily target
 - **Post-Target**: 100% to driver
 - Configurable percentages (global or individual)
 
-#### 🔋 Smart Battery Management
+#### Smart Battery Management
 - Real-time battery level monitoring
 - 2-hour charging cycle management
 - Automatic low-battery notifications
 - Temporary vehicle reassignment during charging
 
-#### 📊 Performance Tracking
+#### Performance Tracking
 - Daily target monitoring (default: 3000 KSH)
 - Rolling balance for unmet targets
 - Automatic termination after 3 consecutive misses
 - Bonus payments for target achievement
 
-#### 📱 Mpesa Integration
+#### Mpesa Integration
 - Real-time payment listening
 - Automatic driver payments
 - Transaction recording and audit trail
 - Customer payment association
 
-## 🛠️ Installation
+## Installation
 
 ### Prerequisites
 - ERPNext 15 installation
@@ -101,7 +101,6 @@ Sunny TukTuk is a fleet management system designed for 21 battery-powered, solar
 ### Vehicle Setup
 
 1. **Add TukTuk Vehicles**
-   - Format: KAAxxxT (e.g., KAA001T)
    - 3-digit Mpesa account numbers
    - Set individual rental rates (optional)
 
@@ -110,7 +109,7 @@ Sunny TukTuk is a fleet management system designed for 21 battery-powered, solar
    - Assign vehicles
    - Set individual targets (optional)
 
-## 📋 DocTypes
+## DocTypes
 
 ### TukTuk Vehicle
 - Vehicle identification and specifications
@@ -143,7 +142,7 @@ Sunny TukTuk is a fleet management system designed for 21 battery-powered, solar
 - Mpesa integration
 - Notification preferences
 
-## 🔐 Roles and Permissions
+## Roles and Permissions
 
 ### System Manager
 - Full system access
@@ -160,7 +159,7 @@ Sunny TukTuk is a fleet management system designed for 21 battery-powered, solar
 - Transaction history
 - Performance metrics
 
-## 📈 Reports and Analytics
+## Reports and Analytics
 
 ### Built-in Reports
 - **Driver Performance Report**: Individual and comparative analysis
@@ -173,7 +172,7 @@ Sunny TukTuk is a fleet management system designed for 21 battery-powered, solar
 - Battery level monitoring
 - Quick access shortcuts
 
-## 🔄 Automated Workflows
+## Automated Workflows
 
 ### Daily Operations
 - **6:00 AM**: System activation and status reset
@@ -192,7 +191,7 @@ Sunny TukTuk is a fleet management system designed for 21 battery-powered, solar
 - Automatic termination procedures
 - Bonus payment processing
 
-## 🚨 Key Business Rules
+## Key Business Rules
 
 1. **Target Management**
    - Unmet daily targets roll over to next day
@@ -214,25 +213,25 @@ Sunny TukTuk is a fleet management system designed for 21 battery-powered, solar
    - System only processes payments during operating hours
    - Daily resets at midnight
 
-## 🛡️ Security Features
+## Security Features
 
 - Role-based access control
 - Secure Mpesa API integration
 - Transaction audit trails
 - Data validation and sanitization
 
-## 📞 Support
+## Support
 
 For support and customization requests, contact:
 - **Email**: yuda@graphicshop.co.ke
 - **Company**: Yuda Media
 - **Location**: Diani Beach, Kenya
 
-## 📄 License
+## License
 
 MIT License - See LICENSE file for details
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch
@@ -240,7 +239,7 @@ MIT License - See LICENSE file for details
 4. Push to the branch
 5. Create a Pull Request
 
-## 🔧 Development
+## Development
 
 ### Project Structure
 ```
