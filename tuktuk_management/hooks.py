@@ -24,31 +24,31 @@ app_color = "blue"
 
 # Whitelisted Methods - Critical for form operations
 whitelisted_methods = [
+    # From tuktuk.py
     "tuktuk_management.api.tuktuk.get_tuktuk_for_rental",
     "tuktuk_management.api.tuktuk.start_rental",
-    "tuktuk_management.api.tuktuk.send_mpesa_payment",
-    "tuktuk_management.api.telematics.update_vehicle_status",
+    "tuktuk_management.api.tuktuk.end_rental",
+    "tuktuk_management.api.tuktuk.mpesa_validation",
+    "tuktuk_management.api.tuktuk.mpesa_confirmation",
+    "tuktuk_management.api.tuktuk.b2c_result",
+    "tuktuk_management.api.tuktuk.b2c_timeout",
+    "tuktuk_management.api.tuktuk.setup_daraja_integration",
+    "tuktuk_management.api.tuktuk.test_payment_simulation",
+    # "tuktuk_management.api.tuktuk.create_test_data",
+    "tuktuk_management.api.tuktuk.fix_account_formats",
+    "tuktuk_management.api.tuktuk.assign_driver_to_tuktuk",
+    "tuktuk_management.api.tuktuk.assign_test_driver",
+    "tuktuk_management.api.tuktuk.get_system_status",
+    "tuktuk_management.api.tuktuk.check_daraja_connection",
+    # "tuktuk_management.api.tuktuk.create_simple_test_driver",
+    # From telematics.py
+    "tuktuk_management.api.telematics.telematics_webhook",
     "tuktuk_management.api.telematics.update_from_device",
     "tuktuk_management.api.telematics.update_location",
     "tuktuk_management.api.telematics.update_battery",
     "tuktuk_management.api.telematics.get_status"
 ]
 
-# Override whitelisted methods to ensure core Frappe functions work
-# override_whitelisted_methods = {
-#     "frappe.desk.form.save.savedocs": "frappe.desk.form.save.savedocs",
-#     "frappe.desk.form.load.getdoctype": "frappe.desk.form.load.getdoctype",
-#     "frappe.desk.form.load.getdoc": "frappe.desk.form.load.getdoc",
-#     "frappe.desk.form.utils.validate_link": "frappe.desk.form.utils.validate_link",
-#     "frappe.desk.search.search_link": "frappe.desk.search.search_link",
-#     "frappe.desk.reportview.get": "frappe.desk.reportview.get",
-#     "frappe.client.get": "frappe.client.get",
-#     "frappe.client.get_list": "frappe.client.get_list",
-#     "frappe.client.save": "frappe.client.save",
-#     "frappe.client.submit": "frappe.client.submit",
-#     "frappe.client.cancel": "frappe.client.cancel",
-#     "frappe.client.delete": "frappe.client.delete"
-# }
 
 # Document Events
 doc_events = {
@@ -77,13 +77,16 @@ scheduler_events = {
         "0 6 * * *": [
             "tuktuk_management.api.tuktuk.start_operating_hours"
         ],
-        # Update vehicle statuses every 5 minutes
+        # Update vehicle statuses every 5 minutes (now this method exists!)
         "*/5 * * * *": [
             "tuktuk_management.api.telematics.update_all_vehicle_statuses"
         ]
     },
     "hourly": [
         "tuktuk_management.api.tuktuk.check_battery_levels"
+    ],
+    "daily": [
+        "tuktuk_management.api.tuktuk.generate_daily_reports"
     ]
 }
 
