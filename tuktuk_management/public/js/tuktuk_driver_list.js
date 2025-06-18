@@ -9,3 +9,16 @@ frappe.listview_settings['TukTuk Driver'] = {
         });
     }
 };
+
+frappe.listview_settings['TukTuk Driver'] = {
+    add_fields: ["assigned_tuktuk", "current_balance", "consecutive_misses"],
+    get_indicator: function(doc) {
+        if (doc.consecutive_misses >= 2) {
+            return [__("Critical"), "red", "consecutive_misses,>=,2"];
+        } else if (doc.assigned_tuktuk) {
+            return [__("Assigned"), "green", "assigned_tuktuk,!=,"];
+        } else {
+            return [__("Unassigned"), "grey", "assigned_tuktuk,=,"];
+        }
+    }
+};

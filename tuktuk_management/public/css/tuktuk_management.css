@@ -1,0 +1,29 @@
+/* Override ERPNext navbar logo size - change from 28px to 46px */
+.navbar-home img {
+    max-height: 46px !important;
+    width: auto;
+}
+
+.page-card-head img {
+    max-height: 102px !important;
+}
+
+/* Keep all sidebar nested menu items always visible */
+.sidebar-child-item.nested-container.hidden {
+    display: block !important;
+}
+
+/* Alternative approach - force all nested containers to be visible */
+.sidebar-child-item.nested-container {
+    display: block !important;
+}
+
+/* Optional: Remove the expand/collapse arrow if you want */
+.sidebar-item .collapsible-icon {
+    display: none !important;
+}
+
+/* Optional: Adjust indentation for always-visible nested items */
+.sidebar-child-item.nested-container .sidebar-item {
+    padding-left: 30px;
+}

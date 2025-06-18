@@ -295,3 +295,49 @@ $(document).ready(function() {
 
 // Expose global functions for use in other scripts
 frappe.tuktuk_management = tuktuk_management;
+
+// Add this to tuktuk_management.js or create a new JS file
+
+$(document).ready(function() {
+    // Function to expand all sidebar menus
+    function expandAllSidebarMenus() {
+        // Remove hidden class from all nested containers
+        $('.sidebar-child-item.nested-container.hidden').removeClass('hidden');
+        
+        // Optional: Add expanded class to parent items
+        $('.sidebar-item.has-child').addClass('opened');
+    }
+    
+    // Run on page load
+    expandAllSidebarMenus();
+    
+    // Re-run when sidebar is updated (for dynamic content)
+    const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            if (mutation.type === 'childList' || mutation.type === 'attributes') {
+                expandAllSidebarMenus();
+            }
+        });
+    });
+    
+    // Watch for changes in the sidebar
+    const sidebar = document.querySelector('.desk-sidebar');
+    if (sidebar) {
+        observer.observe(sidebar, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['class']
+        });
+    }
+    
+    // Prevent collapse on click (optional)
+    $(document).on('click', '.sidebar-item.has-child', function(e) {
+        e.preventDefault();
+        // Allow navigation but prevent collapse
+        const link = $(this).find('a').first();
+        if (link.length && link.attr('href') && link.attr('href') !== '#') {
+            window.location.href = link.attr('href');
+        }
+    });
+});
