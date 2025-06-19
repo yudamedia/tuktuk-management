@@ -46,14 +46,26 @@ whitelisted_methods = [
     "tuktuk_management.api.telematics.update_from_device",
     "tuktuk_management.api.telematics.update_location",
     "tuktuk_management.api.telematics.update_battery",
-    "tuktuk_management.api.telematics.get_status"
+    "tuktuk_management.api.telematics.get_status",
+
+    # deposit management methods
+    "tuktuk_management.tuktuk_management.doctype.tuktuk_driver.tuktuk_driver.process_deposit_top_up",
+    "tuktuk_management.tuktuk_management.doctype.tuktuk_driver.tuktuk_driver.process_damage_deduction", 
+    "tuktuk_management.tuktuk_management.doctype.tuktuk_driver.tuktuk_driver.process_target_miss_deduction",
+    "tuktuk_management.tuktuk_management.doctype.tuktuk_driver.tuktuk_driver.process_driver_exit",
+    "tuktuk_management.tuktuk_management.doctype.tuktuk_driver.tuktuk_driver.get_deposit_summary",
+    "tuktuk_management.api.tuktuk.get_drivers_with_deposit_info",
+    "tuktuk_management.api.tuktuk.bulk_process_target_deductions",
+    "tuktuk_management.api.tuktuk.generate_deposit_report",
+    "tuktuk_management.api.tuktuk.process_bulk_refunds"
+
 ]
 
 
 # Document Events
 doc_events = {
     "TukTuk Transaction": {
-        "after_insert": "tuktuk_management.api.tuktuk.handle_mpesa_payment"
+        "after_insert": "tuktuk_management.api.tuktuk.handle_mpesa_payment_with_deposit"
     },
     "TukTuk Driver": {
         "validate": "tuktuk_management.api.tuktuk.validate_driver",
@@ -70,7 +82,7 @@ scheduler_events = {
     "cron": {
         # Reset daily targets at midnight
         "0 0 * * *": [
-            "tuktuk_management.api.tuktuk.reset_daily_targets",
+            "tuktuk_management.api.tuktuk.reset_daily_targets_with_deposit",
             "tuktuk_management.api.tuktuk.end_operating_hours"
         ],
         # Check for operating hours at 6 AM

@@ -11,7 +11,11 @@ frappe.ui.form.on('TukTuk Driver', {
         if (!frm.doc.__islocal) {
             setup_custom_buttons(frm);
             setup_indicators(frm);
+            setup_deposit_indicators(frm);
         }
+        
+        // Handle deposit field dependencies
+        handle_deposit_dependencies(frm);
     },
     
     driver_first_name: function(frm) {
@@ -64,6 +68,22 @@ frappe.ui.form.on('TukTuk Driver', {
         if (!frm.doc.__islocal) {
             setup_indicators(frm);
         }
+    },
+    
+    deposit_required: function(frm) {
+        handle_deposit_dependencies(frm);
+    },
+    
+    initial_deposit_amount: function(frm) {
+        if (!frm.doc.__islocal) {
+            setup_deposit_indicators(frm);
+        }
+    },
+    
+    current_deposit_balance: function(frm) {
+        if (!frm.doc.__islocal) {
+            setup_deposit_indicators(frm);
+        }
     }
 });
 
@@ -78,6 +98,12 @@ function set_driver_name(frm) {
     if (fullName && fullName !== frm.doc.driver_name) {
         frm.set_value('driver_name', fullName);
     }
+}
+
+function handle_deposit_dependencies(frm) {
+    // Show/hide deposit fields based on deposit_required
+    frm.toggle_display(['initial_deposit_amount', 'allow_target_deduction_from_deposit'], 
+                      frm.doc.deposit_required);
 }
 
 function setup_custom_buttons(frm) {
@@ -123,6 +149,35 @@ function setup_custom_buttons(frm) {
         frm.add_custom_button(__('Check TukTuk Status'), function() {
             check_tuktuk_status(frm);
         }, __('Actions'));
+    }
+    
+    // Deposit management buttons
+    if (frm.doc.deposit_required && !frm.doc.exit_date) {
+        frm.add_custom_button(__('Top Up Deposit'), function() {
+            process_deposit_top_up(frm);
+        }, __('Deposit'));
+        
+        frm.add_custom_button(__('View Deposit Summary'), function() {
+            show_deposit_summary(frm);
+        }, __('Deposit'));
+        
+        // Admin buttons
+        if (frappe.user.has_role(['System Manager', 'Tuktuk Manager'])) {
+            frm.add_custom_button(__('Damage Deduction'), function() {
+                process_damage_deduction(frm);
+            }, __('Deposit'));
+            
+            frm.add_custom_button(__('Target Miss Deduction'), function() {
+                process_target_miss_deduction(frm);
+            }, __('Deposit'));
+        }
+    }
+    
+    // Exit processing button (Admin only)
+    if (frappe.user.has_role(['System Manager', 'Tuktuk Manager']) && !frm.doc.exit_date) {
+        frm.add_custom_button(__('Process Driver Exit'), function() {
+            process_driver_exit(frm);
+        }, __('Admin'));
     }
     
     // Reset target balance button (for managers)
@@ -176,6 +231,28 @@ function setup_indicators(frm) {
         frm.dashboard.add_indicator(__('Assigned to TukTuk'), 'blue');
     } else {
         frm.dashboard.add_indicator(__('No TukTuk Assigned'), 'grey');
+    }
+}
+
+function setup_deposit_indicators(frm) {
+    if (!frm.doc.deposit_required) return;
+    
+    // Add deposit balance indicator
+    const deposit_balance = frm.doc.current_deposit_balance || 0;
+    let deposit_color = 'green';
+    
+    if (deposit_balance <= 0) {
+        deposit_color = 'red';
+    } else if (deposit_balance < (frm.doc.initial_deposit_amount * 0.5)) {
+        deposit_color = 'orange';
+    }
+    
+    frm.dashboard.add_indicator(__('Deposit Balance: {0} KSH', [deposit_balance]), deposit_color);
+    
+    // Add exit status if applicable
+    if (frm.doc.exit_date) {
+        const refund_color = frm.doc.refund_status === 'Completed' ? 'green' : 'orange';
+        frm.dashboard.add_indicator(__('Exit Status: {0}', [frm.doc.refund_status]), refund_color);
     }
 }
 
@@ -270,6 +347,180 @@ function check_tuktuk_status(frm) {
             }
         });
     }
+}
+
+// Deposit Management Functions
+
+function process_deposit_top_up(frm) {
+    frappe.prompt([
+        {
+            label: 'Top Up Amount (KSH)',
+            fieldname: 'amount',
+            fieldtype: 'Currency',
+            reqd: 1
+        },
+        {
+            label: 'Payment Reference (Mpesa Code)',
+            fieldname: 'reference',
+            fieldtype: 'Data'
+        },
+        {
+            label: 'Notes',
+            fieldname: 'description',
+            fieldtype: 'Small Text'
+        }
+    ], function(values) {
+        frappe.call({
+            method: 'tuktuk_management.tuktuk_management.doctype.tuktuk_driver.tuktuk_driver.process_deposit_top_up',
+            args: {
+                driver_name: frm.doc.name,
+                amount: values.amount,
+                reference: values.reference || '',
+                description: values.description || ''
+            },
+            callback: function(r) {
+                if (r.message && r.message.success) {
+                    frm.reload_doc();
+                    frappe.msgprint(__('Deposit top-up processed successfully. New balance: {0} KSH', [r.message.new_balance]));
+                }
+            }
+        });
+    }, __('Process Deposit Top-Up'), __('Process'));
+}
+
+function process_damage_deduction(frm) {
+    frappe.prompt([
+        {
+            label: 'Damage Amount (KSH)',
+            fieldname: 'amount',
+            fieldtype: 'Currency',
+            reqd: 1
+        },
+        {
+            label: 'Damage Description',
+            fieldname: 'description',
+            fieldtype: 'Small Text',
+            reqd: 1
+        },
+        {
+            label: 'Reference (Report #, Photos, etc.)',
+            fieldname: 'reference',
+            fieldtype: 'Data'
+        }
+    ], function(values) {
+        frappe.call({
+            method: 'tuktuk_management.tuktuk_management.doctype.tuktuk_driver.tuktuk_driver.process_damage_deduction',
+            args: {
+                driver_name: frm.doc.name,
+                amount: values.amount,
+                description: values.description,
+                reference: values.reference || ''
+            },
+            callback: function(r) {
+                if (r.message && r.message.success) {
+                    frm.reload_doc();
+                    frappe.msgprint(__('Damage deduction processed. New balance: {0} KSH', [r.message.new_balance]));
+                }
+            }
+        });
+    }, __('Process Damage Deduction'), __('Process'));
+}
+
+function process_target_miss_deduction(frm) {
+    if (!frm.doc.allow_target_deduction_from_deposit) {
+        frappe.msgprint(__('Driver has not allowed target deductions from deposit'));
+        return;
+    }
+    
+    frappe.prompt([
+        {
+            label: 'Missed Target Amount (KSH)',
+            fieldname: 'missed_amount',
+            fieldtype: 'Currency',
+            reqd: 1
+        }
+    ], function(values) {
+        frappe.call({
+            method: 'tuktuk_management.tuktuk_management.doctype.tuktuk_driver.tuktuk_driver.process_target_miss_deduction',
+            args: {
+                driver_name: frm.doc.name,
+                missed_amount: values.missed_amount
+            },
+            callback: function(r) {
+                if (r.message && r.message.success) {
+                    frm.reload_doc();
+                    frappe.msgprint(__('Target miss deduction processed. New balance: {0} KSH', [r.message.new_balance]));
+                } else {
+                    frappe.msgprint(__('Target miss deduction could not be processed'));
+                }
+            }
+        });
+    }, __('Process Target Miss Deduction'), __('Process'));
+}
+
+function process_driver_exit(frm) {
+    frappe.prompt([
+        {
+            label: 'Exit Date',
+            fieldname: 'exit_date',
+            fieldtype: 'Date',
+            default: frappe.datetime.get_today(),
+            reqd: 1
+        }
+    ], function(values) {
+        frappe.confirm(
+            __('Are you sure you want to process driver exit? This will calculate refund and unassign the TukTuk.'),
+            function() {
+                frappe.call({
+                    method: 'tuktuk_management.tuktuk_management.doctype.tuktuk_driver.tuktuk_driver.process_driver_exit',
+                    args: {
+                        driver_name: frm.doc.name,
+                        exit_date: values.exit_date
+                    },
+                    callback: function(r) {
+                        if (r.message && r.message.success) {
+                            frm.reload_doc();
+                            frappe.msgprint(__('Driver exit processed. Refund amount: {0} KSH', [r.message.refund_amount]));
+                        }
+                    }
+                });
+            }
+        );
+    }, __('Process Driver Exit'), __('Process'));
+}
+
+function show_deposit_summary(frm) {
+    frappe.call({
+        method: 'tuktuk_management.tuktuk_management.doctype.tuktuk_driver.tuktuk_driver.get_deposit_summary',
+        args: {
+            driver_name: frm.doc.name
+        },
+        callback: function(r) {
+            if (r.message) {
+                const summary = r.message;
+                const message = `
+                    <h4>Deposit Summary for ${summary.driver_name}</h4>
+                    <table class="table table-bordered">
+                        <tr><td><strong>Initial Deposit:</strong></td><td>${summary.initial_deposit} KSH</td></tr>
+                        <tr><td><strong>Current Balance:</strong></td><td>${summary.current_balance} KSH</td></tr>
+                        <tr><td><strong>Total Deposits:</strong></td><td>${summary.total_deposits} KSH</td></tr>
+                        <tr><td><strong>Total Deductions:</strong></td><td>${summary.total_deductions} KSH</td></tr>
+                        <tr><td><strong>Target Deduction Allowed:</strong></td><td>${summary.allows_target_deduction ? 'Yes' : 'No'}</td></tr>
+                        <tr><td><strong>Total Transactions:</strong></td><td>${summary.transaction_count}</td></tr>
+                        ${summary.exit_date ? `<tr><td><strong>Exit Date:</strong></td><td>${summary.exit_date}</td></tr>` : ''}
+                        ${summary.refund_amount ? `<tr><td><strong>Refund Amount:</strong></td><td>${summary.refund_amount} KSH</td></tr>` : ''}
+                        ${summary.refund_status ? `<tr><td><strong>Refund Status:</strong></td><td>${summary.refund_status}</td></tr>` : ''}
+                    </table>
+                `;
+                
+                frappe.msgprint({
+                    title: __('Deposit Summary'),
+                    message: message,
+                    indicator: 'blue'
+                });
+            }
+        }
+    });
 }
 
 function reset_target_balance(frm) {
