@@ -1195,3 +1195,369 @@ def check_daraja_connection():
     except Exception as e:
         frappe.msgprint(f"❌ Daraja connection error: {str(e)}")
         return False
+
+# Enhanced section for deposit management integration
+
+def handle_mpesa_payment_with_deposit(doc, method):
+    """Enhanced handle incoming Mpesa payments with deposit integration"""
+    if not doc.tuktuk:
+        frappe.throw("No TukTuk specified for payment")
+        
+    if not doc.amount or doc.amount <= 0:
+        frappe.throw("Invalid payment amount")
+        
+    if not is_within_operating_hours():
+        doc.payment_status = "Failed"
+        doc.add_comment('Comment', 'Payment rejected: Outside operating hours')
+        doc.save()
+        return
+        
+    settings = frappe.get_single("TukTuk Settings")
+    
+    try:
+        driver = frappe.get_all(
+            "TukTuk Driver",
+            filters={"assigned_tuktuk": doc.tuktuk},
+            fields=["driver_national_id", "mpesa_number", "current_balance",
+                   "daily_target", "fare_percentage", "allow_target_deduction_from_deposit",
+                   "current_deposit_balance"],
+            limit=1
+        )
+        
+        if not driver:
+            doc.payment_status = "Failed"
+            doc.add_comment('Comment', 'Payment failed: No driver assigned to TukTuk')
+            doc.save()
+            return
+            
+        driver_doc = frappe.get_doc("TukTuk Driver", {
+            "driver_national_id": driver[0].driver_national_id
+        })
+        
+        amount = doc.amount
+        percentage = driver_doc.fare_percentage or settings.global_fare_percentage
+        target = driver_doc.daily_target or settings.global_daily_target
+        
+        # Calculate shares based on target status
+        if driver_doc.current_balance >= target:
+            doc.driver_share = amount
+            doc.target_contribution = 0
+        else:
+            doc.driver_share = amount * (percentage / 100)
+            doc.target_contribution = amount - doc.driver_share
+            
+        # Process driver payment using enhanced Daraja integration
+        if send_mpesa_payment(driver_doc.mpesa_number, doc.driver_share):
+            if doc.target_contribution:
+                driver_doc.current_balance += doc.target_contribution
+            
+            doc.payment_status = "Completed"
+            doc.save()
+            driver_doc.save()
+            
+            # Check battery level after successful transaction
+            tuktuk = frappe.get_doc("TukTuk Vehicle", doc.tuktuk)
+            check_battery_level(tuktuk)
+        else:
+            doc.payment_status = "Failed"
+            doc.add_comment('Comment', 'Driver payment failed')
+            doc.save()
+            
+    except Exception as e:
+        frappe.log_error(f"Payment Processing Failed: {str(e)}")
+        doc.payment_status = "Failed"
+        doc.add_comment('Comment', f'Payment processing error: {str(e)}')
+        doc.save()
+
+def reset_daily_targets_with_deposit():
+    """Enhanced reset daily targets with deposit deduction option"""
+    settings = frappe.get_single("TukTuk Settings")
+    
+    if not is_within_operating_hours():
+        return
+        
+    drivers = frappe.get_all("TukTuk Driver", 
+                            filters={"assigned_tuktuk": ["!=", ""]},
+                            fields=["driver_national_id", "current_balance", "consecutive_misses",
+                                   "allow_target_deduction_from_deposit", "current_deposit_balance"])
+    
+    for driver in drivers:
+        try:
+            driver_doc = frappe.get_doc("TukTuk Driver", {
+                "driver_national_id": driver.driver_national_id
+            })
+            target = driver_doc.daily_target or settings.global_daily_target
+            
+            # Handle target miss
+            if driver_doc.current_balance < target:
+                shortfall = target - driver_doc.current_balance
+                driver_doc.consecutive_misses += 1
+                
+                # Check if driver allows deposit deduction for missed targets
+                if (driver_doc.allow_target_deduction_from_deposit and 
+                    driver_doc.current_deposit_balance >= shortfall):
+                    
+                    # Offer to deduct from deposit
+                    try:
+                        # In a real implementation, you might want to send SMS/email to driver
+                        # asking for confirmation before deducting from deposit
+                        
+                        # For now, we'll log this option and let management handle it
+                        frappe.log_error(
+                            f"Driver {driver_doc.driver_name} missed target by {shortfall} KSH. "
+                            f"Deposit balance: {driver_doc.current_deposit_balance} KSH. "
+                            f"Driver allows automatic deduction: {driver_doc.allow_target_deduction_from_deposit}",
+                            "Target Miss - Deposit Deduction Available"
+                        )
+                        
+                        # Create a notification for management
+                        create_target_miss_notification(driver_doc, shortfall)
+                        
+                    except Exception as e:
+                        frappe.log_error(f"Error processing deposit deduction option: {str(e)}")
+                
+                if driver_doc.consecutive_misses >= 3:
+                    terminate_driver_with_deposit_refund(driver_doc)
+                else:
+                    # Roll over unmet balance
+                    driver_doc.current_balance = -shortfall  # Negative balance indicates debt
+            else:
+                driver_doc.consecutive_misses = 0
+                # Pay bonus if enabled and criteria met
+                if settings.bonus_enabled and settings.bonus_amount:
+                    if send_mpesa_payment(driver_doc.mpesa_number, settings.bonus_amount, "BONUS"):
+                        frappe.msgprint(f"Bonus payment sent to driver {driver_doc.driver_name}")
+                driver_doc.current_balance = 0
+                
+            driver_doc.save()
+        except Exception as e:
+            frappe.log_error(f"Failed to reset targets for driver {driver.driver_national_id}: {str(e)}")
+
+def terminate_driver_with_deposit_refund(driver):
+    """Enhanced terminate driver and process deposit refund"""
+    try:
+        if driver.assigned_tuktuk:
+            tuktuk = frappe.get_doc("TukTuk Vehicle", driver.assigned_tuktuk)
+            tuktuk.status = "Available"
+            tuktuk.save()
+        
+        # Process exit and refund
+        driver.process_exit_refund()
+        
+        # Notify management
+        frappe.sendmail(
+            recipients=["manager@sunnytuktuk.com"],
+            subject=f"Driver Termination: {driver.driver_name}",
+            message=f"""
+            Driver {driver.driver_name} has been terminated due to consecutive target misses.
+            
+            Deposit Refund Details:
+            - Original Deposit: {driver.initial_deposit_amount} KSH
+            - Final Balance: {driver.current_deposit_balance} KSH
+            - Refund Amount: {driver.refund_amount} KSH
+            - Refund Status: {driver.refund_status}
+            
+            Please process the refund payment to the driver's registered Mpesa number.
+            """
+        )
+    except Exception as e:
+        frappe.log_error(f"Driver termination failed: {str(e)}")
+        frappe.throw("Failed to process driver termination")
+
+def create_target_miss_notification(driver, shortfall):
+    """Create notification for management about target miss with deposit deduction option"""
+    try:
+        notification = frappe.get_doc({
+            "doctype": "Notification Log",
+            "subject": f"Target Miss - Deposit Deduction Available: {driver.driver_name}",
+            "email_content": f"""
+            Driver {driver.driver_name} missed their daily target by {shortfall} KSH.
+            
+            Details:
+            - Shortfall: {shortfall} KSH
+            - Current Deposit Balance: {driver.current_deposit_balance} KSH
+            - Driver allows deposit deduction: {'Yes' if driver.allow_target_deduction_from_deposit else 'No'}
+            - Consecutive misses: {driver.consecutive_misses}
+            
+            {'You can deduct this amount from the driver"s deposit if needed.' if driver.allow_target_deduction_from_deposit else 'Driver has not allowed automatic deposit deductions.'}
+            """,
+            "document_type": "TukTuk Driver",
+            "document_name": driver.name,
+            "for_user": "Administrator"
+        })
+        notification.insert(ignore_permissions=True)
+    except Exception as e:
+        frappe.log_error(f"Failed to create target miss notification: {str(e)}")
+
+# Enhanced API methods for deposit management
+@frappe.whitelist()
+def get_drivers_with_deposit_info():
+    """Get all drivers with their deposit information"""
+    drivers = frappe.db.sql("""
+        SELECT 
+            name,
+            driver_name,
+            driver_national_id,
+            assigned_tuktuk,
+            deposit_required,
+            initial_deposit_amount,
+            current_deposit_balance,
+            allow_target_deduction_from_deposit,
+            current_balance,
+            consecutive_misses,
+            exit_date,
+            refund_status,
+            refund_amount
+        FROM `tabTukTuk Driver`
+        ORDER BY driver_name
+    """, as_dict=True)
+    
+    return drivers
+
+@frappe.whitelist()
+def bulk_process_target_deductions():
+    """Bulk process target deductions for all eligible drivers"""
+    settings = frappe.get_single("TukTuk Settings")
+    
+    drivers = frappe.get_all("TukTuk Driver", 
+                            filters={
+                                "allow_target_deduction_from_deposit": 1,
+                                "current_balance": ["<", 0],  # Drivers with negative balance (debt)
+                                "current_deposit_balance": [">", 0],  # Drivers with deposit available
+                                "exit_date": ["is", "not set"]  # Active drivers only
+                            },
+                            fields=["name", "driver_name", "current_balance", "current_deposit_balance"])
+    
+    processed_drivers = []
+    
+    for driver_info in drivers:
+        try:
+            driver = frappe.get_doc("TukTuk Driver", driver_info.name)
+            debt_amount = abs(driver.current_balance)  # Convert negative to positive
+            
+            if driver.current_deposit_balance >= debt_amount:
+                # Process the deduction
+                success = driver.process_target_miss_deduction(debt_amount)
+                if success:
+                    processed_drivers.append({
+                        "driver": driver.driver_name,
+                        "amount_deducted": debt_amount,
+                        "new_deposit_balance": driver.current_deposit_balance
+                    })
+        except Exception as e:
+            frappe.log_error(f"Error processing bulk deduction for {driver_info.driver_name}: {str(e)}")
+    
+    return {
+        "success": True,
+        "processed_count": len(processed_drivers),
+        "processed_drivers": processed_drivers
+    }
+
+@frappe.whitelist()
+def generate_deposit_report(from_date=None, to_date=None):
+    """Generate comprehensive deposit management report"""
+    if not from_date:
+        from_date = frappe.utils.add_days(frappe.utils.today(), -30)
+    if not to_date:
+        to_date = frappe.utils.today()
+    
+    # Get all deposit transactions in date range
+    transactions = frappe.db.sql("""
+        SELECT 
+            dt.transaction_date,
+            dt.transaction_type,
+            dt.amount,
+            dt.balance_after_transaction,
+            dt.description,
+            dt.transaction_reference,
+            d.driver_name,
+            d.driver_national_id
+        FROM `tabDriver Deposit Transaction` dt
+        JOIN `tabTukTuk Driver` d ON dt.parent = d.name
+        WHERE dt.transaction_date BETWEEN %s AND %s
+        ORDER BY dt.transaction_date DESC, d.driver_name
+    """, (from_date, to_date), as_dict=True)
+    
+    # Summary statistics
+    summary = frappe.db.sql("""
+        SELECT 
+            COUNT(DISTINCT d.name) as total_drivers_with_deposits,
+            SUM(CASE WHEN d.deposit_required = 1 THEN d.initial_deposit_amount ELSE 0 END) as total_initial_deposits,
+            SUM(CASE WHEN d.deposit_required = 1 THEN d.current_deposit_balance ELSE 0 END) as total_current_deposits,
+            COUNT(CASE WHEN d.exit_date IS NOT NULL AND d.refund_status = 'Pending' THEN 1 END) as pending_refunds,
+            SUM(CASE WHEN d.exit_date IS NOT NULL AND d.refund_status = 'Pending' THEN d.refund_amount ELSE 0 END) as total_pending_refund_amount
+        FROM `tabTukTuk Driver` d
+        WHERE d.deposit_required = 1
+    """, as_dict=True)[0]
+    
+    return {
+        "from_date": from_date,
+        "to_date": to_date,
+        "transactions": transactions,
+        "summary": summary,
+        "transaction_count": len(transactions)
+    }
+
+@frappe.whitelist()
+def process_bulk_refunds():
+    """Process all pending refunds for exited drivers"""
+    pending_refunds = frappe.get_all("TukTuk Driver",
+                                   filters={
+                                       "exit_date": ["is", "set"],
+                                       "refund_status": "Pending",
+                                       "refund_amount": [">", 0]
+                                   },
+                                   fields=["name", "driver_name", "refund_amount", "mpesa_number"])
+    
+    processed_refunds = []
+    failed_refunds = []
+    
+    for refund_info in pending_refunds:
+        try:
+            # In a real implementation, you would integrate with Mpesa B2C API
+            # For now, we'll just update the status
+            driver = frappe.get_doc("TukTuk Driver", refund_info.name)
+            
+            # Simulate refund processing
+            refund_success = send_mpesa_payment(
+                driver.mpesa_number, 
+                driver.refund_amount, 
+                "DEPOSIT_REFUND"
+            )
+            
+            if refund_success:
+                driver.refund_status = "Completed"
+                driver.add_deposit_transaction(
+                    transaction_type="Refund",
+                    amount=-driver.refund_amount,
+                    description="Final deposit refund processed",
+                    reference="AUTO_REFUND"
+                )
+                driver.save()
+                
+                processed_refunds.append({
+                    "driver": driver.driver_name,
+                    "amount": driver.refund_amount,
+                    "status": "Completed"
+                })
+            else:
+                failed_refunds.append({
+                    "driver": driver.driver_name,
+                    "amount": driver.refund_amount,
+                    "error": "Mpesa payment failed"
+                })
+                
+        except Exception as e:
+            failed_refunds.append({
+                "driver": refund_info.driver_name,
+                "amount": refund_info.refund_amount,
+                "error": str(e)
+            })
+    
+    return {
+        "success": True,
+        "processed_count": len(processed_refunds),
+        "failed_count": len(failed_refunds),
+        "processed_refunds": processed_refunds,
+        "failed_refunds": failed_refunds
+    }        
