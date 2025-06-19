@@ -1,0 +1,69 @@
+{
+    "add_total_row": 1,
+    "columns": [],
+    "creation": "2024-12-15 12:00:00.000000",
+    "disabled": 0,
+    "docstatus": 0,
+    "doctype": "Report",
+    "filters": [
+     {
+      "fieldname": "driver",
+      "fieldtype": "Link",
+      "label": "Driver",
+      "mandatory": 0,
+      "options": "TukTuk Driver",
+      "wildcard_filter": 0
+     },
+     {
+      "fieldname": "deposit_status",
+      "fieldtype": "Select",
+      "label": "Deposit Status",
+      "mandatory": 0,
+      "options": "\nRequired\nNot Required",
+      "wildcard_filter": 0
+     },
+     {
+      "fieldname": "exit_status",
+      "fieldtype": "Select", 
+      "label": "Driver Status",
+      "mandatory": 0,
+      "options": "\nActive\nExited",
+      "wildcard_filter": 0
+     },
+     {
+      "fieldname": "refund_status",
+      "fieldtype": "Select",
+      "label": "Refund Status", 
+      "mandatory": 0,
+      "options": "\nPending\nProcessed\nCompleted\nCancelled",
+      "wildcard_filter": 0
+     },
+     {
+      "fieldname": "allows_target_deduction",
+      "fieldtype": "Select",
+      "label": "Allows Target Deduction",
+      "mandatory": 0,
+      "options": "\nYes\nNo",
+      "wildcard_filter": 0
+     }
+    ],
+    "idx": 0,
+    "is_standard": "Yes",
+    "modified": "2024-12-15 12:00:00.000000",
+    "modified_by": "Administrator",
+    "module": "Tuktuk Management",
+    "name": "Deposit Management Report",
+    "owner": "Administrator",
+    "prepared_report": 0,
+    "ref_doctype": "TukTuk Driver",
+    "report_name": "Deposit Management Report",
+    "report_type": "Script Report",
+    "roles": [
+     {
+      "role": "System Manager"
+     },
+     {
+      "role": "Tuktuk Manager"
+     }
+    ]
+   }

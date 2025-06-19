@@ -150,6 +150,14 @@ fixtures = [
 reports = [
     {
         "doctype": "Report",
+        "is_standard": "Yes", 
+        "name": "Deposit Management Report",
+        "report_name": "Deposit Management Report",
+        "report_type": "Script Report",
+        "ref_doctype": "TukTuk Driver"
+    },
+    {
+        "doctype": "Report",
         "is_standard": "Yes",
         "name": "Driver Performance Report",
         "report_name": "Driver Performance Report",
