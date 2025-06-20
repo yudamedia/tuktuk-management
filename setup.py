@@ -2,12 +2,29 @@ from setuptools import setup, find_packages
 
 setup(
     name='tuktuk_management',
-    version='0.0.1',
-    description='Sunny Tuktuk Management System',
+    version='0.1.2',
+    description='Sunny Tuktuk Management System - A comprehensive ERPNext 15 application for managing electric tuktuks, drivers, payments, and operations in Diani Beach, Kenya.',
+    long_description=open('README.md').read(),
+    long_description_content_type='text/markdown',
     author='Yuda Media',
     author_email='yuda@graphicshop.co.ke',
+    url='https://github.com/yudamedia/tuktuk-management',
     packages=find_packages(),
     zip_safe=False,
     include_package_data=True,
-    install_requires=[]
+    install_requires=[],
+    classifiers=[
+        'Development Status :: 4 - Beta',
+        'Intended Audience :: Developers',
+        'License :: OSI Approved :: MIT License',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12',
+        'Topic :: Office/Business',
+        'Topic :: Office/Business :: Financial',
+        'Topic :: Office/Business :: Scheduling',
+    ],
+    keywords=['erpnext', 'fleet-management', 'mpesa', 'tuktuk', 'kenya', 'transportation'],
+    python_requires='>=3.10',
 )
