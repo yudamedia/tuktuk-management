@@ -1570,12 +1570,80 @@ def payment_validation(**kwargs):
     from tuktuk_management.api.tuktuk import mpesa_validation
     return mpesa_validation(**kwargs)
 
+# Update your payment_confirmation function in tuktuk_management/api/tuktuk.py
+# Replace the existing payment_confirmation function with this:
+
 @frappe.whitelist(allow_guest=True)
 def payment_confirmation(**kwargs):
-    """Alternative confirmation endpoint without 'mpesa' in URL"""
-    # Just call the existing mpesa_confirmation function
-    from tuktuk_management.api.tuktuk import mpesa_confirmation
-    return mpesa_confirmation(**kwargs)
+    """Fixed confirmation endpoint that calculates shares before creating transaction"""
+    try:
+        # Extract transaction details
+        transaction_id = kwargs.get('TransID')
+        amount = float(kwargs.get('TransAmount', 0))
+        account_number = kwargs.get('BillRefNumber', '').strip()
+        customer_phone = kwargs.get('MSISDN')
+        trans_time = kwargs.get('TransTime')
+        first_name = kwargs.get('FirstName', '')
+        last_name = kwargs.get('LastName', '')
+        
+        # Find the tuktuk
+        tuktuk = frappe.db.get_value("TukTuk Vehicle", {"mpesa_account": account_number}, "name")
+        if not tuktuk:
+            frappe.log_error(f"TukTuk not found for account: {account_number}")
+            return {"ResultCode": "0", "ResultDesc": "Success"}
+        
+        # Find assigned driver
+        driver_name = frappe.db.get_value("TukTuk Driver", {"assigned_tuktuk": tuktuk}, "name")
+        if not driver_name:
+            frappe.log_error(f"No driver assigned to tuktuk: {tuktuk}")
+            return {"ResultCode": "0", "ResultDesc": "Success"}
+        
+        # Check if transaction already exists
+        if frappe.db.exists("TukTuk Transaction", {"transaction_id": transaction_id}):
+            frappe.log_error(f"Transaction already processed: {transaction_id}")
+            return {"ResultCode": "0", "ResultDesc": "Success"}
+        
+        # Get driver and settings for calculations
+        driver = frappe.get_doc("TukTuk Driver", driver_name)
+        settings = frappe.get_single("TukTuk Settings")
+        
+        # Calculate shares
+        percentage = driver.fare_percentage or settings.global_fare_percentage
+        target = driver.daily_target or settings.global_daily_target
+        
+        if driver.current_balance >= target:
+            driver_share = amount  # 100% to driver
+            target_contribution = 0
+        else:
+            driver_share = amount * (percentage / 100)
+            target_contribution = amount - driver_share
+        
+        # Create transaction with calculated fields
+        transaction = frappe.get_doc({
+            "doctype": "TukTuk Transaction",
+            "transaction_id": transaction_id,
+            "tuktuk": tuktuk,
+            "driver": driver_name,
+            "amount": amount,
+            "driver_share": driver_share,
+            "target_contribution": target_contribution,
+            "customer_phone": customer_phone,
+            "timestamp": now_datetime(),
+            "payment_status": "Completed"
+        })
+        
+        transaction.insert(ignore_permissions=True)
+        
+        # Update driver balance
+        driver.current_balance += target_contribution
+        driver.save()
+        
+        frappe.db.commit()
+        return {"ResultCode": "0", "ResultDesc": "Success"}
+        
+    except Exception as e:
+        frappe.log_error(f"Payment confirmation error: {str(e)}")
+        return {"ResultCode": "0", "ResultDesc": "Success"}
 
 @frappe.whitelist(allow_guest=True)
 def transaction_validation(**kwargs):
