@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='tuktuk_management',
-    version='0.1.2',
+    version='0.1.4',
     description='Sunny Tuktuk Management System - A comprehensive ERPNext 15 application for managing electric tuktuks, drivers, payments, and operations in Diani Beach, Kenya.',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',

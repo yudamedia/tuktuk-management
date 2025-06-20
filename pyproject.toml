@@ -21,7 +21,7 @@ classifiers = [
     "Topic :: Office/Business :: Financial",
     "Topic :: Office/Business :: Scheduling",
 ]
-version = "0.1.2"
+version = "0.1.4"
 dependencies = [
     # "frappe~=15.0.0" # Installed and managed by bench.
 ]
@@ -50,15 +50,15 @@ lerna-package = "tuktuk_management"
 
 # Version management
 [tool.bumpversion]
-current_version = "0.1.2"
+current_version = "0.1.4"
 parse = "(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)"
 serialize = ["{major}.{minor}.{patch}"]
 search = "version = '{current_version}'"
 replace = "version = '{new_version}'"
 
 [tool.bumpversion.file:pyproject.toml]
-search = 'version = "0.1.2"'
-replace = 'version = "0.1.2"'
+search = 'version = "0.1.4"'
+replace = 'version = "0.1.4"'
 
 [tool.bumpversion.file:setup.py]
 search = "version='0.1.1'"

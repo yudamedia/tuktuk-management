@@ -44,7 +44,7 @@ changelog:
 		echo "Error: VERSION is required. Use: make changelog VERSION=0.1.1"; \
 		exit 1; \
 	fi
-	@python scripts/generate_changelog.py --version $(VERSION)
+	@python3 scripts/generate_changelog.py --version $(VERSION)
 
 changelog-preview:
 	@echo "Previewing changelog changes..."
@@ -52,7 +52,7 @@ changelog-preview:
 		echo "Error: VERSION is required. Use: make changelog-preview VERSION=0.1.1"; \
 		exit 1; \
 	fi
-	@python scripts/generate_changelog.py --version $(VERSION) --preview
+	@python3 scripts/generate_changelog.py --version $(VERSION) --preview
 
 # Version bumping
 version-bump:
@@ -116,7 +116,7 @@ install:
 
 test:
 	@echo "Running tests..."
-	@python -m pytest tests/ -v
+	@python3 -m pytest tests/ -v
 	@echo "✅ Tests completed"
 
 clean:
@@ -146,4 +146,4 @@ status:
 # Validate conventional commits
 validate-commits:
 	@echo "Validating conventional commits..."
-	@python scripts/validate_commits.py || echo "No commit validator found" 
+	@python3 scripts/validate_commits.py || echo "No commit validator found" 
