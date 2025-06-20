@@ -1561,3 +1561,110 @@ def process_bulk_refunds():
         "processed_refunds": processed_refunds,
         "failed_refunds": failed_refunds
     }        
+
+
+@frappe.whitelist(allow_guest=True)
+def payment_validation(**kwargs):
+    """Alternative validation endpoint without 'mpesa' in URL"""
+    # Just call the existing mpesa_validation function
+    from tuktuk_management.api.tuktuk import mpesa_validation
+    return mpesa_validation(**kwargs)
+
+@frappe.whitelist(allow_guest=True)
+def payment_confirmation(**kwargs):
+    """Alternative confirmation endpoint without 'mpesa' in URL"""
+    # Just call the existing mpesa_confirmation function
+    from tuktuk_management.api.tuktuk import mpesa_confirmation
+    return mpesa_confirmation(**kwargs)
+
+@frappe.whitelist(allow_guest=True)
+def transaction_validation(**kwargs):
+    """Another alternative validation endpoint"""
+    from tuktuk_management.api.tuktuk import mpesa_validation
+    return mpesa_validation(**kwargs)
+
+@frappe.whitelist(allow_guest=True)
+def transaction_confirmation(**kwargs):
+    """Another alternative confirmation endpoint"""
+    from tuktuk_management.api.tuktuk import mpesa_confirmation
+    return mpesa_confirmation(**kwargs)
+
+# Test the new endpoints
+def test_new_endpoints():
+    import requests
+    
+    base_url = "https://console.sunnytuktuk.com"
+    
+    # Test validation endpoint
+    validation_url = f"{base_url}/api/method/tuktuk_management.api.tuktuk.payment_validation"
+    confirmation_url = f"{base_url}/api/method/tuktuk_management.api.tuktuk.payment_confirmation"
+    
+    test_data = {"TransAmount": "100", "BillRefNumber": "001", "MSISDN": "254708374149"}
+    
+    print("Testing new validation endpoint...")
+    response = requests.post(validation_url, json=test_data, timeout=10)
+    print(f"Validation: {response.status_code} - {response.text}")
+    
+    print("Testing new confirmation endpoint...")
+    test_confirmation_data = {
+        "TransID": "TEST123456",
+        "TransAmount": "100",
+        "BillRefNumber": "001", 
+        "MSISDN": "254708374149",
+        "TransTime": "20241220143022",
+        "FirstName": "Test",
+        "LastName": "Customer"
+    }
+    
+    response = requests.post(confirmation_url, json=test_confirmation_data, timeout=10)
+    print(f"Confirmation: {response.status_code} - {response.text}")
+
+# Register with new URLs
+def register_with_new_urls():
+    try:
+        from tuktuk_management.api.tuktuk import get_access_token
+        token = get_access_token()
+        
+        if not token:
+            print("❌ Access token failed")
+            return False
+        
+        print(f"✅ Access token: {token[:20]}...")
+        
+        import requests
+        
+        api_url = "https://sandbox.safaricom.co.ke/mpesa/c2b/v1/registerurl"
+        
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        }
+        
+        # Use new URLs without "mpesa" in them
+        payload = {
+            "ShortCode": "174379",
+            "ResponseType": "Completed",
+            "ConfirmationURL": "https://console.sunnytuktuk.com/api/method/tuktuk_management.api.tuktuk.payment_confirmation",
+            "ValidationURL": "https://console.sunnytuktuk.com/api/method/tuktuk_management.api.tuktuk.payment_validation"
+        }
+        
+        print(f"Attempting registration with new URLs: {payload}")
+        
+        response = requests.post(api_url, json=payload, headers=headers, timeout=30)
+        result = response.json()
+        
+        print(f"Registration response: {result}")
+        
+        if response.status_code == 200 and result.get("ResponseCode") == "0":
+            print("✅ C2B URLs registered successfully!")
+            return True
+        else:
+            print(f"❌ Registration failed: {result}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Registration error: {e}")
+        return False
+
+print("Creating alternative endpoints...")
+# The functions are now defined, let's test them    
