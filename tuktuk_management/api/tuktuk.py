@@ -285,7 +285,6 @@ def register_c2b_url():
         frappe.log_error(f"❌ C2B URL registration error: {str(e)}")
         return False
 
-@frappe.whitelist(allow_guest=True)
 def mpesa_validation(**kwargs):
     """Validate incoming M-Pesa payments"""
     try:
@@ -349,7 +348,6 @@ def mpesa_validation(**kwargs):
             "ResultDesc": "Validation failed"
         }
 
-@frappe.whitelist(allow_guest=True)
 def mpesa_confirmation(**kwargs):
     """Process confirmed M-Pesa payments"""
     try:
