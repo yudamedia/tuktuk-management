@@ -11,7 +11,7 @@ import json
 # Daraja API Configuration
 SANDBOX_BASE_URL = "https://sandbox.safaricom.co.ke"
 PRODUCTION_BASE_URL = "https://api.safaricom.co.ke"
-SANDBOX_SHORTCODE = "174379"  # Standard sandbox paybill
+SANDBOX_SHORTCODE = "600980"  # Standard sandbox paybill
 
 # ===== EXISTING FUNCTIONS (Enhanced) =====
 
