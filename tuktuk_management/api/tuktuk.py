@@ -275,15 +275,16 @@ def register_c2b_url():
         response = requests.post(api_url, json=payload, headers=headers)
         result = response.json()
         
-        if response.status_code == 200 and result.get("ResponseCode") == "0":
-            frappe.log_error(f"✅ C2B URL registration successful: {result}")
+        # Check for success - Daraja returns '00000000' for success
+        if (response.status_code == 200 and 
+            (result.get("ResponseCode") == "0" or result.get("ResponseCode") == "00000000") and
+            result.get("ResponseDescription") == "Success"):
+            frappe.msgprint(f"✅ C2B URL registration successful: {result.get('ResponseDescription')}")
             return True
         else:
-            frappe.log_error(f"❌ C2B URL registration failed: {result}")
-            return False
+            frappe.throw(f"❌ C2B URL registration failed: {result}")
     except Exception as e:
-        frappe.log_error(f"❌ C2B URL registration error: {str(e)}")
-        return False
+        frappe.throw(f"❌ C2B URL registration error: {str(e)}")
 
 def mpesa_validation(**kwargs):
     """Validate incoming M-Pesa payments"""
