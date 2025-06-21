@@ -1,4 +1,3 @@
-# ~/frappe-bench/apps/tuktuk_management/tuktuk_management/hooks.py
 app_name = "tuktuk_management"
 app_title = "Tuktuk Management"
 app_publisher = "Yuda Media"
@@ -7,14 +6,10 @@ app_email = "yuda@graphicshop.co.ke"
 app_license = "MIT"
 
 app_include_css = [
-    "/assets/tuktuk_management/css/tuktuk_management.css",
-    # "https://unpkg.com/leaflet@1.7.1/dist/leaflet.css",
-    # "https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.74.4/dist/L.Control.Locate.min.css"
+    "/assets/tuktuk_management/css/tuktuk_management.css"
 ]
 
 app_include_js = [
-    # "https://unpkg.com/leaflet@1.7.1/dist/leaflet.js",
-    # "https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.74.4/dist/L.Control.Locate.min.js",
     "/assets/tuktuk_management/js/tuktuk_management.js",
     "/assets/tuktuk_management/js/tuktuk_tracker.js"
 ]
@@ -48,6 +43,20 @@ whitelisted_methods = [
     "tuktuk_management.api.telematics.update_battery",
     "tuktuk_management.api.telematics.get_status",
 
+    # TukTuk Driver Authentication and Portal API endpoints (updated names)
+    "tuktuk_management.api.driver_auth.create_tuktuk_driver_user_account",
+    "tuktuk_management.api.driver_auth.create_all_tuktuk_driver_accounts", 
+    "tuktuk_management.api.driver_auth.reset_tuktuk_driver_password",
+    "tuktuk_management.api.driver_auth.get_tuktuk_driver_dashboard_data",
+    "tuktuk_management.api.driver_auth.get_tuktuk_driver_transaction_history",
+    "tuktuk_management.api.driver_auth.get_tuktuk_driver_rental_history",
+    "tuktuk_management.api.driver_auth.request_tuktuk_rental",
+    "tuktuk_management.api.driver_auth.start_tuktuk_rental",
+    "tuktuk_management.api.driver_auth.update_tuktuk_driver_phone",
+    "tuktuk_management.api.driver_auth.get_all_tuktuk_driver_accounts",
+    "tuktuk_management.api.driver_auth.disable_tuktuk_driver_account",
+    "tuktuk_management.api.driver_auth.enable_tuktuk_driver_account",
+
     # deposit management methods
     "tuktuk_management.tuktuk_management.doctype.tuktuk_driver.tuktuk_driver.process_deposit_top_up",
     "tuktuk_management.tuktuk_management.doctype.tuktuk_driver.tuktuk_driver.process_damage_deduction", 
@@ -58,7 +67,6 @@ whitelisted_methods = [
     "tuktuk_management.api.tuktuk.bulk_process_target_deductions",
     "tuktuk_management.api.tuktuk.generate_deposit_report",
     "tuktuk_management.api.tuktuk.process_bulk_refunds"
-
 ]
 
 
@@ -124,6 +132,9 @@ boot_session = "tuktuk_management.boot.boot_session"
 
 translate_app = True
 
+# Login hooks for automatic redirect
+on_session_creation = "tuktuk_management.api.driver_auth.on_session_creation"
+
 fixtures = [
     {
         "doctype": "Workspace",
@@ -166,10 +177,15 @@ reports = [
     }
 ]
 
-# Standard includes for web forms and pages
-standard_portal_menu_items = [
-    {"title": "Driver Dashboard", "route": "/driver-dashboard", "reference_doctype": "TukTuk Driver"}
+# Website Routes - Add the new TukTuk driver dashboard route
+website_route_rules = [
+    {"from_route": "/tuktuk-driver-dashboard", "to_route": "tuktuk_driver_dashboard"},
 ]
+
+# Portal settings for TukTuk drivers
+has_website_permission = {
+    "TukTuk Driver": "tuktuk_management.api.driver_auth.has_website_permission"
+}
 
 # Website context for portal pages
 website_context = {

@@ -1,0 +1,461 @@
+{% extends "templates/web.html" %}
+
+{% block title %}{{ _("TukTuk Driver Dashboard") }} - Sunny TukTuk{% endblock %}
+
+{% block head_include %}
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<style>
+    .tuktuk-driver-dashboard {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .dashboard-card {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .stat-card {
+        text-align: center;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 15px;
+    }
+    
+    .stat-card h3 {
+        margin: 10px 0 5px 0;
+        font-size: 1.8em;
+    }
+    
+    .stat-card p {
+        margin: 0;
+        color: #666;
+        font-size: 0.9em;
+    }
+    
+    .progress {
+        width: 100%;
+        height: 20px;
+        background-color: #f0f0f0;
+        border-radius: 10px;
+        overflow: hidden;
+        margin: 10px 0;
+    }
+    
+    .progress-bar {
+        height: 100%;
+        background-color: #28a745;
+        text-align: center;
+        line-height: 20px;
+        color: white;
+        font-size: 12px;
+        transition: width 0.3s ease;
+    }
+    
+    .tuktuk-status {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px;
+        background: #f8f9fa;
+        border-radius: 6px;
+        margin: 10px 0;
+    }
+    
+    .status-indicator {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+    }
+    
+    .status-available { background-color: #28a745; }
+    .status-assigned { background-color: #007bff; }
+    .status-charging { background-color: #ffc107; }
+    .status-maintenance { background-color: #dc3545; }
+    
+    .transaction-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+    }
+    
+    .transaction-table th,
+    .transaction-table td {
+        padding: 10px;
+        text-align: left;
+        border-bottom: 1px solid #ddd;
+    }
+    
+    .transaction-table th {
+        background-color: #f8f9fa;
+        font-weight: 600;
+    }
+    
+    .amount {
+        font-weight: 600;
+        color: #28a745;
+    }
+    
+    .btn {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-block;
+        text-align: center;
+        font-size: 14px;
+        margin: 5px;
+    }
+    
+    .btn-primary {
+        background-color: #007bff;
+        color: white;
+    }
+    
+    .btn-success {
+        background-color: #28a745;
+        color: white;
+    }
+    
+    .alert {
+        padding: 15px;
+        border-radius: 5px;
+        margin: 15px 0;
+    }
+    
+    .alert-info {
+        background-color: #d1ecf1;
+        border: 1px solid #bee5eb;
+        color: #0c5460;
+    }
+    
+    @media (max-width: 768px) {
+        .tuktuk-driver-dashboard {
+            padding: 10px;
+        }
+        
+        .row {
+            margin: 0;
+        }
+        
+        .col-md-3, .col-md-6, .col-md-12 {
+            padding: 5px;
+        }
+        
+        .transaction-table {
+            font-size: 12px;
+        }
+        
+        .transaction-table th,
+        .transaction-table td {
+            padding: 5px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block page_content %}
+{% if error %}
+    <div class="container">
+        <div class="alert alert-danger">
+            <h4>Error Loading TukTuk Driver Dashboard</h4>
+            <p>{{ error }}</p>
+            <a href="/login" class="btn btn-primary">Login Again</a>
+        </div>
+    </div>
+{% else %}
+<div class="tuktuk-driver-dashboard">
+    <!-- Header -->
+    <div class="dashboard-card">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <h1>Welcome, {{ tuktuk_driver.name }}!</h1>
+                <p style="color: #666; margin: 0;">{{ frappe.format_date(frappe.utils.today()) }}</p>
+            </div>
+            <!-- <div>
+                <a href="/app" class="btn btn-primary">Full Dashboard</a>
+                <a href="/logout" class="btn" style="background: #6c757d; color: white;">Logout</a>
+            </div> -->
+        </div>
+    </div>
+    
+    <!-- Status Cards -->
+    <div class="row">
+        <div class="col-md-3">
+            <div class="stat-card" style="background: linear-gradient(135deg, #28a745, #20c997);">
+                <p style="color: white;">Today's Earnings</p>
+                <h3 style="color: white;">KSH {{ "{:,.0f}".format(today_earnings) }}</h3>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="stat-card" style="background: linear-gradient(135deg, #007bff, #6f42c1);">
+                <p style="color: white;">Daily Target</p>
+                <h3 style="color: white;">KSH {{ "{:,.0f}".format(daily_target) }}</h3>
+                <div class="progress">
+                    <div class="progress-bar" style="width: {{ target_progress }}%">
+                        {{ "%.0f"|format(target_progress) }}%
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="stat-card" style="background: linear-gradient(135deg, {% if tuktuk_driver.current_balance >= 0 %}#28a745{% else %}#dc3545{% endif %}, #fd7e14);">
+                <p style="color: white;">Current Balance</p>
+                <h3 style="color: white;">KSH {{ "{:,.0f}".format(tuktuk_driver.current_balance) }}</h3>
+                <p style="color: white; font-size: 12px;">
+                    {% if tuktuk_driver.current_balance >= 0 %}Credit{% else %}Outstanding{% endif %}
+                </p>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="stat-card" style="background: linear-gradient(135deg, #6c757d, #495057);">
+                <p style="color: white;">Assigned TukTuk</p>
+                {% if tuktuk %}
+                    <h3 style="color: white;">{{ tuktuk.tuktuk_id }}</h3>
+                    <p style="color: white; font-size: 12px;">Battery: {{ tuktuk.battery_level }}%</p>
+                {% else %}
+                    <h3 style="color: white;">None</h3>
+                    <p style="color: white; font-size: 12px;">Not Assigned</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- TukTuk Status -->
+    {% if tuktuk %}
+    <div class="dashboard-card">
+        <h4>Your TukTuk Status</h4>
+        <div class="tuktuk-status">
+            <div class="status-indicator status-{{ tuktuk.status|lower }}"></div>
+            <div>
+                <strong>{{ tuktuk.tuktuk_id }}</strong> - {{ tuktuk.status }}
+                <br>
+                <small>Battery: {{ tuktuk.battery_level }}% | Account: {{ tuktuk.mpesa_account }}</small>
+            </div>
+        </div>
+        
+        {% if tuktuk.battery_level <= 20 %}
+        <div class="alert alert-warning">
+            <strong>⚠️ Low Battery Warning!</strong> Consider returning to charging station.
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+    
+    <!-- Active Rentals -->
+    {% if rentals %}
+    <div class="dashboard-card">
+        <h4>Active Rentals</h4>
+        {% for rental in rentals %}
+        <div class="alert alert-info">
+            <strong>🚗 Renting TukTuk:</strong> {{ rental.rented_tuktuk }}<br>
+            <strong>Started:</strong> {{ frappe.format_datetime(rental.start_time) }}<br>
+            <strong>Rental Fee:</strong> KSH {{ "{:,.0f}".format(rental.rental_fee) }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    
+    <!-- Quick Actions -->
+    <div class="dashboard-card">
+        <h4>Quick Actions</h4>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            {% if not tuktuk %}
+                <button class="btn btn-primary" onclick="requestTukTukRental()">
+                    🔄 Request TukTuk Rental
+                </button>
+            {% endif %}
+            <button class="btn btn-success" onclick="viewTransactions()">
+                📊 View All Transactions
+            </button>
+            <button class="btn" style="background: #6f42c1; color: white;" onclick="updatePhone()">
+                📱 Update Phone Number
+            </button>
+        </div>
+    </div>
+    
+    <!-- Recent Transactions -->
+    <div class="dashboard-card">
+        <h4>Recent Transactions</h4>
+        {% if transactions %}
+        <div style="overflow-x: auto;">
+            <table class="transaction-table">
+                <thead>
+                    <tr>
+                        <th>Date/Time</th>
+                        <th>Amount</th>
+                        <th>Your Share</th>
+                        <th>Target</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for transaction in transactions %}
+                    <tr>
+                        <td>{{ frappe.format_datetime(transaction.timestamp) }}</td>
+                        <td class="amount">KSH {{ "{:,.0f}".format(transaction.amount) }}</td>
+                        <td class="amount">KSH {{ "{:,.0f}".format(transaction.driver_share) }}</td>
+                        <td>KSH {{ "{:,.0f}".format(transaction.target_contribution) }}</td>
+                        <td>
+                            <span class="badge" style="
+                                padding: 3px 8px; 
+                                border-radius: 12px; 
+                                font-size: 11px;
+                                {% if transaction.payment_status == 'Completed' %}
+                                    background: #28a745; color: white;
+                                {% else %}
+                                    background: #ffc107; color: #212529;
+                                {% endif %}
+                            ">
+                                {{ transaction.payment_status }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p style="text-align: center; color: #666; margin: 20px 0;">No transactions yet today</p>
+        {% endif %}
+    </div>
+    
+    <!-- Operating Hours Info -->
+    <div class="dashboard-card">
+        <h4>Operating Information</h4>
+        <div class="row">
+            <div class="col-md-6">
+                <p><strong>Operating Hours:</strong> {{ operating_hours.start }} - {{ operating_hours.end }}</p>
+                <p><strong>Your MPesa Number:</strong> {{ tuktuk_driver.mpesa_number }}</p>
+            </div>
+            <div class="col-md-6">
+                <p><strong>Consecutive Misses:</strong> {{ tuktuk_driver.consecutive_misses }}/3</p>
+                {% if tuktuk_driver.consecutive_misses >= 2 %}
+                <div class="alert alert-warning">
+                    <strong>⚠️ Warning:</strong> You have {{ tuktuk_driver.consecutive_misses }} consecutive target misses. 
+                    Please meet your daily target to avoid termination.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript for Interactive Features -->
+<script>
+function requestTukTukRental() {
+    if(confirm('Request a TukTuk rental? This will check for available vehicles.')) {
+        frappe.call({
+            method: 'tuktuk_management.api.driver_auth.request_tuktuk_rental',
+            callback: function(r) {
+                if(r.message && r.message.available_tuktuks) {
+                    let tuktuks = r.message.available_tuktuks;
+                    if(tuktuks.length === 0) {
+                        alert('No TukTuks available for rental at the moment. Please try again later.');
+                        return;
+                    }
+                    
+                    let options = tuktuks.map(t => 
+                        `${t.tuktuk_id} (Battery: ${t.battery_level}%, Rate: KSH ${t.rental_rate_initial})`
+                    ).join('\n');
+                    
+                    let selection = prompt(`Available TukTuks:\n${options}\n\nEnter TukTuk ID to rent:`);
+                    
+                    if(selection) {
+                        let selectedTuktuk = tuktuks.find(t => t.tuktuk_id === selection.trim());
+                        if(selectedTuktuk) {
+                            startRental(selectedTuktuk.name);
+                        } else {
+                            alert('Invalid TukTuk ID. Please try again.');
+                        }
+                    }
+                } else {
+                    alert('Error: ' + (r.message || 'Unable to load available TukTuks'));
+                }
+            }
+        });
+    }
+}
+
+function startRental(tuktukName) {
+    frappe.call({
+        method: 'tuktuk_management.api.driver_auth.start_tuktuk_rental',
+        args: { tuktuk_name: tuktukName },
+        callback: function(r) {
+            if(r.message && r.message.rental_id) {
+                alert(`✅ Rental started successfully!\nTukTuk: ${r.message.tuktuk_id}\nFee: KSH ${r.message.rental_fee}`);
+                location.reload();
+            } else {
+                alert('Failed to start rental: ' + (r.message || 'Unknown error'));
+            }
+        }
+    });
+}
+
+function viewTransactions() {
+    // Open transaction history in a new window or redirect
+    window.open('/app/tuktuk-transaction?driver=' + encodeURIComponent('{{ tuktuk_driver.name }}'), '_blank');
+}
+
+function updatePhone() {
+    let newPhone = prompt('Enter your new phone number (format: 0712345678 or 254712345678):');
+    if(newPhone) {
+        frappe.call({
+            method: 'tuktuk_management.api.driver_auth.update_tuktuk_driver_phone',
+            args: { new_phone: newPhone },
+            callback: function(r) {
+                if(r.message) {
+                    alert('✅ Phone number updated successfully!');
+                    location.reload();
+                } else {
+                    alert('Failed to update phone number. Please check the format.');
+                }
+            }
+        });
+    }
+}
+
+// Auto-refresh every 2 minutes
+setInterval(function() {
+    location.reload();
+}, 120000);
+
+// Include frappe's call method if not available
+if(typeof frappe === 'undefined') {
+    var frappe = {
+        call: function(opts) {
+            fetch('/api/method/' + opts.method, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Frappe-CSRF-Token': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify(opts.args || {})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if(opts.callback) {
+                    opts.callback({message: data.message});
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                if(opts.callback) {
+                    opts.callback({message: null});
+                }
+            });
+        }
+    };
+}
+</script>
+{% endif %}
+{% endblock %}

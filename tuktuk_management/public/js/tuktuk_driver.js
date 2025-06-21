@@ -581,3 +581,290 @@ function reset_consecutive_misses(frm) {
         }
     );
 }
+
+// Add to: tuktuk_management/public/js/tuktuk_driver.js
+// This enhances the existing file with account management features
+
+// Add these functions to the existing tuktuk_driver.js file
+
+function setup_account_management_buttons(frm) {
+    // Only show for System Manager and Tuktuk Manager
+    if (frappe.user.has_role(['System Manager', 'Tuktuk Manager'])) {
+        
+        if (!frm.doc.user_account) {
+            // Driver doesn't have an account - show create button
+            frm.add_custom_button(__('Create User Account'), function() {
+                create_driver_account(frm);
+            }, __('Account Management'));
+        } else {
+            // Driver has an account - show management options
+            frm.add_custom_button(__('Reset Password'), function() {
+                reset_driver_password(frm);
+            }, __('Account Management'));
+            
+            frm.add_custom_button(__('Disable Account'), function() {
+                disable_driver_account(frm);
+            }, __('Account Management'));
+            
+            frm.add_custom_button(__('View Login Details'), function() {
+                view_login_details(frm);
+            }, __('Account Management'));
+        }
+    }
+}
+
+function create_driver_account(frm) {
+    frappe.confirm(
+        __('Create a user account for {0}? This will allow them to login and access the driver portal.', [frm.doc.driver_name]),
+        function() {
+            frappe.call({
+                method: 'tuktuk_management.api.driver_auth.create_driver_user_account',
+                args: {
+                    driver_name: frm.doc.name,
+                    email: frm.doc.driver_email,
+                    phone: frm.doc.driver_primary_phone
+                },
+                callback: function(r) {
+                    if (r.message) {
+                        frm.reload_doc();
+                        frappe.show_alert({
+                            message: __('User account created successfully! Login credentials have been prepared for SMS.'),
+                            indicator: 'green'
+                        });
+                    }
+                }
+            });
+        }
+    );
+}
+
+function reset_driver_password(frm) {
+    frappe.confirm(
+        __('Reset password for {0}? A new password will be generated and prepared for SMS delivery.', [frm.doc.driver_name]),
+        function() {
+            frappe.call({
+                method: 'tuktuk_management.api.driver_auth.reset_driver_password',
+                args: {
+                    driver_name: frm.doc.name
+                },
+                callback: function(r) {
+                    if (r.message) {
+                        frappe.show_alert({
+                            message: __('Password reset successfully! New credentials prepared for SMS.'),
+                            indicator: 'green'
+                        });
+                    }
+                }
+            });
+        }
+    );
+}
+
+function disable_driver_account(frm) {
+    frappe.confirm(
+        __('Disable user account for {0}? They will not be able to login until re-enabled.', [frm.doc.driver_name]),
+        function() {
+            frappe.call({
+                method: 'tuktuk_management.api.driver_auth.disable_driver_account',
+                args: {
+                    driver_name: frm.doc.name
+                },
+                callback: function(r) {
+                    if (r.message) {
+                        frappe.show_alert({
+                            message: __('Account disabled successfully'),
+                            indicator: 'orange'
+                        });
+                    }
+                }
+            });
+        }
+    );
+}
+
+function view_login_details(frm) {
+    if (frm.doc.user_account) {
+        const message = `
+            <h4>Driver Login Information</h4>
+            <table class="table table-bordered">
+                <tr><td><strong>Driver Name:</strong></td><td>${frm.doc.driver_name}</td></tr>
+                <tr><td><strong>Login Email:</strong></td><td>${frm.doc.user_account}</td></tr>
+                <tr><td><strong>Phone Number:</strong></td><td>${frm.doc.driver_primary_phone}</td></tr>
+                <tr><td><strong>Portal URL:</strong></td><td><a href="https://sunnytuktuk.com/driver-dashboard" target="_blank">https://sunnytuktuk.com/driver-dashboard</a></td></tr>
+                <tr><td><strong>Full System URL:</strong></td><td><a href="https://sunnytuktuk.com/app" target="_blank">https://sunnytuktuk.com/app</a></td></tr>
+            </table>
+            <div class="alert alert-info">
+                <strong>Note:</strong> Password information is available in the Notification Log after account creation or reset.
+            </div>
+        `;
+        
+        frappe.msgprint({
+            title: __('Login Details'),
+            message: message,
+            indicator: 'blue'
+        });
+    }
+}
+
+// Update the main refresh function to include account management
+frappe.ui.form.on('TukTuk Driver', {
+    refresh: function(frm) {
+        // Set driver name if not set
+        if (!frm.doc.driver_name) {
+            set_driver_name(frm);
+        }
+        
+        // Add custom buttons and indicators for existing records
+        if (!frm.doc.__islocal) {
+            setup_custom_buttons(frm);
+            setup_indicators(frm);
+            setup_deposit_indicators(frm);
+            setup_account_management_buttons(frm); // Add this line
+        }
+        
+        // Handle deposit field dependencies
+        handle_deposit_dependencies(frm);
+        
+        // Show account status indicator
+        if (frm.doc.user_account) {
+            frm.dashboard.add_indicator(__('Has User Account'), 'green');
+        } else {
+            frm.dashboard.add_indicator(__('No User Account'), 'orange');
+        }
+    }
+});
+
+// Add this to tuktuk_management/public/js/tuktuk_driver_list.js
+// Enhanced list view for driver account management
+
+frappe.listview_settings['TukTuk Driver'] = {
+    onload: function(listview) {
+        // Add breadcrumb
+        frappe.breadcrumbs.add({
+            type: 'Custom',
+            label: 'Tuktuk Management',
+            route: '/app/tuktuk-management'
+        });
+        
+        // Add bulk account creation button
+        if (frappe.user.has_role(['System Manager', 'Tuktuk Manager'])) {
+            listview.page.add_menu_item(__('Create All Driver Accounts'), function() {
+                frappe.confirm(
+                    __('Create user accounts for all drivers who don\'t have one? This will generate login credentials for each driver.'),
+                    function() {
+                        frappe.call({
+                            method: 'tuktuk_management.api.driver_auth.create_all_driver_accounts',
+                            callback: function(r) {
+                                if (r.message) {
+                                    const result = r.message;
+                                    let message = `✅ Created ${result.created.length} accounts`;
+                                    if (result.failed.length > 0) {
+                                        message += `\n❌ ${result.failed.length} failed`;
+                                    }
+                                    
+                                    frappe.msgprint({
+                                        title: __('Bulk Account Creation Complete'),
+                                        message: message,
+                                        indicator: result.failed.length > 0 ? 'orange' : 'green'
+                                    });
+                                    
+                                    listview.refresh();
+                                }
+                            }
+                        });
+                    }
+                );
+            });
+            
+            listview.page.add_menu_item(__('View All Driver Accounts'), function() {
+                frappe.call({
+                    method: 'tuktuk_management.api.driver_auth.get_all_driver_accounts',
+                    callback: function(r) {
+                        if (r.message) {
+                            show_driver_accounts_dialog(r.message);
+                        }
+                    }
+                });
+            });
+        }
+        
+        // Existing menu items...
+        listview.page.add_menu_item(__('Deposit Management Report'), function() {
+            frappe.set_route('query-report', 'Deposit Management Report');
+        });
+        
+        listview.page.add_menu_item(__('Driver Performance Report'), function() {
+            frappe.set_route('query-report', 'Driver Performance Report');
+        });
+    },
+    
+    // Enhanced list view settings
+    add_fields: ["assigned_tuktuk", "current_balance", "consecutive_misses", "deposit_required", "current_deposit_balance", "user_account"],
+    
+    get_indicator: function(doc) {
+        // Priority indicators based on account status and performance
+        if (!doc.user_account) {
+            return [__("No Account"), "red", "user_account,=,"];
+        } else if (doc.consecutive_misses >= 2) {
+            return [__("Critical"), "red", "consecutive_misses,>=,2"];
+        } else if (doc.deposit_required && doc.current_deposit_balance <= 0) {
+            return [__("No Deposit"), "orange", "current_deposit_balance,<=,0"];
+        } else if (doc.assigned_tuktuk) {
+            return [__("Assigned"), "green", "assigned_tuktuk,!=,"];
+        } else {
+            return [__("Unassigned"), "grey", "assigned_tuktuk,=,"];
+        }
+    },
+    
+    // Add custom columns
+    formatters: {
+        user_account: function(value, df, options, doc) {
+            if (value) {
+                return `<span class="text-success" title="Has user account">✓ ${value}</span>`;
+            } else {
+                return '<span class="text-muted" title="No user account">—</span>';
+            }
+        }
+    }
+};
+
+function show_driver_accounts_dialog(accounts) {
+    let html = `
+        <div style="max-height: 400px; overflow-y: auto;">
+            <table class="table table-bordered table-striped">
+                <thead>
+                    <tr>
+                        <th>Driver Name</th>
+                        <th>Email/Account</th>
+                        <th>Phone</th>
+                        <th>TukTuk</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+    
+    accounts.forEach(driver => {
+        const hasAccount = driver.user_account ? '✅' : '❌';
+        const accountText = driver.user_account || 'No Account';
+        const tuktukText = driver.assigned_tuktuk || 'Unassigned';
+        
+        html += `
+            <tr>
+                <td><a href="/app/tuktuk-driver/${driver.name}">${driver.driver_name}</a></td>
+                <td>${accountText}</td>
+                <td>${driver.driver_primary_phone || '—'}</td>
+                <td>${tuktukText}</td>
+                <td>${hasAccount}</td>
+            </tr>
+        `;
+    });
+    
+    html += '</tbody></table></div>';
+    
+    frappe.msgprint({
+        title: __('All Driver Accounts'),
+        message: html,
+        indicator: 'blue'
+    });
+}
