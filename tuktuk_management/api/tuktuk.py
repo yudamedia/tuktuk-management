@@ -267,8 +267,8 @@ def register_c2b_url():
     payload = {
         "ShortCode": shortcode,
         "ResponseType": "Completed",  # Only confirmed payments
-        "ConfirmationURL": f"{base_url}/api/method/tuktuk_management.api.tuktuk.mpesa_confirmation",
-        "ValidationURL": f"{base_url}/api/method/tuktuk_management.api.tuktuk.mpesa_validation"
+        "ConfirmationURL": f"{base_url}/api/method/tuktuk_management.api.tuktuk.payment_confirmation",
+        "ValidationURL": f"{base_url}/api/method/tuktuk_management.api.tuktuk.payment_validation"
     }
     
     try:
@@ -1568,80 +1568,12 @@ def payment_validation(**kwargs):
     from tuktuk_management.api.tuktuk import mpesa_validation
     return mpesa_validation(**kwargs)
 
-# Update your payment_confirmation function in tuktuk_management/api/tuktuk.py
-# Replace the existing payment_confirmation function with this:
-
 @frappe.whitelist(allow_guest=True)
 def payment_confirmation(**kwargs):
-    """Fixed confirmation endpoint that calculates shares before creating transaction"""
-    try:
-        # Extract transaction details
-        transaction_id = kwargs.get('TransID')
-        amount = float(kwargs.get('TransAmount', 0))
-        account_number = kwargs.get('BillRefNumber', '').strip()
-        customer_phone = kwargs.get('MSISDN')
-        trans_time = kwargs.get('TransTime')
-        first_name = kwargs.get('FirstName', '')
-        last_name = kwargs.get('LastName', '')
-        
-        # Find the tuktuk
-        tuktuk = frappe.db.get_value("TukTuk Vehicle", {"mpesa_account": account_number}, "name")
-        if not tuktuk:
-            frappe.log_error(f"TukTuk not found for account: {account_number}")
-            return {"ResultCode": "0", "ResultDesc": "Success"}
-        
-        # Find assigned driver
-        driver_name = frappe.db.get_value("TukTuk Driver", {"assigned_tuktuk": tuktuk}, "name")
-        if not driver_name:
-            frappe.log_error(f"No driver assigned to tuktuk: {tuktuk}")
-            return {"ResultCode": "0", "ResultDesc": "Success"}
-        
-        # Check if transaction already exists
-        if frappe.db.exists("TukTuk Transaction", {"transaction_id": transaction_id}):
-            frappe.log_error(f"Transaction already processed: {transaction_id}")
-            return {"ResultCode": "0", "ResultDesc": "Success"}
-        
-        # Get driver and settings for calculations
-        driver = frappe.get_doc("TukTuk Driver", driver_name)
-        settings = frappe.get_single("TukTuk Settings")
-        
-        # Calculate shares
-        percentage = driver.fare_percentage or settings.global_fare_percentage
-        target = driver.daily_target or settings.global_daily_target
-        
-        if driver.current_balance >= target:
-            driver_share = amount  # 100% to driver
-            target_contribution = 0
-        else:
-            driver_share = amount * (percentage / 100)
-            target_contribution = amount - driver_share
-        
-        # Create transaction with calculated fields
-        transaction = frappe.get_doc({
-            "doctype": "TukTuk Transaction",
-            "transaction_id": transaction_id,
-            "tuktuk": tuktuk,
-            "driver": driver_name,
-            "amount": amount,
-            "driver_share": driver_share,
-            "target_contribution": target_contribution,
-            "customer_phone": customer_phone,
-            "timestamp": now_datetime(),
-            "payment_status": "Completed"
-        })
-        
-        transaction.insert(ignore_permissions=True)
-        
-        # Update driver balance
-        driver.current_balance += target_contribution
-        driver.save()
-        
-        frappe.db.commit()
-        return {"ResultCode": "0", "ResultDesc": "Success"}
-        
-    except Exception as e:
-        frappe.log_error(f"Payment confirmation error: {str(e)}")
-        return {"ResultCode": "0", "ResultDesc": "Success"}
+    """Alternative confirmation endpoint without 'mpesa' in URL"""
+    # Just call the existing mpesa_confirmation function
+    from tuktuk_management.api.tuktuk import mpesa_confirmation
+    return mpesa_confirmation(**kwargs)
 
 @frappe.whitelist(allow_guest=True)
 def transaction_validation(**kwargs):
@@ -1653,84 +1585,4 @@ def transaction_validation(**kwargs):
 def transaction_confirmation(**kwargs):
     """Another alternative confirmation endpoint"""
     from tuktuk_management.api.tuktuk import mpesa_confirmation
-    return mpesa_confirmation(**kwargs)
-
-# Test the new endpoints
-def test_new_endpoints():
-    import requests
-    
-    base_url = "https://console.sunnytuktuk.com"
-    
-    # Test validation endpoint
-    validation_url = f"{base_url}/api/method/tuktuk_management.api.tuktuk.payment_validation"
-    confirmation_url = f"{base_url}/api/method/tuktuk_management.api.tuktuk.payment_confirmation"
-    
-    test_data = {"TransAmount": "100", "BillRefNumber": "001", "MSISDN": "254708374149"}
-    
-    print("Testing new validation endpoint...")
-    response = requests.post(validation_url, json=test_data, timeout=10)
-    print(f"Validation: {response.status_code} - {response.text}")
-    
-    print("Testing new confirmation endpoint...")
-    test_confirmation_data = {
-        "TransID": "TEST123456",
-        "TransAmount": "100",
-        "BillRefNumber": "001", 
-        "MSISDN": "254708374149",
-        "TransTime": "20241220143022",
-        "FirstName": "Test",
-        "LastName": "Customer"
-    }
-    
-    response = requests.post(confirmation_url, json=test_confirmation_data, timeout=10)
-    print(f"Confirmation: {response.status_code} - {response.text}")
-
-# Register with new URLs
-def register_with_new_urls():
-    try:
-        from tuktuk_management.api.tuktuk import get_access_token
-        token = get_access_token()
-        
-        if not token:
-            print("❌ Access token failed")
-            return False
-        
-        print(f"✅ Access token: {token[:20]}...")
-        
-        import requests
-        
-        api_url = "https://sandbox.safaricom.co.ke/mpesa/c2b/v1/registerurl"
-        
-        headers = {
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json"
-        }
-        
-        # Use new URLs without "mpesa" in them
-        payload = {
-            "ShortCode": "174379",
-            "ResponseType": "Completed",
-            "ConfirmationURL": "https://console.sunnytuktuk.com/api/method/tuktuk_management.api.tuktuk.payment_confirmation",
-            "ValidationURL": "https://console.sunnytuktuk.com/api/method/tuktuk_management.api.tuktuk.payment_validation"
-        }
-        
-        print(f"Attempting registration with new URLs: {payload}")
-        
-        response = requests.post(api_url, json=payload, headers=headers, timeout=30)
-        result = response.json()
-        
-        print(f"Registration response: {result}")
-        
-        if response.status_code == 200 and result.get("ResponseCode") == "0":
-            print("✅ C2B URLs registered successfully!")
-            return True
-        else:
-            print(f"❌ Registration failed: {result}")
-            return False
-            
-    except Exception as e:
-        print(f"❌ Registration error: {e}")
-        return False
-
-print("Creating alternative endpoints...")
-# The functions are now defined, let's test them    
+    return mpesa_confirmation(**kwargs)    
