@@ -1,7 +1,10 @@
 # ~/frappe-bench/apps/tuktuk_management/tuktuk_management/api/device_mapping.py
+# Complete device mapping API with all functions and fixes
 
 import frappe
-from frappe.utils import now_datetime
+from frappe import _
+from frappe.utils import now_datetime, date_diff, add_days, flt
+import json
 
 @frappe.whitelist()
 def auto_map_devices_from_telemetry():
@@ -9,6 +12,8 @@ def auto_map_devices_from_telemetry():
     Auto-map telemetry devices to TukTuk vehicles based on the exported data
     """
     try:
+        print("🚀 Starting auto device mapping...")
+        
         # Telemetry device data from the export
         telemetry_devices = [
             {"device_id": "135", "imei": "860909050379362", "voltage": 79.0, "lat": -4.286028, "lng": 39.587394, "status": "Static"},
@@ -49,57 +54,23 @@ def auto_map_devices_from_telemetry():
                     # Update the vehicle with device information
                     vehicle_doc = frappe.get_doc("TukTuk Vehicle", vehicle.name)
                     
-                    vehicle_doc.device_id = str(device["device_id"])
-                    vehicle_doc.device_imei = str(device["imei"])
-                    vehicle_doc.latitude = float(device["lat"])
-                    vehicle_doc.longitude = float(device["lng"])
+                    vehicle_doc.device_id = device["device_id"]
+                    vehicle_doc.device_imei = device["imei"]
+                    vehicle_doc.current_latitude = device["lat"]
+                    vehicle_doc.current_longitude = device["lng"]
                     
-                    # Update battery if device is online
+                    # Set battery level based on voltage
                     if device["voltage"] > 0:
-                        # Import battery converter safely
-                        try:
-                            from tuktuk_management.api.battery_utils import BatteryConverter
-                            battery_percentage = BatteryConverter.voltage_to_percentage(device["voltage"])
-                        except ImportError:
-                            # Fallback if battery_utils not available
-                            battery_percentage = int(device["voltage"]) if device["voltage"] <= 100 else 80
-                        
-                        vehicle_doc.battery_level = battery_percentage
-                        vehicle_doc.battery_voltage = float(device["voltage"])
+                        vehicle_doc.battery_level = int(device["voltage"])
                     
-                    # Set status based on telemetry
-                    if str(device["status"]).lower() == "offline":
-                        vehicle_doc.status = "Offline"
-                    elif vehicle_doc.status == "Offline":
-                        vehicle_doc.status = "Available"
-                    
-                    # Update geolocation
-                    import json
-                    location_data = {
-                        "type": "FeatureCollection",
-                        "features": [{
-                            "type": "Feature",
-                            "properties": {
-                                "name": vehicle_doc.tuktuk_id,
-                                "device_id": str(device["device_id"]),
-                                "status": str(device["status"])
-                            },
-                            "geometry": {
-                                "type": "Point",
-                                "coordinates": [float(device["lng"]), float(device["lat"])]
-                            }
-                        }]
-                    }
-                    vehicle_doc.current_location = json.dumps(location_data)
-                    vehicle_doc.last_reported = now_datetime()
-                    
+                    vehicle_doc.last_telemetry_update = now_datetime()
                     vehicle_doc.save(ignore_permissions=True)
                     
                     mapping_results["mapped"] += 1
                     mapping_results["mappings"].append({
                         "tuktuk_id": vehicle.tuktuk_id,
-                        "device_id": str(device["device_id"]),
-                        "imei": str(device["imei"]),
+                        "device_id": device["device_id"],
+                        "imei": device["imei"],
                         "battery": f"{device['voltage']}V → {vehicle_doc.battery_level}%"
                     })
                     
@@ -180,8 +151,8 @@ def simple_device_mapping():
                     # Update device mapping
                     doc.device_id = device_id
                     doc.device_imei = imei
-                    doc.latitude = lat
-                    doc.longitude = lng
+                    doc.current_latitude = lat
+                    doc.current_longitude = lng
                     
                     # Update battery (treat values as percentages)
                     if voltage > 0:
@@ -189,7 +160,7 @@ def simple_device_mapping():
                         doc.battery_voltage = voltage
                     
                     # Update timestamp
-                    doc.last_reported = now_datetime()
+                    doc.last_telemetry_update = now_datetime()
                     
                     # Save
                     doc.save(ignore_permissions=True)
@@ -239,255 +210,9 @@ def manual_device_mapping(tuktuk_vehicle, device_id, device_imei):
             frappe.throw(f"Device already mapped to TukTuk {existing_mapping[0].tuktuk_id}")
         
         # Update the mapping
-        vehicle.device_id = str(device_id)
-        vehicle.device_imei = str(device_imei)
-        vehicle.save()
-        
-        # Try to get initial data from telemetry
-        try:
-            from tuktuk_management.api.telematics import TelematicsIntegration
-            integration = TelematicsIntegration()
-            integration.update_vehicle_status(device_id)
-        except Exception as e:
-            frappe.log_error(f"Initial telemetry update failed: {str(e)}")
-        
-        return {
-            "success": True,
-            "message": f"Device {device_id} mapped to TukTuk {vehicle.tuktuk_id}"
-        }
-        
-    except Exception as e:
-        frappe.throw(f"Manual mapping failed: {str(e)}")
-
-@frappe.whitelist()
-def get_unmapped_devices():
-    """
-    Get list of vehicles without device mapping
-    """
-    try:
-        unmapped_vehicles = frappe.get_all("TukTuk Vehicle",
-                                          filters={
-                                              "$or": [
-                                                  {"device_id": ["in", ["", None]]},
-                                                  {"device_imei": ["in", ["", None]]}
-                                              ]
-                                          },
-                                          fields=["name", "tuktuk_id", "status"],
-                                          order_by="tuktuk_id")
-        
-        # Available telemetry devices (from export data)
-        available_devices = [
-            {"device_id": "135", "imei": "860909050379362", "status": "Static"},
-            {"device_id": "136", "imei": "860909050460220", "status": "Offline"},
-            {"device_id": "137", "imei": "860909050354241", "status": "Static"},
-            {"device_id": "138", "imei": "860909050379198", "status": "Static"},
-            {"device_id": "139", "imei": "860909050379230", "status": "Static"},
-            {"device_id": "140", "imei": "860909050529479", "status": "Static"},
-            {"device_id": "141", "imei": "860909050501510", "status": "Static"},
-            {"device_id": "142", "imei": "860909050446716", "status": "Static"},
-            {"device_id": "143", "imei": "860909050354399", "status": "Static"}
-        ]
-        
-        # Filter out already mapped devices
-        mapped_device_ids = frappe.get_all("TukTuk Vehicle",
-                                          filters={"device_id": ["!=", ""]},
-                                          fields=["device_id"],
-                                          pluck="device_id")
-        
-        mapped_imeis = frappe.get_all("TukTuk Vehicle", 
-                                     filters={"device_imei": ["!=", ""]},
-                                     fields=["device_imei"],
-                                     pluck="device_imei")
-        
-        available_devices = [d for d in available_devices 
-                           if d["device_id"] not in mapped_device_ids 
-                           and d["imei"] not in mapped_imeis]
-        
-        return {
-            "unmapped_vehicles": unmapped_vehicles,
-            "available_devices": available_devices,
-            "mapping_suggestions": generate_mapping_suggestions(unmapped_vehicles, available_devices)
-        }
-        
-    except Exception as e:
-        frappe.throw(f"Failed to get unmapped devices: {str(e)}")
-
-def generate_mapping_suggestions(vehicles, devices):
-    """
-    Generate intelligent mapping suggestions based on proximity or patterns
-    """
-    suggestions = []
-    
-    for i, vehicle in enumerate(vehicles):
-        if i < len(devices):
-            device = devices[i]
-            suggestions.append({
-                "tuktuk_id": vehicle["tuktuk_id"],
-                "tuktuk_name": vehicle["name"],
-                "suggested_device_id": device["device_id"],
-                "suggested_imei": device["imei"],
-                "device_status": device["status"],
-                "confidence": "Medium",  # Could be enhanced with proximity analysis
-                "reason": f"Sequential mapping suggestion {i+1}"
-            })
-    
-    return suggestions
-
-@frappe.whitelist()
-def validate_device_mappings():
-    """
-    Validate all current device mappings and check for issues
-    """
-    try:
-        all_vehicles = frappe.get_all("TukTuk Vehicle",
-                                     fields=["name", "tuktuk_id", "device_id", "device_imei", "last_reported"])
-        
-        validation_results = {
-            "total_vehicles": len(all_vehicles),
-            "mapped_vehicles": 0,
-            "unmapped_vehicles": 0,
-            "duplicate_mappings": [],
-            "inactive_devices": [],
-            "recent_updates": 0
-        }
-        
-        device_id_map = {}
-        imei_map = {}
-        
-        for vehicle in all_vehicles:
-            # Check mapping status
-            if vehicle.device_id or vehicle.device_imei:
-                validation_results["mapped_vehicles"] += 1
-                
-                # Check for duplicates
-                if vehicle.device_id:
-                    if vehicle.device_id in device_id_map:
-                        validation_results["duplicate_mappings"].append({
-                            "device_id": vehicle.device_id,
-                            "vehicles": [device_id_map[vehicle.device_id], vehicle.tuktuk_id]
-                        })
-                    else:
-                        device_id_map[vehicle.device_id] = vehicle.tuktuk_id
-                
-                if vehicle.device_imei:
-                    if vehicle.device_imei in imei_map:
-                        validation_results["duplicate_mappings"].append({
-                            "imei": vehicle.device_imei,
-                            "vehicles": [imei_map[vehicle.device_imei], vehicle.tuktuk_id]
-                        })
-                    else:
-                        imei_map[vehicle.device_imei] = vehicle.tuktuk_id
-                
-                # Check for recent updates
-                if vehicle.last_reported:
-                    import frappe.utils
-                    hours_ago = frappe.utils.date_diff(frappe.utils.now_datetime(), vehicle.last_reported) * 24
-                    if hours_ago <= 24:
-                        validation_results["recent_updates"] += 1
-                    elif hours_ago > 72:
-                        validation_results["inactive_devices"].append({
-                            "tuktuk_id": vehicle.tuktuk_id,
-                            "device_id": vehicle.device_id,
-                            "last_reported": vehicle.last_reported,
-                            "hours_ago": round(hours_ago, 1)
-                        })
-            else:
-                validation_results["unmapped_vehicles"] += 1
-        
-        return validation_results
-        
-    except Exception as e:
-        frappe.throw(f"Validation failed: {str(e)}")
-
-@frappe.whitelist()
-def reset_device_mapping(tuktuk_vehicle):
-    """
-    Reset device mapping for a specific vehicle
-    """
-    try:
-        vehicle = frappe.get_doc("TukTuk Vehicle", tuktuk_vehicle)
-        
-        # Clear device mapping
-        vehicle.device_id = ""
-        vehicle.device_imei = ""
-        
-        # Optionally clear telemetry data
-        vehicle.battery_voltage = None
-        vehicle.last_reported = None
-        
-        vehicle.save()
-        
-        return {
-            "success": True,
-            "message": f"Device mapping reset for TukTuk {vehicle.tuktuk_id}"
-        }
-        
-    except Exception as e:
-        frappe.throw(f"Reset failed: {str(e)}")
-
-# Debug function to help troubleshoot
-@frappe.whitelist()
-def debug_mapping_issue():
-    """
-    Debug function to identify the mapping issue
-    """
-    try:
-        print("🔍 Debugging device mapping issue...")
-        
-        # Check vehicles
-        vehicles = frappe.get_all("TukTuk Vehicle", 
-                                 fields=["name", "tuktuk_id", "device_id", "device_imei"],
-                                 limit=5)
-        
-        print(f"Found {len(vehicles)} vehicles:")
-        for v in vehicles:
-            print(f"  - {v.tuktuk_id}: device_id='{v.device_id}', device_imei='{v.device_imei}'")
-        
-        # Test device data types
-        test_device = {"device_id": "135", "status": "Static"}
-        
-        print(f"Test device status type: {type(test_device['status'])}")
-        print(f"Test device status value: '{test_device['status']}'")
-        print(f"Test device status lower: '{test_device['status'].lower()}'")
-        
-        return {
-            "success": True,
-            "message": "Debug completed - check console for output"
-        }
-        
-    except Exception as e:
-        error_msg = f"Debug failed: {str(e)}"
-        print(f"❌ {error_msg}")
-        return {
-            "success": False,
-            "message": error_msg
-        }
-
-@frappe.whitelist()
-def manual_device_mapping(tuktuk_vehicle, device_id, device_imei):
-    """
-    Manually map a device to a TukTuk vehicle
-    """
-    try:
-        vehicle = frappe.get_doc("TukTuk Vehicle", tuktuk_vehicle)
-        
-        # Check if device is already mapped to another vehicle
-        existing_mapping = frappe.get_all("TukTuk Vehicle",
-                                         filters={
-                                             "$or": [
-                                                 {"device_id": device_id},
-                                                 {"device_imei": device_imei}
-                                             ],
-                                             "name": ["!=", vehicle.name]
-                                         },
-                                         fields=["tuktuk_id"])
-        
-        if existing_mapping:
-            frappe.throw(f"Device already mapped to TukTuk {existing_mapping[0].tuktuk_id}")
-        
-        # Update the mapping
         vehicle.device_id = device_id
         vehicle.device_imei = device_imei
+        vehicle.last_telemetry_update = now_datetime()
         vehicle.save()
         
         # Try to get initial data from telemetry
@@ -509,42 +234,42 @@ def manual_device_mapping(tuktuk_vehicle, device_id, device_imei):
 @frappe.whitelist()
 def get_unmapped_devices():
     """
-    Get list of vehicles without device mapping
+    Get list of vehicles without device mapping and available devices
     """
     try:
+        # Get unmapped vehicles
         unmapped_vehicles = frappe.get_all("TukTuk Vehicle",
-                                          filters={
-                                              "$or": [
-                                                  {"device_id": ["in", ["", None]]},
-                                                  {"device_imei": ["in", ["", None]]}
-                                              ]
-                                          },
-                                          fields=["name", "tuktuk_id", "status"],
-                                          order_by="tuktuk_id")
+                                         filters={
+                                             "$or": [
+                                                 {"device_id": ["in", ["", None]]},
+                                                 {"device_imei": ["in", ["", None]]}
+                                             ]
+                                         },
+                                         fields=["name", "tuktuk_id", "status"])
         
-        # Available telemetry devices (from export data)
+        # Available devices (from telemetry data)
         available_devices = [
-            {"device_id": "135", "imei": "860909050379362", "status": "Static"},
-            {"device_id": "136", "imei": "860909050460220", "status": "Offline"},
-            {"device_id": "137", "imei": "860909050354241", "status": "Static"},
-            {"device_id": "138", "imei": "860909050379198", "status": "Static"},
-            {"device_id": "139", "imei": "860909050379230", "status": "Static"},
-            {"device_id": "140", "imei": "860909050529479", "status": "Static"},
-            {"device_id": "141", "imei": "860909050501510", "status": "Static"},
-            {"device_id": "142", "imei": "860909050446716", "status": "Static"},
-            {"device_id": "143", "imei": "860909050354399", "status": "Static"}
+            {"device_id": "135", "imei": "860909050379362", "status": "Active"},
+            {"device_id": "136", "imei": "860909050460220", "status": "Active"},
+            {"device_id": "137", "imei": "860909050354241", "status": "Active"},
+            {"device_id": "138", "imei": "860909050379198", "status": "Active"},
+            {"device_id": "139", "imei": "860909050379230", "status": "Active"},
+            {"device_id": "140", "imei": "860909050529479", "status": "Active"},
+            {"device_id": "141", "imei": "860909050501510", "status": "Active"},
+            {"device_id": "142", "imei": "860909050446716", "status": "Active"},
+            {"device_id": "143", "imei": "860909050354399", "status": "Active"}
         ]
         
         # Filter out already mapped devices
-        mapped_device_ids = frappe.get_all("TukTuk Vehicle",
-                                          filters={"device_id": ["!=", ""]},
-                                          fields=["device_id"],
-                                          pluck="device_id")
+        mapped_device_ids = frappe.db.get_list("TukTuk Vehicle", 
+                                             filters={"device_id": ["!=", ""]},
+                                             fields=["device_id"],
+                                             pluck="device_id")
         
-        mapped_imeis = frappe.get_all("TukTuk Vehicle", 
-                                     filters={"device_imei": ["!=", ""]},
-                                     fields=["device_imei"],
-                                     pluck="device_imei")
+        mapped_imeis = frappe.db.get_list("TukTuk Vehicle", 
+                                        filters={"device_imei": ["!=", ""]},
+                                        fields=["device_imei"],
+                                        pluck="device_imei")
         
         available_devices = [d for d in available_devices 
                            if d["device_id"] not in mapped_device_ids 
@@ -574,7 +299,7 @@ def generate_mapping_suggestions(vehicles, devices):
                 "suggested_device_id": device["device_id"],
                 "suggested_imei": device["imei"],
                 "device_status": device["status"],
-                "confidence": "Medium",  # Could be enhanced with proximity analysis
+                "confidence": "Medium",
                 "reason": f"Sequential mapping suggestion {i+1}"
             })
     
@@ -626,6 +351,7 @@ def apply_mapping_suggestions():
 def validate_device_mappings():
     """
     Validate all current device mappings and check for issues
+    FIXED: Removed problematic local import that caused variable shadowing
     """
     try:
         all_vehicles = frappe.get_all("TukTuk Vehicle",
@@ -669,8 +395,8 @@ def validate_device_mappings():
                 
                 # Check for recent updates
                 if vehicle.last_reported:
-                    import frappe.utils
-                    hours_ago = frappe.utils.date_diff(frappe.utils.now_datetime(), vehicle.last_reported) * 24
+                    # FIXED: Use imported functions directly instead of frappe.utils
+                    hours_ago = date_diff(now_datetime(), vehicle.last_reported) * 24
                     if hours_ago <= 24:
                         validation_results["recent_updates"] += 1
                     elif hours_ago > 72:
@@ -686,6 +412,7 @@ def validate_device_mappings():
         return validation_results
         
     except Exception as e:
+        # FIXED: Now frappe.throw will work correctly without variable conflict
         frappe.throw(f"Validation failed: {str(e)}")
 
 @frappe.whitelist()
@@ -713,3 +440,42 @@ def reset_device_mapping(tuktuk_vehicle):
         
     except Exception as e:
         frappe.throw(f"Reset failed: {str(e)}")
+
+@frappe.whitelist()
+def debug_mapping_issue():
+    """
+    Debug function to identify mapping issues
+    """
+    try:
+        print("🔍 Debugging device mapping issue...")
+        
+        # Check vehicles
+        vehicles = frappe.get_all("TukTuk Vehicle", 
+                                 fields=["name", "tuktuk_id", "device_id", "device_imei"],
+                                 limit=5)
+        
+        print(f"Found {len(vehicles)} vehicles:")
+        for v in vehicles:
+            print(f"  - {v.tuktuk_id}: device_id='{v.device_id}', device_imei='{v.device_imei}'")
+        
+        # Test device data types
+        test_device = {"device_id": "135", "status": "Static"}
+        
+        print(f"Test device status type: {type(test_device['status'])}")
+        print(f"Test device status value: '{test_device['status']}'")
+        print(f"Test device status lower: '{test_device['status'].lower()}'")
+        
+        return {
+            "success": True,
+            "message": "Debug completed - check console for output",
+            "vehicles_checked": len(vehicles),
+            "vehicles": vehicles
+        }
+        
+    except Exception as e:
+        error_msg = f"Debug failed: {str(e)}"
+        print(f"❌ {error_msg}")
+        return {
+            "success": False,
+            "message": error_msg
+        }
