@@ -1,58 +1,44 @@
 // ~/frappe-bench/apps/tuktuk_management/tuktuk_management/public/js/csv_telemetry_upload.js
 
-// CSV Telemetry Upload Interface
-frappe.provide('tuktuk_management.csv_upload');
-
 tuktuk_management.csv_upload = {
-    
     show_upload_dialog: function() {
         const dialog = new frappe.ui.Dialog({
-            title: __('Upload Telemetry CSV Data'),
+            title: __('Upload Telemetry CSV'),
             size: 'large',
             fields: [
-                {
-                    fieldtype: 'HTML',
-                    fieldname: 'upload_info',
-                    options: `
-                        <div class="alert alert-info">
-                            <h6><i class="fa fa-info-circle"></i> CSV Upload Information</h6>
-                            <p>Upload CSV files containing telemetry data to update vehicle information in bulk.</p>
-                            <ul class="mb-0">
-                                <li><strong>Telemetry Export:</strong> Direct export from your telemetry platform</li>
-                                <li><strong>Battery Update:</strong> Update battery levels for multiple vehicles</li>
-                                <li><strong>Location Update:</strong> Update GPS coordinates for vehicles</li>
-                                <li><strong>Vehicle Data:</strong> Complete vehicle information update</li>
-                            </ul>
-                        </div>
-                    `
-                },
-                {
-                    fieldtype: 'Select',
-                    fieldname: 'mapping_type',
-                    label: __('Vehicle Identification Method'),
-                    options: [
-                        {label: 'Auto-detect', value: 'auto'},
-                        {label: 'By TukTuk ID', value: 'tuktuk_id'},
-                        {label: 'By Device ID', value: 'device_id'},
-                        {label: 'By IMEI', value: 'imei'}
-                    ],
-                    default: 'auto',
-                    description: 'How to match CSV rows to vehicles'
-                },
                 {
                     fieldtype: 'Attach',
                     fieldname: 'csv_file',
                     label: __('CSV File'),
                     reqd: 1,
-                    description: 'Select your CSV file containing telemetry data'
+                    options: {
+                        restrictions: {
+                            allowed_file_types: ['.csv']
+                        }
+                    }
+                },
+                {
+                    fieldtype: 'Select',
+                    fieldname: 'mapping_type',
+                    label: __('Mapping Type'),
+                    options: [
+                        '',
+                        'auto',
+                        'telemetry_export',
+                        'battery_update',
+                        'location_update',
+                        'vehicle_data'
+                    ],
+                    default: 'auto',
+                    description: __('Auto-detect will try to identify the CSV format automatically')
                 },
                 {
                     fieldtype: 'HTML',
-                    fieldname: 'template_section',
+                    fieldname: 'template_download',
                     options: `
                         <div class="mt-3">
-                            <h6>Download Templates:</h6>
-                            <div class="btn-group" role="group">
+                            <h6>CSV Templates:</h6>
+                            <div class="btn-group btn-group-sm" role="group">
                                 <button type="button" class="btn btn-sm btn-outline-primary" onclick="tuktuk_management.csv_upload.download_template('telemetry_export')">
                                     Telemetry Export
                                 </button>
@@ -110,9 +96,9 @@ tuktuk_management.csv_upload = {
             indicator: 'blue'
         });
         
-        // Read file content
+        // Use the correct method to read file content
         frappe.call({
-            method: 'frappe.core.api.file.get_file',
+            method: 'tuktuk_management.api.csv_telemetry.read_file_content',
             args: {
                 file_url: file_url
             },
@@ -129,6 +115,13 @@ tuktuk_management.csv_upload = {
                         }
                     });
                 }
+            },
+            error: function(error) {
+                frappe.msgprint({
+                    title: __('File Read Error'),
+                    message: error.message,
+                    indicator: 'red'
+                });
             }
         });
     },
@@ -141,7 +134,8 @@ tuktuk_management.csv_upload = {
                 <div class="alert alert-danger mt-3">
                     <h6><i class="fa fa-exclamation-triangle"></i> Validation Failed</h6>
                     <p><strong>Error:</strong> ${validation_data.error}</p>
-                    ${validation_data.headers ? `<p><strong>Found Headers:</strong> ${validation_data.headers.join(', ')}</p>` : ''}
+                    ${validation_data.headers ? 
+                        `<p><strong>Found Headers:</strong> ${validation_data.headers.join(', ')}</p>` : ''}
                 </div>
             `;
             return;
@@ -184,9 +178,9 @@ tuktuk_management.csv_upload = {
         // Hide main dialog
         dialog.hide();
         
-        // Read CSV file content
+        // Read CSV file content using the correct method
         frappe.call({
-            method: 'frappe.core.api.file.get_file',
+            method: 'tuktuk_management.api.csv_telemetry.read_file_content',
             args: {
                 file_url: values.csv_file
             },
@@ -212,79 +206,98 @@ tuktuk_management.csv_upload = {
                             });
                         }
                     });
-                } else {
-                    progress_dialog.hide();
-                    frappe.msgprint(__('Failed to read CSV file'));
                 }
+            },
+            error: function(error) {
+                progress_dialog.hide();
+                frappe.msgprint({
+                    title: __('File Read Error'),
+                    message: error.message,
+                    indicator: 'red'
+                });
             }
         });
     },
     
     show_progress_dialog: function() {
-        const progress_dialog = new frappe.ui.Dialog({
+        return new frappe.ui.Dialog({
             title: __('Processing CSV Upload'),
+            indicator: 'blue',
             fields: [
                 {
                     fieldtype: 'HTML',
-                    fieldname: 'progress_content',
+                    fieldname: 'progress_html',
                     options: `
-                        <div class="text-center">
-                            <div class="progress mb-3">
-                                <div class="progress-bar progress-bar-striped progress-bar-animated" 
-                                     role="progressbar" style="width: 100%"></div>
-                            </div>
-                            <h6>Processing telemetry data...</h6>
-                            <p class="text-muted">Please wait while we update vehicle information from your CSV file.</p>
-                            <div class="spinner-border text-primary" role="status">
+                        <div class="text-center p-4">
+                            <div class="spinner-border text-primary mb-3" role="status">
                                 <span class="sr-only">Loading...</span>
                             </div>
+                            <h5>Processing CSV file...</h5>
+                            <p class="text-muted">This may take a few moments depending on file size.</p>
                         </div>
                     `
                 }
             ]
         });
-        
-        progress_dialog.show();
-        return progress_dialog;
     },
     
     show_results_dialog: function(results) {
-        const success_rate = results.total_rows > 0 ? 
+        const dialog = new frappe.ui.Dialog({
+            title: __('CSV Upload Results'),
+            size: 'large',
+            fields: [
+                {
+                    fieldtype: 'HTML',
+                    fieldname: 'results_html',
+                    options: tuktuk_management.csv_upload.generate_results_html(results)
+                }
+            ],
+            primary_action: function() {
+                dialog.hide();
+                // Refresh the list view
+                if (cur_list) {
+                    cur_list.refresh();
+                }
+            },
+            primary_action_label: __('Close')
+        });
+        
+        dialog.show();
+    },
+    
+    generate_results_html: function(results) {
+        const success_percentage = results.total_rows > 0 ? 
             Math.round((results.updated / results.total_rows) * 100) : 0;
         
-        let status_color = 'success';
-        if (success_rate < 50) status_color = 'danger';
-        else if (success_rate < 80) status_color = 'warning';
-        
-        let content = `
+        let html = `
             <div class="csv-upload-results">
-                <div class="row mb-3">
-                    <div class="col-md-3 text-center">
-                        <div class="card bg-light">
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="card text-center">
                             <div class="card-body">
                                 <h4 class="text-primary">${results.total_rows}</h4>
                                 <small>Total Rows</small>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3 text-center">
-                        <div class="card bg-light">
+                    <div class="col-md-3">
+                        <div class="card text-center">
                             <div class="card-body">
                                 <h4 class="text-success">${results.updated}</h4>
                                 <small>Updated</small>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3 text-center">
-                        <div class="card bg-light">
+                    <div class="col-md-3">
+                        <div class="card text-center">
                             <div class="card-body">
                                 <h4 class="text-danger">${results.failed}</h4>
                                 <small>Failed</small>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3 text-center">
-                        <div class="card bg-light">
+                    <div class="col-md-3">
+                        <div class="card text-center">
                             <div class="card-body">
                                 <h4 class="text-warning">${results.skipped}</h4>
                                 <small>Skipped</small>
@@ -294,131 +307,91 @@ tuktuk_management.csv_upload = {
                 </div>
                 
                 <div class="progress mb-3">
-                    <div class="progress-bar bg-${status_color}" style="width: ${success_rate}%">
-                        ${success_rate}% Success Rate
+                    <div class="progress-bar bg-success" style="width: ${success_percentage}%">
+                        ${success_percentage}% Success
                     </div>
                 </div>
         `;
         
-        // Show detected format info
-        if (results.csv_format) {
-            content += `
-                <div class="alert alert-info">
-                    <strong>Detected Format:</strong> ${results.csv_format.type.replace('_', ' ').toUpperCase()}<br>
-                    <strong>Columns Found:</strong> ${results.headers ? results.headers.length : 'Unknown'}
-                </div>
-            `;
-        }
-        
-        // Show successful updates
-        if (results.success_details && results.success_details.length > 0) {
-            content += `
-                <div class="mt-3">
-                    <h6>✅ Successful Updates (Showing first 10):</h6>
+        if (results.errors && results.errors.length > 0) {
+            html += `
+                <div class="mt-4">
+                    <h6 class="text-danger">Errors (${results.errors.length}):</h6>
                     <div class="table-responsive">
-                        <table class="table table-sm">
+                        <table class="table table-sm table-striped">
                             <thead>
                                 <tr>
                                     <th>Row</th>
-                                    <th>TukTuk ID</th>
-                                    <th>Device ID</th>
-                                    <th>Updates Applied</th>
+                                    <th>Error</th>
                                 </tr>
                             </thead>
                             <tbody>
             `;
             
-            results.success_details.slice(0, 10).forEach(detail => {
-                content += `
+            results.errors.slice(0, 10).forEach(error => {
+                html += `
                     <tr>
-                        <td>${detail.row}</td>
-                        <td>${detail.tuktuk_id || 'N/A'}</td>
-                        <td>${detail.device_id || 'N/A'}</td>
-                        <td><small>${detail.updates.join(', ')}</small></td>
+                        <td>${error.row || 'N/A'}</td>
+                        <td>${error.message || error}</td>
                     </tr>
                 `;
             });
             
-            content += '</tbody></table></div>';
-            
-            if (results.success_details.length > 10) {
-                content += `<small class="text-muted">... and ${results.success_details.length - 10} more</small>`;
-            }
-            
-            content += '</div>';
-        }
-        
-        // Show errors
-        if (results.errors && results.errors.length > 0) {
-            content += `
-                <div class="mt-3">
-                    <h6>❌ Errors (Showing first 10):</h6>
-                    <div class="alert alert-danger">
-                        <ul class="mb-0">
-            `;
-            
-            results.errors.slice(0, 10).forEach(error => {
-                content += `<li><small>${error}</small></li>`;
-            });
-            
-            content += '</ul>';
-            
             if (results.errors.length > 10) {
-                content += `<small>... and ${results.errors.length - 10} more errors</small>`;
+                html += `<tr><td colspan="2"><em>... and ${results.errors.length - 10} more errors</em></td></tr>`;
             }
             
-            content += '</div></div>';
+            html += `
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
         }
         
-        // Show warnings
-        if (results.warnings && results.warnings.length > 0) {
-            content += `
-                <div class="mt-3">
-                    <h6>⚠️ Warnings:</h6>
-                    <div class="alert alert-warning">
-                        <ul class="mb-0">
+        if (results.success_details && results.success_details.length > 0) {
+            html += `
+                <div class="mt-4">
+                    <h6 class="text-success">Recent Updates:</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped">
+                            <thead>
+                                <tr>
+                                    <th>TukTuk ID</th>
+                                    <th>Battery Level</th>
+                                    <th>Location</th>
+                                    <th>Updated</th>
+                                </tr>
+                            </thead>
+                            <tbody>
             `;
             
-            results.warnings.forEach(warning => {
-                content += `<li><small>${warning}</small></li>`;
+            results.success_details.slice(0, 5).forEach(detail => {
+                html += `
+                    <tr>
+                        <td>${detail.tuktuk_id || 'N/A'}</td>
+                        <td>${detail.battery_level !== undefined ? detail.battery_level + '%' : 'N/A'}</td>
+                        <td>${detail.location || 'N/A'}</td>
+                        <td>${detail.timestamp || 'Now'}</td>
+                    </tr>
+                `;
             });
             
-            content += '</ul></div></div>';
+            html += `
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
         }
         
-        content += '</div>';
-        
-        const results_dialog = new frappe.ui.Dialog({
-            title: __('CSV Upload Results'),
-            size: 'large',
-            fields: [
-                {
-                    fieldtype: 'HTML',
-                    fieldname: 'results_content',
-                    options: content
-                }
-            ],
-            primary_action: function() {
-                results_dialog.hide();
-                // Refresh current page if it's a list view
-                if (cur_list) {
-                    cur_list.refresh();
-                }
-            },
-            primary_action_label: __('Close'),
-            secondary_action: function() {
-                // Download detailed report
-                tuktuk_management.csv_upload.download_detailed_report(results);
-            },
-            secondary_action_label: __('Download Report')
-        });
-        
-        results_dialog.show();
+        html += '</div>';
+        return html;
     },
     
     download_template: function(format_type) {
         frappe.call({
-            method: 'tuktuk_management.api.csv_telemetry.get_csv_upload_template',
+            method: 'tuktuk_management.api.csv_telemetry.get_csv_template',
             args: {
                 format_type: format_type
             },
@@ -427,102 +400,28 @@ tuktuk_management.csv_upload = {
                     const headers = r.message.headers;
                     const csv_content = headers.join(',') + '\n';
                     
-                    // Add sample row
-                    let sample_row = [];
-                    if (format_type === 'telemetry_export') {
-                        sample_row = [
-                            '860909050379362', '135', 'TUK-001', 'TukTuk', 'KAA123T',
-                            'Sunny TukTuk', 'Diani Fleet', 'John Doe', '254712345678', 'Static',
-                            'GPS Tracker', '254701234567', '2024-01-01', '2025-01-01', '39.587394',
-                            '-4.286028', '0', '45', '10', '12', '25',
-                            '2024-12-15 10:30:00', 'OFF', 'ON', 'Valid', '2024-12-15 10:30:00',
-                            '0', '79', 'Active'
-                        ];
-                    } else if (format_type === 'battery_update') {
-                        sample_row = ['TUK-001', '75', 'false', '2024-12-15 10:30:00'];
-                    } else if (format_type === 'location_update') {
-                        sample_row = ['TUK-001', '-4.286028', '39.587394', 'Diani Beach', '2024-12-15 10:30:00'];
-                    } else if (format_type === 'vehicle_data') {
-                        sample_row = ['TUK-001', '135', '860909050379362', '75', '-4.286028', '39.587394', '0', 'Available'];
+                    // Create and download CSV file
+                    const blob = new Blob([csv_content], { type: 'text/csv;charset=utf-8;' });
+                    const link = document.createElement('a');
+                    
+                    if (link.download !== undefined) {
+                        const url = URL.createObjectURL(blob);
+                        link.setAttribute('href', url);
+                        link.setAttribute('download', `${format_type}_template.csv`);
+                        link.style.visibility = 'hidden';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
                     }
-                    
-                    const full_content = csv_content + sample_row.join(',');
-                    
-                    // Create and download file
-                    const blob = new Blob([full_content], { type: 'text/csv' });
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `tuktuk_${format_type}_template.csv`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    window.URL.revokeObjectURL(url);
-                    
-                    frappe.show_alert({
-                        message: __('Template downloaded successfully'),
-                        indicator: 'green'
-                    });
                 }
             }
-        });
-    },
-    
-    download_detailed_report: function(results) {
-        let report_content = 'CSV Upload Report\n';
-        report_content += `Generated: ${frappe.datetime.now_datetime()}\n\n`;
-        report_content += `Total Rows: ${results.total_rows}\n`;
-        report_content += `Updated: ${results.updated}\n`;
-        report_content += `Failed: ${results.failed}\n`;
-        report_content += `Skipped: ${results.skipped}\n\n`;
-        
-        if (results.success_details && results.success_details.length > 0) {
-            report_content += 'Successful Updates:\n';
-            report_content += 'Row,TukTuk ID,Device ID,Updates\n';
-            results.success_details.forEach(detail => {
-                report_content += `${detail.row},${detail.tuktuk_id || 'N/A'},${detail.device_id || 'N/A'},"${detail.updates.join('; ')}"\n`;
-            });
-            report_content += '\n';
-        }
-        
-        if (results.errors && results.errors.length > 0) {
-            report_content += 'Errors:\n';
-            results.errors.forEach(error => {
-                report_content += `"${error}"\n`;
-            });
-            report_content += '\n';
-        }
-        
-        if (results.warnings && results.warnings.length > 0) {
-            report_content += 'Warnings:\n';
-            results.warnings.forEach(warning => {
-                report_content += `"${warning}"\n`;
-            });
-        }
-        
-        // Download report
-        const blob = new Blob([report_content], { type: 'text/plain' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `tuktuk_csv_upload_report_${frappe.datetime.get_today()}.txt`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-        
-        frappe.show_alert({
-            message: __('Report downloaded successfully'),
-            indicator: 'green'
         });
     }
 };
 
-// Add CSV upload button to TukTuk Vehicle list
-frappe.listview_settings['TukTuk Vehicle'] = frappe.listview_settings['TukTuk Vehicle'] || {};
-
-// Extend the existing onload function
-const original_onload = frappe.listview_settings['TukTuk Vehicle'].onload || function() {};
+// Extend the TukTuk Vehicle list view
+const original_onload = frappe.listview_settings['TukTuk Vehicle'] && 
+                       frappe.listview_settings['TukTuk Vehicle'].onload || function() {};
 
 frappe.listview_settings['TukTuk Vehicle'].onload = function(listview) {
     // Call original onload if it exists
