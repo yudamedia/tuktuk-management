@@ -86,6 +86,7 @@
    "length": 3
   },
   {
+   "collapsible": 1,
    "fieldname": "battery_section",
    "fieldtype": "Section Break",
    "label": "Battery Information"
@@ -245,9 +246,10 @@
    "label": "Rate (Per Hour After)"
   },
   {
+   "collapsible": 1,
    "fieldname": "sim_card_section",
    "fieldtype": "Section Break",
-   "label": "Sim Card"
+   "label": "Sim Card Details"
   },
   {
    "fieldname": "column_break_oulk",
@@ -260,7 +262,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-06-23 21:11:14.300358",
+ "modified": "2025-06-23 23:54:16.703376",
  "modified_by": "Administrator",
  "module": "Tuktuk Management",
  "name": "TukTuk Vehicle",

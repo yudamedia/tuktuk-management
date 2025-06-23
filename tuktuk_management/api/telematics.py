@@ -247,12 +247,7 @@ def update_all_vehicle_statuses():
         
         frappe.db.commit()
         
-        # Log the results
-        result_message = f"Telemetry update completed: {updated_count}/{len(all_vehicles)} vehicles updated"
-        if error_count > 0:
-            result_message += f", {error_count} errors"
-        
-        frappe.log_error(result_message)
+
         
         return {
             "success": True,
