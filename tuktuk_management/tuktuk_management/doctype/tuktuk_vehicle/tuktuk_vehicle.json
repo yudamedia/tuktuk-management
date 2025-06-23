@@ -25,11 +25,10 @@
   "telematics_tab",
   "telematics_section",
   "telematics_device_model",
-  "device_id",
   "device_imei",
   "last_reported",
   "column_break_telemetry",
-  "current_location",
+  "device_id",
   "last_battery_reading",
   "sim_section",
   "sim_provider",
@@ -132,7 +131,7 @@
    "label": "Telematics Device"
   },
   {
-   "description": "The OB number (e.g., OB3538970116)",
+   "description": "GrowTri Device ID",
    "fieldname": "device_id",
    "fieldtype": "Data",
    "label": "Device ID"
@@ -207,7 +206,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-04-15 15:04:43.641088",
+ "modified": "2025-06-23 18:06:09.562381",
  "modified_by": "Administrator",
  "module": "Tuktuk Management",
  "name": "TukTuk Vehicle",
