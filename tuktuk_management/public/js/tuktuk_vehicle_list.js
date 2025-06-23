@@ -1,6 +1,7 @@
 // ~/frappe-bench/apps/tuktuk_management/tuktuk_management/public/js/tuktuk_vehicle_list.js
-// Enhanced TukTuk Vehicle List view with device mapping integration AND CSV Upload
+// Fixed TukTuk Vehicle List with proper initialization
 
+// FIRST: Define the listview settings
 frappe.listview_settings['TukTuk Vehicle'] = {
     // Add device mapping status to list view
     add_fields: ["device_id", "device_imei", "battery_level", "last_reported", "latitude", "longitude"],
@@ -74,45 +75,8 @@ frappe.listview_settings['TukTuk Vehicle'] = {
     },
 
     onload: function(listview) {
-        // Add bulk device mapping actions
-        if (frappe.user.has_role(['System Manager', 'Tuktuk Manager'])) {
-            listview.page.add_action_item(__("Auto-Map All Devices"), function() {
-                bulk_auto_map_devices();
-            });
-            
-            listview.page.add_action_item(__("Validate All Mappings"), function() {
-                validate_all_device_mappings();
-            });
-            
-            listview.page.add_action_item(__("Device Mapping Report"), function() {
-                show_device_mapping_report();
-            });
-            
-            // **ADD CSV UPLOAD BUTTON HERE**
-            listview.page.add_action_item(__("📁 CSV Upload"), function() {
-                if (typeof tuktuk_management !== 'undefined' && tuktuk_management.csv_upload) {
-                    tuktuk_management.csv_upload.show_upload_dialog();
-                } else {
-                    // Fallback if CSV upload module not loaded
-                    frappe.msgprint({
-                        title: __('CSV Upload Not Available'),
-                        message: __('The CSV upload functionality is not loaded. Please ensure the csv_telemetry_upload.js file is included.'),
-                        indicator: 'red'
-                    });
-                }
-            });
-        }
-        
-        // Add refresh telematics data action
-        listview.page.add_action_item(__("Refresh Telematics"), function() {
-            refresh_all_telematics_data();
-        });
-        
-        // Add battery status filter buttons
-        add_battery_filter_buttons(listview);
-        
-        // Add device mapping filter buttons
-        add_device_mapping_filters(listview);
+        console.log('🚗 TukTuk Vehicle list onload called');
+        setup_tuktuk_vehicle_actions(listview);
     },
 
     // Custom filters for device mapping
@@ -125,6 +89,211 @@ frappe.listview_settings['TukTuk Vehicle'] = {
         }
     ]
 };
+
+// SECOND: Define the setup function
+function setup_tuktuk_vehicle_actions(listview) {
+    console.log('🔧 Setting up TukTuk Vehicle actions...');
+    
+    if (!listview || !listview.page) {
+        console.log('❌ Listview or listview.page not available');
+        return;
+    }
+    
+    // Add bulk device mapping actions
+    if (frappe.user.has_role(['System Manager', 'Tuktuk Manager'])) {
+        console.log('✅ User has required roles, adding buttons...');
+        
+        listview.page.add_action_item(__("🔄 Auto-Map All Devices"), function() {
+            bulk_auto_map_devices();
+        });
+        
+        listview.page.add_action_item(__("✅ Validate All Mappings"), function() {
+            validate_all_device_mappings();
+        });
+        
+        listview.page.add_action_item(__("📊 Device Mapping Report"), function() {
+            show_device_mapping_report();
+        });
+        
+        // CSV UPLOAD BUTTON - with error handling
+        listview.page.add_action_item(__("📁 CSV Upload"), function() {
+            console.log('CSV Upload button clicked');
+            try {
+                if (typeof tuktuk_management !== 'undefined' && 
+                    tuktuk_management.csv_upload && 
+                    typeof tuktuk_management.csv_upload.show_upload_dialog === 'function') {
+                    
+                    console.log('✅ Opening CSV upload dialog');
+                    tuktuk_management.csv_upload.show_upload_dialog();
+                } else {
+                    console.log('❌ CSV upload module not available, showing fallback');
+                    show_csv_upload_fallback();
+                }
+            } catch (error) {
+                console.error('Error opening CSV upload:', error);
+                frappe.msgprint({
+                    title: __('CSV Upload Error'),
+                    message: __('There was an error opening the CSV upload dialog. Check console for details.'),
+                    indicator: 'red'
+                });
+            }
+        });
+        
+        console.log('✅ All action buttons added successfully');
+    } else {
+        console.log('❌ User does not have required roles');
+    }
+    
+    // Add refresh telematics data action (for all users)
+    listview.page.add_action_item(__("🔄 Refresh Telematics"), function() {
+        refresh_all_telematics_data();
+    });
+    
+    // Add filter buttons
+    try {
+        add_battery_filter_buttons(listview);
+        add_device_mapping_filters(listview);
+        console.log('✅ Filter buttons added');
+    } catch (error) {
+        console.error('Error adding filter buttons:', error);
+    }
+}
+
+// THIRD: Fallback CSV upload function
+function show_csv_upload_fallback() {
+    const dialog = new frappe.ui.Dialog({
+        title: __('CSV Upload'),
+        fields: [
+            {
+                fieldtype: 'HTML',
+                fieldname: 'fallback_info',
+                options: `
+                    <div class="alert alert-info">
+                        <h6>CSV Upload Functionality</h6>
+                        <p>The CSV upload module is not fully loaded. You can still upload CSV files using the basic method:</p>
+                        <ol>
+                            <li>Use the File Manager to upload your CSV</li>
+                            <li>Use the API method to process it</li>
+                            <li>Or try refreshing the page</li>
+                        </ol>
+                    </div>
+                `
+            },
+            {
+                fieldtype: 'Attach',
+                fieldname: 'csv_file',
+                label: __('CSV File'),
+                description: 'Upload your telemetry CSV file'
+            }
+        ],
+        primary_action: function(values) {
+            if (values.csv_file) {
+                process_csv_via_api(values.csv_file);
+                dialog.hide();
+            } else {
+                frappe.msgprint(__('Please select a CSV file'));
+            }
+        },
+        primary_action_label: __('Process CSV')
+    });
+    
+    dialog.show();
+}
+
+function process_csv_via_api(file_url) {
+    frappe.show_alert({
+        message: __('Processing CSV file...'),
+        indicator: 'blue'
+    });
+    
+    frappe.call({
+        method: 'tuktuk_management.api.csv_integration.process_uploaded_file',
+        args: {
+            file_url: file_url,
+            mapping_type: 'auto'
+        },
+        callback: function(r) {
+            if (r.message) {
+                const results = r.message;
+                frappe.msgprint({
+                    title: __('CSV Processing Results'),
+                    message: `
+                        <div>
+                            <p><strong>Total Rows:</strong> ${results.total_rows}</p>
+                            <p><strong>Updated:</strong> ${results.updated}</p>
+                            <p><strong>Failed:</strong> ${results.failed}</p>
+                            <p><strong>Skipped:</strong> ${results.skipped}</p>
+                        </div>
+                    `,
+                    indicator: results.updated > 0 ? 'green' : 'orange'
+                });
+                
+                if (cur_list) {
+                    cur_list.refresh();
+                }
+            }
+        },
+        error: function(error) {
+            frappe.msgprint({
+                title: __('CSV Processing Failed'),
+                message: error.message,
+                indicator: 'red'
+            });
+        }
+    });
+}
+
+// FOURTH: Force initialization on document ready
+$(document).ready(function() {
+    console.log('🚀 Document ready - checking for TukTuk Vehicle list');
+    
+    // Wait a bit for page to load, then force setup if needed
+    setTimeout(function() {
+        if (window.location.href.includes('TukTuk%20Vehicle') || 
+            window.location.href.includes('TukTuk Vehicle') ||
+            (cur_list && cur_list.doctype === 'TukTuk Vehicle')) {
+            
+            console.log('📍 TukTuk Vehicle list detected');
+            
+            // Check if actions are already loaded
+            if (cur_list && cur_list.page && cur_list.page.menu) {
+                const existing_actions = cur_list.page.menu.find('a:contains("CSV Upload")');
+                
+                if (existing_actions.length === 0) {
+                    console.log('🔧 Actions not found, forcing setup...');
+                    setup_tuktuk_vehicle_actions(cur_list);
+                } else {
+                    console.log('✅ Actions already exist');
+                }
+            }
+        }
+    }, 1000);
+    
+    // Also try again after a longer delay
+    setTimeout(function() {
+        if (cur_list && cur_list.doctype === 'TukTuk Vehicle') {
+            const existing_actions = cur_list.page.menu.find('a:contains("CSV Upload")');
+            if (existing_actions.length === 0) {
+                console.log('🔧 Second attempt - forcing setup...');
+                setup_tuktuk_vehicle_actions(cur_list);
+            }
+        }
+    }, 3000);
+});
+
+// FIFTH: Listen for route changes
+$(document).on('page-change', function() {
+    setTimeout(function() {
+        if (cur_list && cur_list.doctype === 'TukTuk Vehicle') {
+            console.log('📍 Page changed to TukTuk Vehicle list');
+            const existing_actions = cur_list.page.menu.find('a:contains("CSV Upload")');
+            if (existing_actions.length === 0) {
+                console.log('🔧 Page change - forcing setup...');
+                setup_tuktuk_vehicle_actions(cur_list);
+            }
+        }
+    }, 500);
+});
 
 // Bulk Device Mapping Functions
 function bulk_auto_map_devices() {
