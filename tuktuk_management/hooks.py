@@ -46,11 +46,22 @@ whitelisted_methods = [
     "tuktuk_management.api.telematics.update_battery",
     "tuktuk_management.api.telematics.get_status",
 
-    # CSV Update Methods
+    # Device mapping methods...
+    "tuktuk_management.api.device_mapping.auto_map_devices_from_telemetry",
+    "tuktuk_management.api.device_mapping.manual_device_mapping",
+    "tuktuk_management.api.device_mapping.get_unmapped_devices",
+    "tuktuk_management.api.device_mapping.validate_device_mappings",
+    "tuktuk_management.api.device_mapping.reset_device_mapping",
+    "tuktuk_management.api.device_mapping.apply_mapping_suggestions",    
+
+    # CSV UPLOAD METHODS:
     "tuktuk_management.api.csv_telemetry.upload_telemetry_csv_data",
     "tuktuk_management.api.csv_telemetry.validate_csv_before_upload",
     "tuktuk_management.api.csv_telemetry.get_csv_upload_template",
     "tuktuk_management.api.csv_integration.batch_update_from_device_export",
+    "tuktuk_management.api.csv_integration.process_uploaded_file",
+    "tuktuk_management.api.csv_integration.get_upload_statistics",
+    "tuktuk_management.api.csv_integration.create_sample_csv_data",
 
     # TukTuk Driver Authentication and Portal API endpoints (updated names)
     "tuktuk_management.api.driver_auth.create_tuktuk_driver_user_account",

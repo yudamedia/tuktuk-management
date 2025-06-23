@@ -1,5 +1,5 @@
 // ~/frappe-bench/apps/tuktuk_management/tuktuk_management/public/js/tuktuk_vehicle_list.js
-// Enhanced TukTuk Vehicle List view with device mapping integration
+// Enhanced TukTuk Vehicle List view with device mapping integration AND CSV Upload
 
 frappe.listview_settings['TukTuk Vehicle'] = {
     // Add device mapping status to list view
@@ -86,6 +86,20 @@ frappe.listview_settings['TukTuk Vehicle'] = {
             
             listview.page.add_action_item(__("Device Mapping Report"), function() {
                 show_device_mapping_report();
+            });
+            
+            // **ADD CSV UPLOAD BUTTON HERE**
+            listview.page.add_action_item(__("📁 CSV Upload"), function() {
+                if (typeof tuktuk_management !== 'undefined' && tuktuk_management.csv_upload) {
+                    tuktuk_management.csv_upload.show_upload_dialog();
+                } else {
+                    // Fallback if CSV upload module not loaded
+                    frappe.msgprint({
+                        title: __('CSV Upload Not Available'),
+                        message: __('The CSV upload functionality is not loaded. Please ensure the csv_telemetry_upload.js file is included.'),
+                        indicator: 'red'
+                    });
+                }
             });
         }
         
