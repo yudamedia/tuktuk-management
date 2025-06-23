@@ -193,35 +193,84 @@ class TelematicsIntegration:
             frappe.log_error(f"Error updating vehicle status: {str(e)}")
             return False
 
+@frappe.whitelist()
 def update_all_vehicle_statuses():
-    """Background job to update all vehicle statuses"""
+    """Update status for all vehicles with telematics devices"""
     try:
         integration = TelematicsIntegration()
+        
+        # Fixed filter syntax - use proper OR condition structure
         vehicles = frappe.get_all(
             "TukTuk Vehicle",
-            filters={
-                "$or": [
-                    {"device_id": ["!=", ""]},
-                    {"device_imei": ["!=", ""]}
-                ]
-            },
-            fields=["device_id", "device_imei", "name", "tuktuk_id"]
+            filters=[
+                ["device_id", "!=", ""],
+                ["device_id", "is", "set"]
+            ],
+            fields=["device_id", "device_imei", "name", "tuktuk_id"],
+            ignore_permissions=True,
+            limit_page_length=0
         )
         
-        updated_count = 0
+        # Also get vehicles with IMEI but no device_id
+        vehicles_with_imei = frappe.get_all(
+            "TukTuk Vehicle",
+            filters=[
+                ["device_imei", "!=", ""],
+                ["device_imei", "is", "set"],
+                ["device_id", "in", ["", None]]  # Only if device_id is empty
+            ],
+            fields=["device_id", "device_imei", "name", "tuktuk_id"],
+            ignore_permissions=True,
+            limit_page_length=0
+        )
         
-        for vehicle in vehicles:
-            device_id = vehicle.device_id or vehicle.device_imei
-            if device_id:
-                success = integration.update_vehicle_status(device_id)
-                if success:
-                    updated_count += 1
+        # Combine the results
+        all_vehicles = vehicles + vehicles_with_imei
+        
+        updated_count = 0
+        error_count = 0
+        errors = []
+        
+        for vehicle in all_vehicles:
+            try:
+                device_id = vehicle.get("device_id") or vehicle.get("device_imei")
+                if device_id:
+                    success = integration.update_vehicle_status(device_id)
+                    if success:
+                        updated_count += 1
+                    else:
+                        error_count += 1
+                        errors.append(f"Failed to update {vehicle.get('tuktuk_id', 'Unknown')}")
+            except Exception as e:
+                error_count += 1
+                errors.append(f"Error updating {vehicle.get('tuktuk_id', 'Unknown')}: {str(e)}")
         
         frappe.db.commit()
-        frappe.log_error(f"Telemetry update completed: {updated_count}/{len(vehicles)} vehicles updated")
+        
+        # Log the results
+        result_message = f"Telemetry update completed: {updated_count}/{len(all_vehicles)} vehicles updated"
+        if error_count > 0:
+            result_message += f", {error_count} errors"
+        
+        frappe.log_error(result_message)
+        
+        return {
+            "success": True,
+            "updated": updated_count,
+            "errors": error_count,
+            "total": len(all_vehicles),
+            "message": result_message,
+            "error_details": errors[:5]  # Only return first 5 errors
+        }
         
     except Exception as e:
-        frappe.log_error(f"Error in update_all_vehicle_statuses: {str(e)}")
+        error_msg = f"Error in update_all_vehicle_statuses: {str(e)}"
+        frappe.log_error(error_msg)
+        return {
+            "success": False,
+            "message": error_msg,
+            "error": str(e)
+        }
 
 # API endpoint for webhook integration
 @frappe.whitelist(allow_guest=True)
