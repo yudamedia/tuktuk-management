@@ -11,7 +11,8 @@ app_include_css = [
 
 app_include_js = [
     "/assets/tuktuk_management/js/tuktuk_management.js",
-    "/assets/tuktuk_management/js/tuktuk_tracker.js"
+    "/assets/tuktuk_management/js/tuktuk_tracker.js",
+    "/assets/tuktuk_management/js/csv_telemetry_upload.js"
 ]
 
 app_icon = "octicon octicon-file-directory"
@@ -44,6 +45,12 @@ whitelisted_methods = [
     "tuktuk_management.api.telematics.update_location",
     "tuktuk_management.api.telematics.update_battery",
     "tuktuk_management.api.telematics.get_status",
+
+    # CSV Update Methods
+    "tuktuk_management.api.csv_telemetry.upload_telemetry_csv_data",
+    "tuktuk_management.api.csv_telemetry.validate_csv_before_upload",
+    "tuktuk_management.api.csv_telemetry.get_csv_upload_template",
+    "tuktuk_management.api.csv_integration.batch_update_from_device_export",
 
     # TukTuk Driver Authentication and Portal API endpoints (updated names)
     "tuktuk_management.api.driver_auth.create_tuktuk_driver_user_account",
