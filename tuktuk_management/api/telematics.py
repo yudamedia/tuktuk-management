@@ -199,33 +199,26 @@ def update_all_vehicle_statuses():
     try:
         integration = TelematicsIntegration()
         
-        # Fixed filter syntax - use proper OR condition structure
-        vehicles = frappe.get_all(
+        # Use separate queries to avoid OR filter issues
+        vehicles_with_device_id = frappe.get_all(
             "TukTuk Vehicle",
-            filters=[
-                ["device_id", "!=", ""],
-                ["device_id", "is", "set"]
-            ],
+            filters={"device_id": ["!=", ""]},
             fields=["device_id", "device_imei", "name", "tuktuk_id"],
-            ignore_permissions=True,
-            limit_page_length=0
+            ignore_permissions=True
         )
         
-        # Also get vehicles with IMEI but no device_id
-        vehicles_with_imei = frappe.get_all(
-            "TukTuk Vehicle",
-            filters=[
-                ["device_imei", "!=", ""],
-                ["device_imei", "is", "set"],
-                ["device_id", "in", ["", None]]  # Only if device_id is empty
-            ],
+        vehicles_with_imei_only = frappe.get_all(
+            "TukTuk Vehicle", 
+            filters={
+                "device_imei": ["!=", ""],
+                "device_id": ["in", ["", None]]
+            },
             fields=["device_id", "device_imei", "name", "tuktuk_id"],
-            ignore_permissions=True,
-            limit_page_length=0
+            ignore_permissions=True
         )
         
         # Combine the results
-        all_vehicles = vehicles + vehicles_with_imei
+        all_vehicles = vehicles_with_device_id + vehicles_with_imei_only
         
         updated_count = 0
         error_count = 0
@@ -247,20 +240,20 @@ def update_all_vehicle_statuses():
         
         frappe.db.commit()
         
-
+        # REMOVED: frappe.log_error(result_message) - this was logging success as error
         
         return {
             "success": True,
             "updated": updated_count,
             "errors": error_count,
             "total": len(all_vehicles),
-            "message": result_message,
+            "message": f"Telemetry update completed: {updated_count}/{len(all_vehicles)} vehicles updated" + (f", {error_count} errors" if error_count > 0 else ""),
             "error_details": errors[:5]  # Only return first 5 errors
         }
         
     except Exception as e:
         error_msg = f"Error in update_all_vehicle_statuses: {str(e)}"
-        frappe.log_error(error_msg)
+        frappe.log_error(error_msg)  # KEEP: This is a real error
         return {
             "success": False,
             "message": error_msg,
@@ -285,7 +278,7 @@ def telematics_webhook():
                 return {"status": "success" if success else "error"}
         return {"status": "error", "message": "No data received"}
     except Exception as e:
-        frappe.log_error(f"Telematics Webhook Error: {str(e)}")
+        frappe.log_error(f"Telematics Webhook Error: {str(e)}")  # KEEP: This is a real error
         return {"status": "error", "message": str(e)}
 
 # Enhanced API methods
@@ -326,16 +319,23 @@ def bulk_import_telemetry_data(csv_data):
                 
                 device_id = parsed_data["device_id"]
                 
-                # Find vehicle
-                vehicle = frappe.get_all("TukTuk Vehicle",
-                                       filters={
-                                           "$or": [
-                                               {"device_id": device_id},
-                                               {"device_imei": parsed_data["device_imei"]}
-                                           ]
-                                       },
-                                       fields=["name"],
-                                       limit=1)
+                # Find vehicle using separate queries to avoid OR filter issues
+                vehicle = None
+                if device_id:
+                    vehicles = frappe.get_all("TukTuk Vehicle",
+                                           filters={"device_id": device_id},
+                                           fields=["name"],
+                                           limit=1)
+                    if vehicles:
+                        vehicle = vehicles
+                
+                if not vehicle and parsed_data["device_imei"]:
+                    vehicles = frappe.get_all("TukTuk Vehicle",
+                                           filters={"device_imei": parsed_data["device_imei"]},
+                                           fields=["name"],
+                                           limit=1)
+                    if vehicles:
+                        vehicle = vehicles
                 
                 if vehicle:
                     # Update the vehicle
@@ -356,6 +356,9 @@ def bulk_import_telemetry_data(csv_data):
                 results["errors"].append(f"Row {row_num}: {str(e)}")
         
         frappe.db.commit()
+        
+        # REMOVED: Success logging - results are returned to caller
+        
         return results
         
     except Exception as e:
@@ -390,12 +393,13 @@ def sync_device_mapping():
 def get_telemetry_status():
     """Get telemetry integration status"""
     try:
-        vehicles_with_devices = frappe.db.count("TukTuk Vehicle", {
-            "$or": [
-                {"device_id": ["!=", ""]},
-                {"device_imei": ["!=", ""]}
-            ]
+        # Use separate queries instead of $or to avoid filter issues
+        vehicles_with_device_id = frappe.db.count("TukTuk Vehicle", {"device_id": ["!=", ""]})
+        vehicles_with_imei = frappe.db.count("TukTuk Vehicle", {
+            "device_imei": ["!=", ""],
+            "device_id": ["in", ["", None]]
         })
+        vehicles_with_devices = vehicles_with_device_id + vehicles_with_imei
         
         total_vehicles = frappe.db.count("TukTuk Vehicle")
         
@@ -476,5 +480,5 @@ def update_from_device(vehicle_name, device_id):
             frappe.throw(_("Unable to retrieve data from telematics device"))
             
     except Exception as e:
-        frappe.log_error(f"Telematics update failed: {str(e)}")
+        frappe.log_error(f"Telematics update failed: {str(e)}")  # KEEP: This is a real error
         frappe.throw(_("Failed to update from telematics device: {0}").format(str(e)))
