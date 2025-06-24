@@ -131,7 +131,7 @@ def register_c2b_url():
         frappe.throw("Failed to get production access token")
     
     # Use PRODUCTION URL
-    api_url = f"{PRODUCTION_BASE_URL}/mpesa/c2b/v1/registerurl"
+    api_url = f"{PRODUCTION_BASE_URL}/mpesa/c2b/v2/registerurl"
     
     headers = {
         "Authorization": f"Bearer {access_token}",
