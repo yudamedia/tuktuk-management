@@ -86,7 +86,18 @@ whitelisted_methods = [
     "tuktuk_management.api.tuktuk.get_drivers_with_deposit_info",
     "tuktuk_management.api.tuktuk.bulk_process_target_deductions",
     "tuktuk_management.api.tuktuk.generate_deposit_report",
-    "tuktuk_management.api.tuktuk.process_bulk_refunds"
+    "tuktuk_management.api.tuktuk.process_bulk_refunds",
+
+    # User management methods
+    "tuktuk_management.api.user_management.create_tuktuk_manager_user",
+    "tuktuk_management.api.user_management.resend_welcome_email",
+    "tuktuk_management.api.user_management.check_and_send_tuktuk_manager_welcome",
+    "tuktuk_management.api.user_management.check_role_change_and_send_welcome"
+]
+
+# Email templates
+email_template_dirs = [
+    "tuktuk_management/templates/emails"
 ]
 
 
@@ -102,9 +113,12 @@ doc_events = {
     "TukTuk Vehicle": {
         "validate": "tuktuk_management.api.tuktuk.validate_vehicle",
         "on_update": "tuktuk_management.api.tuktuk.handle_vehicle_status_change"
+    },
+    "User": {
+            "after_insert": "tuktuk_management.api.user_management.check_and_send_tuktuk_manager_welcome",
+            "on_update": "tuktuk_management.api.user_management.check_role_change_and_send_welcome"
     }
 }
-
 # Scheduled Tasks
 scheduler_events = {
     "cron": {

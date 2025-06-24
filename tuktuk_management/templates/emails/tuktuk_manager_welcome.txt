@@ -1,0 +1,33 @@
+Welcome to Sunny Tuktuk Management System!
+
+Hello {{ full_name }},
+
+Welcome to the Sunny Tuktuk Management System! We're excited to have you as part of our team managing our solar-powered tuktuk fleet in Diani Beach, Kenya.
+
+Your Login Credentials:
+- Login URL: {{ site_url }}
+- Username: {{ email }}
+- Password: {{ password }}
+
+IMPORTANT: Please change your password immediately after your first login for security.
+
+Getting Started:
+1. Login at {{ site_url }}
+2. Change your password in user settings
+3. Download the user manual: {{ manual_url }}
+4. Explore the tuktuk management dashboard
+
+Your account has Tuktuk Manager privileges, giving you access to:
+- Fleet management and monitoring
+- Driver management and performance tracking  
+- Transaction monitoring and revenue management
+- Comprehensive reporting and analytics
+- System configuration and settings
+
+If you need assistance, refer to the user manual or contact the system administrator.
+
+
+Best regards,
+The Sunny Tuktuk Team
+
+© 2025 Sunny Tuktuk | Diani Beach, Kenya

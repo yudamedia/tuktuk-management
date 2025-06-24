@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to Sunny Tuktuk</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background: linear-gradient(135deg, #FFA500, #FF8C00);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+            border-radius: 10px 10px 0 0;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 600;
+        }
+        .header p {
+            margin: 10px 0 0 0;
+            font-size: 16px;
+            opacity: 0.9;
+        }
+        .content {
+            background: white;
+            padding: 30px;
+            border: 1px solid #e6e6e6;
+            border-top: none;
+        }
+        .credentials {
+            background: #f8f9fa;
+            border: 2px solid #28a745;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .credentials h3 {
+            color: #28a745;
+            margin-top: 0;
+            font-size: 18px;
+        }
+        .credential-item {
+            margin: 10px 0;
+            padding: 8px 12px;
+            background: white;
+            border-radius: 4px;
+            border-left: 4px solid #28a745;
+        }
+        .credential-label {
+            font-weight: 600;
+            color: #555;
+            font-size: 14px;
+        }
+        .credential-value {
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            color: #333;
+            margin-top: 2px;
+        }
+        .button {
+            display: inline-block;
+            background: #007bff;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            margin: 10px 5px;
+            transition: background-color 0.3s;
+        }
+        .button:hover {
+            background: #0056b3;
+            color: white;
+        }
+        .button.secondary {
+            background: #6c757d;
+        }
+        .button.secondary:hover {
+            background: #545b62;
+        }
+        .footer {
+            background: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            border-radius: 0 0 10px 10px;
+            border: 1px solid #e6e6e6;
+            border-top: none;
+            color: #666;
+            font-size: 14px;
+        }
+        .important-note {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 20px 0;
+            color: #856404;
+        }
+        .tuktuk-icon {
+            font-size: 24px;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><span class="tuktuk-icon">🛺</span>Welcome to Sunny Tuktuk</h1>
+        <p>Your Management System Access</p>
+    </div>
+    
+    <div class="content">
+        <h2>Hello {{ full_name }}!</h2>
+        
+        <p>Welcome to the Sunny Tuktuk Management System! We're excited to have you as part of our team managing our solar-powered tuktuk fleet in Diani Beach, Kenya.</p>
+        
+        <p>Your account has been created with Tuktuk Manager privileges, giving you access to:</p>
+        <ul>
+            <li>🚐 Fleet management and monitoring</li>
+            <li>👥 Driver management and performance tracking</li>
+            <li>💰 Transaction monitoring and revenue management</li>
+            <li>📊 Comprehensive reporting and analytics</li>
+            <li>⚙️ System configuration and settings</li>
+        </ul>
+        
+        <div class="credentials">
+            <h3>🔑 Your Login Credentials</h3>
+            <div class="credential-item">
+                <div class="credential-label">Login URL:</div>
+                <div class="credential-value">{{ site_url }}</div>
+            </div>
+            <div class="credential-item">
+                <div class="credential-label">Username:</div>
+                <div class="credential-value">{{ email }}</div>
+            </div>
+            <div class="credential-item">
+                <div class="credential-label">Temporary Password:</div>
+                <div class="credential-value">{{ password }}</div>
+            </div>
+        </div>
+        
+        <div class="important-note">
+            <strong>🔒 Important Security Note:</strong><br>
+            For your security, please change your password immediately after your first login. Go to your user profile settings to update your password.
+        </div>
+        
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="{{ site_url }}" class="button">🚀 Login to System</a>
+            <a href="{{ manual_url }}" class="button secondary">📖 Download User Manual</a>
+        </div>
+        
+        <h3>Getting Started:</h3>
+        <ol>
+            <li><strong>Login:</strong> Click the login button above or visit {{ site_url }}</li>
+            <li><strong>Change Password:</strong> Update your password in user settings</li>
+            <li><strong>Read Manual:</strong> Download and review the user manual for detailed instructions</li>
+            <li><strong>Explore System:</strong> Familiarize yourself with the tuktuk management dashboard</li>
+        </ol>
+        
+        <h3>Key Features Available:</h3>
+        <ul>
+            <li><strong>Vehicle Management:</strong> Track all 21 solar-powered tuktuks, battery levels, and maintenance</li>
+            <li><strong>Driver Operations:</strong> Manage driver assignments, daily targets, and performance metrics</li>
+            <li><strong>Payment Processing:</strong> Monitor M-Pesa transactions and driver earnings</li>
+            <li><strong>Rental System:</strong> Handle temporary tuktuk assignments during charging periods</li>
+            <li><strong>Analytics:</strong> View comprehensive reports on fleet performance and revenue</li>
+        </ul>
+        
+        <p>If you need assistance or have questions:</p>
+        <ul>
+            <li>📖 Refer to the user manual (link above)</li>
+            <li>💬 Contact the system administrator</li>
+
+        </ul>
+        
+    
+        
+        <p>Best regards,<br>
+        <strong>The Sunny Tuktuk Team</strong></p>
+    </div>
+    
+    <div class="footer">
+        <p>© 2025 Sunny Tuktuk | Diani Beach, Kenya</p>
+        <p>This is an automated email. Please do not reply directly to this message.</p>
+        <p>🌞 Powered by Solar Energy | 🛺 Sustainable Transport Solutions</p>
+    </div>
+</body>
+</html>
