@@ -804,53 +804,42 @@ function add_battery_filter_buttons(listview) {
             </div>
         `);
         
-        // Handle battery filter clicks with error handling
+        // FIXED: Handle battery filter clicks with proper filter format
         listview.page.sidebar.on('click', '.battery-filter', function() {
             try {
                 const filter_type = $(this).data('filter');
-                let filters = [];
                 
-                switch(filter_type) {
-                    case 'critical':
-                        filters = [['TukTuk Vehicle', 'battery_level', '<=', flt(10)]];
-                        break;
-                    case 'low':
-                        filters = [['TukTuk Vehicle', 'battery_level', '<=', flt(25)]];
-                        break;
-                    case 'medium':
-                        filters = [
-                            ['TukTuk Vehicle', 'battery_level', '>', flt(25)],
-                            ['TukTuk Vehicle', 'battery_level', '<=', flt(50)]
-                        ];
-                        break;
-                    case 'good':
-                        filters = [['TukTuk Vehicle', 'battery_level', '>', flt(50)]];
-                        break;
-                    case 'unknown':
-                        filters = [['TukTuk Vehicle', 'battery_level', 'is', 'not set']];
-                        break;
-                }
-                
-                // Safe filter application with error handling
+                // Clear existing filters first
                 if (listview.filter_area && typeof listview.filter_area.clear === 'function') {
-                    try {
-                        listview.filter_area.clear();
-                        filters.forEach(filter => {
-                            listview.filter_area.add(filter);
-                        });
-                        
-                        // Update button states
-                        $('.battery-filter').removeClass('active');
-                        $(this).addClass('active');
-                        
-                        console.log('✅ Battery filter applied:', filter_type);
-                    } catch (filter_apply_error) {
-                        console.error('Error applying battery filter:', filter_apply_error);
-                        frappe.show_alert({
-                            message: __('Filter could not be applied due to system restrictions'),
-                            indicator: 'orange'
-                        });
+                    listview.filter_area.clear();
+                    
+                    // FIXED: Apply filters directly, not through forEach loop
+                    switch(filter_type) {
+                        case 'critical':
+                            listview.filter_area.add('TukTuk Vehicle', 'battery_level', '<=', 10);
+                            break;
+                        case 'low':
+                            listview.filter_area.add('TukTuk Vehicle', 'battery_level', '<=', 25);
+                            break;
+                        case 'medium':
+                            // For range filters, apply them separately
+                            listview.filter_area.add('TukTuk Vehicle', 'battery_level', '>', 25);
+                            listview.filter_area.add('TukTuk Vehicle', 'battery_level', '<=', 50);
+                            break;
+                        case 'good':
+                            listview.filter_area.add('TukTuk Vehicle', 'battery_level', '>', 50);
+                            break;
+                        case 'unknown':
+                            listview.filter_area.add('TukTuk Vehicle', 'battery_level', 'is', 'not set');
+                            break;
                     }
+                    
+                    // Update button states
+                    $('.battery-filter').removeClass('active');
+                    $(this).addClass('active');
+                    
+                    console.log('✅ Battery filter applied:', filter_type);
+                    
                 } else {
                     console.warn('⚠️ Filter area not available for battery filtering');
                     frappe.show_alert({
@@ -858,8 +847,12 @@ function add_battery_filter_buttons(listview) {
                         indicator: 'orange'
                     });
                 }
-            } catch (click_error) {
-                console.error('Error handling battery filter click:', click_error);
+            } catch (filter_apply_error) {
+                console.error('Error applying battery filter:', filter_apply_error);
+                frappe.show_alert({
+                    message: __('Filter could not be applied due to system restrictions'),
+                    indicator: 'orange'
+                });
             }
         });
         
@@ -868,6 +861,7 @@ function add_battery_filter_buttons(listview) {
     }
 }
 
+// FIXED: Device mapping filter function - replace lines 677-750 in your file  
 function add_device_mapping_filters(listview) {
     try {
         // Safety check for required elements
@@ -897,72 +891,59 @@ function add_device_mapping_filters(listview) {
             </div>
         `);
         
-        // Handle device filter clicks with error handling
+        // FIXED: Handle device filter clicks with proper filter format
         listview.page.sidebar.on('click', '.device-filter', function() {
             try {
                 const filter_type = $(this).data('filter');
-                let filters = [];
                 
-                switch(filter_type) {
-                    case 'mapped':
-                        filters = [
-                            ['TukTuk Vehicle', 'device_id', 'is', 'set'],
-                            ['TukTuk Vehicle', 'device_imei', 'is', 'set']
-                        ];
-                        break;
-                    case 'unmapped':
-                        filters = [['TukTuk Vehicle', 'device_id', 'is', 'not set']];
-                        break;
-                    case 'recent':
-                        try {
-                            // Updates within last 6 hours
-                            const six_hours_ago = frappe.datetime.add_to_date(new Date(), {hours: -6});
-                            filters = [['TukTuk Vehicle', 'last_reported', '>', six_hours_ago]];
-                        } catch (date_error) {
-                            console.error('Error calculating recent date filter:', date_error);
-                            frappe.show_alert({
-                                message: __('Could not apply recent updates filter'),
-                                indicator: 'orange'
-                            });
-                            return;
-                        }
-                        break;
-                    case 'stale':
-                        try {
-                            // No updates in last 24 hours
-                            const day_ago = frappe.datetime.add_to_date(new Date(), {days: -1});
-                            filters = [['TukTuk Vehicle', 'last_reported', '<', day_ago]];
-                        } catch (date_error) {
-                            console.error('Error calculating stale date filter:', date_error);
-                            frappe.show_alert({
-                                message: __('Could not apply stale data filter'),
-                                indicator: 'orange'
-                            });
-                            return;
-                        }
-                        break;
-                }
-                
-                // Safe filter application with error handling
+                // Clear existing filters first
                 if (listview.filter_area && typeof listview.filter_area.clear === 'function') {
-                    try {
-                        listview.filter_area.clear();
-                        filters.forEach(filter => {
-                            listview.filter_area.add(filter);
-                        });
-                        
-                        // Update button states
-                        $('.device-filter').removeClass('active');
-                        $(this).addClass('active');
-                        
-                        console.log('✅ Device mapping filter applied:', filter_type);
-                    } catch (filter_apply_error) {
-                        console.error('Error applying device mapping filter:', filter_apply_error);
-                        frappe.show_alert({
-                            message: __('Filter could not be applied due to system restrictions'),
-                            indicator: 'orange'
-                        });
+                    listview.filter_area.clear();
+                    
+                    // FIXED: Apply filters directly, not through forEach loop
+                    switch(filter_type) {
+                        case 'mapped':
+                            listview.filter_area.add('TukTuk Vehicle', 'device_id', 'is', 'set');
+                            break;
+                        case 'unmapped':
+                            listview.filter_area.add('TukTuk Vehicle', 'device_id', 'is', 'not set');
+                            break;
+                        case 'recent':
+                            try {
+                                // Updates within last 6 hours
+                                const six_hours_ago = frappe.datetime.add_to_date(new Date(), {hours: -6});
+                                listview.filter_area.add('TukTuk Vehicle', 'last_reported', '>', six_hours_ago);
+                            } catch (date_error) {
+                                console.error('Error calculating recent date filter:', date_error);
+                                frappe.show_alert({
+                                    message: __('Could not apply recent updates filter'),
+                                    indicator: 'orange'
+                                });
+                                return;
+                            }
+                            break;
+                        case 'stale':
+                            try {
+                                // No updates in last 24 hours
+                                const day_ago = frappe.datetime.add_to_date(new Date(), {days: -1});
+                                listview.filter_area.add('TukTuk Vehicle', 'last_reported', '<', day_ago);
+                            } catch (date_error) {
+                                console.error('Error calculating stale date filter:', date_error);
+                                frappe.show_alert({
+                                    message: __('Could not apply stale data filter'),
+                                    indicator: 'orange'
+                                });
+                                return;
+                            }
+                            break;
                     }
+                    
+                    // Update button states
+                    $('.device-filter').removeClass('active');
+                    $(this).addClass('active');
+                    
+                    console.log('✅ Device mapping filter applied:', filter_type);
+                    
                 } else {
                     console.warn('⚠️ Filter area not available for device mapping filtering');
                     frappe.show_alert({
@@ -970,8 +951,12 @@ function add_device_mapping_filters(listview) {
                         indicator: 'orange'
                     });
                 }
-            } catch (click_error) {
-                console.error('Error handling device mapping filter click:', click_error);
+            } catch (filter_apply_error) {
+                console.error('Error applying device mapping filter:', filter_apply_error);
+                frappe.show_alert({
+                    message: __('Filter could not be applied due to system restrictions'),
+                    indicator: 'orange'
+                });
             }
         });
         
