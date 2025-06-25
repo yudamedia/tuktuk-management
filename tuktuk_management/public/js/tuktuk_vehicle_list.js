@@ -33,19 +33,21 @@ frappe.listview_settings['TukTuk Vehicle'] = {
     get_indicator: function(doc) {
         // Color code based on device mapping and battery status
         if (!doc.device_id || !doc.device_imei) {
-            return [__("No Device"), "red", "device_id,is,not set"];
+            return [__("No Device"), "red"];
         } else if (flt(doc.battery_level) <= 10) {
-            return [__("Critical Battery"), "red", "battery_level,<=,10"];
+            return [__("Critical Battery"), "red"];
         } else if (flt(doc.battery_level) <= 25) {
-            return [__("Low Battery"), "orange", "battery_level,<=,25"];
+            return [__("Low Battery"), "orange"];
         } else if (doc.status === "Available") {
-            return [__("Available"), "green", "status,=,Available"];
+            return [__("Available"), "green"];
         } else if (doc.status === "Assigned") {
-            return [__("Assigned"), "blue", "status,=,Assigned"];
+            return [__("Assigned"), "blue"];
         } else if (doc.status === "Charging") {
-            return [__("Charging"), "orange", "status,=,Charging"];
+            return [__("Charging"), "orange"];
+        } else if (doc.status === "Maintenance") {
+            return [__("Maintenance"), "red"];
         } else {
-            return [__("Maintenance"), "red", "status,=,Maintenance"];
+            return [__("Unknown"), "gray"];
         }
     },
 
