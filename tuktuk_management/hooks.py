@@ -115,6 +115,7 @@ doc_events = {
         "on_update": "tuktuk_management.api.tuktuk.handle_vehicle_status_change"
     },
     "User": {
+            "before_insert": "tuktuk_management.api.user_management.disable_default_welcome_for_tuktuk_managers",
             "after_insert": "tuktuk_management.api.user_management.check_and_send_tuktuk_manager_welcome",
             "on_update": "tuktuk_management.api.user_management.check_role_change_and_send_welcome"
     }

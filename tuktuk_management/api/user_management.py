@@ -3,6 +3,20 @@ from frappe import _
 from frappe.utils import now_datetime, get_url, cstr
 import json
 
+def disable_default_welcome_for_tuktuk_managers(doc, method=None):
+    """
+    Hook function called BEFORE User creation
+    Disables default welcome email for users with Tuktuk Manager role
+    """
+    try:
+        if has_tuktuk_manager_role(doc):
+            # Disable default welcome email before user is saved
+            doc.send_welcome_email = 0
+            frappe.log_error("Default Welcome Email Disabled", f"Disabled for Tuktuk Manager: {doc.email}")
+    except Exception as e:
+        frappe.log_error(f"Failed to disable default welcome email: {str(e)}")
+        
+
 def check_and_send_tuktuk_manager_welcome(doc, method=None):
     """
     Hook function called after User creation
