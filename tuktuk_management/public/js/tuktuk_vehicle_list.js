@@ -24,30 +24,35 @@ if (typeof cint === 'undefined') {
     };
 }
 
-// FIRST: Define the listview settings with error handling
+// FIRST: Define the listview settings with error handling - MINIMAL SAFE VERSION
 frappe.listview_settings['TukTuk Vehicle'] = {
     
     // Add device mapping status to list view
     add_fields: ["device_id", "device_imei", "battery_level", "last_reported", "latitude", "longitude"],
     
     get_indicator: function(doc) {
-        // Color code based on device mapping and battery status
-        if (!doc.device_id || !doc.device_imei) {
-            return [__("No Device"), "red"];
-        } else if (flt(doc.battery_level) <= 10) {
-            return [__("Critical Battery"), "red"];
-        } else if (flt(doc.battery_level) <= 25) {
-            return [__("Low Battery"), "orange"];
-        } else if (doc.status === "Available") {
-            return [__("Available"), "green"];
-        } else if (doc.status === "Assigned") {
-            return [__("Assigned"), "blue"];
-        } else if (doc.status === "Charging") {
-            return [__("Charging"), "orange"];
-        } else if (doc.status === "Maintenance") {
-            return [__("Maintenance"), "red"];
-        } else {
-            return [__("Unknown"), "gray"];
+        try {
+            // Color code based on device mapping and battery status
+            if (!doc.device_id || !doc.device_imei) {
+                return [__("No Device"), "red"];
+            } else if (doc.battery_level && flt(doc.battery_level) <= 10) {
+                return [__("Critical Battery"), "red"];
+            } else if (doc.battery_level && flt(doc.battery_level) <= 25) {
+                return [__("Low Battery"), "orange"];
+            } else if (doc.status === "Available") {
+                return [__("Available"), "green"];
+            } else if (doc.status === "Assigned") {
+                return [__("Assigned"), "blue"];
+            } else if (doc.status === "Charging") {
+                return [__("Charging"), "orange"];
+            } else if (doc.status === "Maintenance") {
+                return [__("Maintenance"), "red"];
+            } else {
+                return [__("Unknown"), "gray"];
+            }
+        } catch (indicator_error) {
+            console.error('Error in get_indicator:', indicator_error);
+            return [__("Error"), "gray"];
         }
     },
 
@@ -103,28 +108,34 @@ frappe.listview_settings['TukTuk Vehicle'] = {
     },
 
     onload: function(listview) {
-        try {
-            console.log('🚗 TukTuk Vehicle list onload called');
-            setup_tuktuk_vehicle_actions(listview);
-        } catch (onload_error) {
-            console.error('Error in TukTuk Vehicle listview onload:', onload_error);
-            // Show user-friendly message but don't break the interface
-            frappe.show_alert({
-                message: __('Some advanced features may not be available'),
-                indicator: 'orange'
-            });
-        }
+        // Delayed initialization to avoid filter setup conflicts
+        setTimeout(function() {
+            try {
+                console.log('🚗 TukTuk Vehicle list onload called');
+                if (listview && listview.page) {
+                    setup_tuktuk_vehicle_actions(listview);
+                } else {
+                    console.warn('⚠️ Listview not fully initialized, retrying...');
+                    // Retry after another delay
+                    setTimeout(function() {
+                        if (listview && listview.page) {
+                            setup_tuktuk_vehicle_actions(listview);
+                        }
+                    }, 1000);
+                }
+            } catch (onload_error) {
+                console.error('Error in TukTuk Vehicle listview onload:', onload_error);
+                // Show user-friendly message but don't break the interface
+                frappe.show_alert({
+                    message: __('Some advanced features may not be available'),
+                    indicator: 'orange'
+                });
+            }
+        }, 500);
     },
 
-    // Custom filters for device mapping
-    filters: [
-        {
-            fieldname: 'status',
-            label: __('Status'),
-            fieldtype: 'Select',
-            options: ['', 'Available', 'Assigned', 'Charging', 'Maintenance', 'Out of Service']
-        }
-    ]
+    // Removed problematic filters - will add back via custom buttons instead
+    // filters: [] // Commenting out to avoid iteration errors
 };
 
 // SECOND: Define the setup function with comprehensive error handling
@@ -967,29 +978,29 @@ function add_device_mapping_filters(listview) {
     }
 }
 
-// Custom column formatting for enhanced display
-frappe.listview_settings['TukTuk Vehicle'].columns = [
-    {
-        field: 'tuktuk_id',
-        width: '120px'
-    },
-    {
-        field: 'status',
-        width: '100px'
-    },
-    {
-        field: 'device_id',
-        width: '120px'
-    },
-    {
-        field: 'battery_level',
-        width: '100px'
-    },
-    {
-        field: 'last_reported',
-        width: '100px'
-    }
-];
+// Custom column formatting for enhanced display - TEMPORARILY DISABLED
+// frappe.listview_settings['TukTuk Vehicle'].columns = [
+//     {
+//         field: 'tuktuk_id',
+//         width: '120px'
+//     },
+//     {
+//         field: 'status',
+//         width: '100px'
+//     },
+//     {
+//         field: 'device_id',
+//         width: '120px'
+//     },
+//     {
+//         field: 'battery_level',
+//         width: '100px'
+//     },
+//     {
+//         field: 'last_reported',
+//         width: '100px'
+//     }
+// ];
 
 // Add custom CSS for enhanced styling
 $(document).ready(function() {
