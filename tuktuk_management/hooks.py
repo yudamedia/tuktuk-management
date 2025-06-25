@@ -117,7 +117,8 @@ doc_events = {
     "User": {
             "before_insert": "tuktuk_management.api.user_management.disable_default_welcome_for_tuktuk_managers",
             "after_insert": "tuktuk_management.api.user_management.check_and_send_tuktuk_manager_welcome",
-            "on_update": "tuktuk_management.api.user_management.check_role_change_and_send_welcome"
+            "on_update": "tuktuk_management.api.user_management.check_role_change_and_send_welcome",
+            "before_save": "tuktuk_management.api.user_management.disable_default_welcome_for_tuktuk_managers"
     }
 }
 # Scheduled Tasks

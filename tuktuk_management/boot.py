@@ -1,6 +1,13 @@
 # ~/frappe-bench/apps/tuktuk_management/tuktuk_management/boot.py
 import frappe
 
+# Apply welcome email override on boot
+try:
+    from tuktuk_management.api.user_management import apply_welcome_email_override
+    apply_welcome_email_override()
+except Exception as e:
+    frappe.log_error(f"Failed to apply welcome email override on boot: {str(e)}")
+
 def boot_session(bootinfo):
     """
     Boot session setup with automatic redirect for TukTuk roles

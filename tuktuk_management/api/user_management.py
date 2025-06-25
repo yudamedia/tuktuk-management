@@ -3,6 +3,44 @@ from frappe import _
 from frappe.utils import now_datetime, get_url, cstr
 import json
 
+# Override the default welcome email method
+def override_send_welcome_mail_to_user(original_method):
+    """
+    Decorator to override ERPNext's default send_welcome_mail_to_user method
+    to prevent default welcome emails for Tuktuk Managers
+    """
+    def wrapper(user, password, **kwargs):
+        try:
+            # Check if this user has Tuktuk Manager role
+            user_doc = frappe.get_doc("User", user)
+            if has_tuktuk_manager_role(user_doc):
+                # Skip default welcome email for Tuktuk Managers
+                frappe.log_error(
+                    "Default Welcome Email Blocked", 
+                    f"Blocked default welcome email for Tuktuk Manager: {user}"
+                )
+                return
+        except Exception as e:
+            frappe.log_error(f"Error in override_send_welcome_mail_to_user: {str(e)}")
+        
+        # Call original method for non-Tuktuk Manager users
+        return original_method(user, password, **kwargs)
+    
+    return wrapper
+
+def apply_welcome_email_override():
+    """
+    Apply the override to ERPNext's default welcome email method
+    """
+    try:
+        import frappe.utils.user
+        if hasattr(frappe.utils.user, 'send_welcome_mail_to_user'):
+            original_method = frappe.utils.user.send_welcome_mail_to_user
+            frappe.utils.user.send_welcome_mail_to_user = override_send_welcome_mail_to_user(original_method)
+            frappe.log_error("Welcome Email Override Applied", "Successfully overrode send_welcome_mail_to_user for Tuktuk Managers")
+    except Exception as e:
+        frappe.log_error(f"Failed to apply welcome email override: {str(e)}")
+
 def disable_default_welcome_for_tuktuk_managers(doc, method=None):
     """
     Hook function called BEFORE User creation
@@ -10,8 +48,14 @@ def disable_default_welcome_for_tuktuk_managers(doc, method=None):
     """
     try:
         if has_tuktuk_manager_role(doc):
-            # Disable default welcome email before user is saved
+            # Disable all default welcome email mechanisms
             doc.send_welcome_email = 0
+            doc.flags.send_welcome_email = False
+            doc.flags.ignore_welcome_email = True
+            
+            # Also disable password reset email
+            doc.flags.ignore_password_policy = True
+            
             frappe.log_error("Default Welcome Email Disabled", f"Disabled for Tuktuk Manager: {doc.email}")
     except Exception as e:
         frappe.log_error(f"Failed to disable default welcome email: {str(e)}")
@@ -25,6 +69,9 @@ def check_and_send_tuktuk_manager_welcome(doc, method=None):
     try:
         # Check if user has Tuktuk Manager role
         if has_tuktuk_manager_role(doc):
+            # Ensure we don't trigger default welcome emails even after insertion
+            doc.flags.ignore_welcome_email = True
+            
             # Get the password from the session if it's a new user creation
             password = frappe.local.response.get('temp_password') or get_temp_password_from_session()
             
@@ -32,16 +79,25 @@ def check_and_send_tuktuk_manager_welcome(doc, method=None):
                 # If no password available, generate a new one and update user
                 password = generate_secure_password()
                 doc.new_password = password
+                doc.flags.ignore_welcome_email = True  # Ensure no default email on save
                 doc.save(ignore_permissions=True)
                 frappe.db.commit()
             
-            # Send custom welcome email
-            send_tuktuk_manager_welcome_email(doc.email, doc.full_name, password)
+            # Send custom welcome email using commit after to ensure it's sent
+            frappe.enqueue(
+                'tuktuk_management.api.user_management.send_tuktuk_manager_welcome_email',
+                email=doc.email,
+                full_name=doc.full_name,
+                password=password,
+                queue='default',
+                timeout=300,
+                is_async=True
+            )
             
             # Log the action
             frappe.log_error(
                 "Tuktuk Manager Welcome Email Triggered",
-                f"Auto-sent welcome email to {doc.email} with Tuktuk Manager role"
+                f"Queued welcome email to {doc.email} with Tuktuk Manager role"
             )
             
     except Exception as e:
@@ -210,12 +266,32 @@ def send_tuktuk_manager_welcome_email(email, full_name, password):
             subject="Welcome to Sunny Tuktuk Management System",
             template="tuktuk_manager_welcome",
             args=context,
-            header=["Welcome to Sunny Tuktuk", "green"]
+            header=["Welcome to Sunny Tuktuk", "green"],
+            reference_doctype="User",
+            reference_name=email
         )
+        
+        # Also create a communication record for tracking
+        communication = frappe.get_doc({
+            "doctype": "Communication",
+            "communication_type": "Email",
+            "communication_medium": "Email",
+            "sent_or_received": "Sent",
+            "email_status": "Sent",
+            "subject": "Welcome to Sunny Tuktuk Management System",
+            "sender": frappe.session.user,
+            "recipients": email,
+            "content": f"Welcome email sent to {full_name} ({email})",
+            "reference_doctype": "User",
+            "reference_name": email,
+            "email_template": "tuktuk_manager_welcome"
+        })
+        communication.insert(ignore_permissions=True)
         
         frappe.log_error("Tuktuk Manager Welcome Email Sent", f"Welcome email sent to {email}")
         
     except Exception as e:
         frappe.log_error(f"Failed to send welcome email to {email}: {str(e)}")
         # Don't throw error - user is created, just email failed
-        frappe.msgprint(f"⚠️ User created but welcome email failed. Please send login details manually to {email}")
+        if frappe.flags.in_request:
+            frappe.msgprint(f"⚠️ User created but welcome email failed. Please send login details manually to {email}")
