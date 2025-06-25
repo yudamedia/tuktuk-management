@@ -1242,4 +1242,71 @@ def update_vehicle_statuses():
     except Exception as e:
         frappe.log_error(f"Vehicle status update failed: {str(e)}")
 
-# ===== END OF FILE =====
+# ===== BATTERY MANAGEMENT FUNCTIONS =====
+
+def check_battery_levels():
+    """
+    Scheduled task to check battery levels and send alerts
+    Called hourly from hooks.py
+    """
+    try:
+        from tuktuk_management.api.battery_utils import check_low_battery_alerts
+        check_low_battery_alerts()
+        frappe.logger().info("Battery level check completed successfully")
+    except Exception as e:
+        frappe.log_error(f"Battery level check failed: {str(e)}", "Battery Check Error")
+
+def update_vehicle_battery_from_telemetry():
+    """
+    Update all vehicle batteries from telemetry data
+    Can be called as a scheduled task
+    """
+    try:
+        from tuktuk_management.api.battery_utils import update_all_battery_levels
+        update_all_battery_levels()
+        frappe.logger().info("Vehicle battery telemetry update completed")
+    except Exception as e:
+        frappe.log_error(f"Battery telemetry update failed: {str(e)}", "Battery Update Error")
+
+@frappe.whitelist()
+def get_low_battery_vehicles():
+    """
+    Get list of vehicles with low battery levels
+    Returns vehicles with battery < 20%
+    """
+    try:
+        vehicles = frappe.db.sql("""
+            SELECT 
+                name, tuktuk_id, battery_level, status, 
+                last_reported, current_latitude, current_longitude
+            FROM `tabTukTuk Vehicle`
+            WHERE battery_level < 20 
+            AND status NOT IN ('Maintenance', 'Out of Service')
+            ORDER BY battery_level ASC
+        """, as_dict=True)
+        
+        return vehicles
+        
+    except Exception as e:
+        frappe.throw(f"Failed to get low battery vehicles: {str(e)}")
+
+@frappe.whitelist()
+def force_battery_alert(vehicle_name):
+    """
+    Manually trigger a battery alert for a specific vehicle
+    """
+    try:
+        from tuktuk_management.api.battery_utils import BatteryConverter, send_battery_alert
+        
+        vehicle = frappe.get_doc("TukTuk Vehicle", vehicle_name)
+        battery_status = BatteryConverter.get_battery_status(vehicle.battery_level)
+        
+        send_battery_alert(vehicle, battery_status)
+        
+        return {
+            "success": True,
+            "message": f"Battery alert sent for TukTuk {vehicle.tuktuk_id}"
+        }
+        
+    except Exception as e:
+        frappe.throw(f"Failed to send battery alert: {str(e)}")
