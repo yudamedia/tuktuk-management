@@ -173,13 +173,14 @@ tuktuk_management.dashboard = {
     
     // Create a battery indicator widget
     create_battery_widget: function(container, battery_level, tuktuk_id) {
-        const battery_info = tuktuk_management.utils.get_battery_status(battery_level);
+        const safe_battery_level = flt(battery_level);
+        const battery_info = tuktuk_management.utils.get_battery_status(safe_battery_level);
         
         const widget = $(`
             <div class="tuktuk-battery-widget" data-tuktuk="${tuktuk_id}">
                 <div class="battery-level" style="color: ${battery_info.color}">
                     <i class="fa ${battery_info.icon}"></i>
-                    <span class="battery-percentage">${battery_level}%</span>
+                    <span class="battery-percentage">${safe_battery_level}%</span>
                 </div>
                 <div class="battery-status">${battery_info.status}</div>
             </div>

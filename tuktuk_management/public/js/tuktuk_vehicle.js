@@ -1,6 +1,23 @@
 // ~/frappe-bench/apps/tuktuk_management/tuktuk_management/public/js/tuktuk_vehicle.js
 // Enhanced TukTuk Vehicle client script with device mapping integration
 
+// Ensure Frappe utility functions are available for type safety
+if (typeof flt === 'undefined') {
+    window.flt = function(value, precision = 2) {
+        if (value === null || value === undefined || value === '') return 0;
+        const num = parseFloat(value);
+        return isNaN(num) ? 0 : parseFloat(num.toFixed(precision));
+    };
+}
+
+if (typeof cint === 'undefined') {
+    window.cint = function(value) {
+        if (value === null || value === undefined || value === '') return 0;
+        const num = parseInt(value);
+        return isNaN(num) ? 0 : num;
+    };
+}
+
 frappe.ui.form.on('TukTuk Vehicle', {
     refresh: function(frm) {
         // Setup custom buttons and indicators
@@ -406,7 +423,7 @@ function setup_indicators(frm) {
     // Add device connectivity indicator
     if (frm.doc.device_id) {
         const connectivity_color = frm.doc.last_reported ? 
-            (frappe.datetime.get_diff(frappe.datetime.now_datetime(), frm.doc.last_reported) < 1 ? 'green' : 'orange') : 
+            (flt(frappe.datetime.get_diff(frappe.datetime.now_datetime(), frm.doc.last_reported)) < 1 ? 'green' : 'orange') : 
             'red';
         frm.dashboard.add_indicator(__('Device: Connected'), connectivity_color);
     } else {
@@ -415,15 +432,15 @@ function setup_indicators(frm) {
     
     // Add last reported indicator if available
     if (frm.doc.last_reported) {
-        let time_diff = frappe.datetime.get_diff(frappe.datetime.now_datetime(), frm.doc.last_reported);
-        let hours_ago = Math.floor(time_diff / 3600);
+        let time_diff = flt(frappe.datetime.get_diff(frappe.datetime.now_datetime(), frm.doc.last_reported));
+        let hours_ago = cint(Math.floor(time_diff / 3600));
         let indicator_color = hours_ago > 24 ? 'red' : (hours_ago > 6 ? 'orange' : 'green');
         frm.dashboard.add_indicator(__('Last Update: {0}h ago', [hours_ago]), indicator_color);
     }
 }
 
 function add_battery_indicator(frm) {
-    const battery_level = frm.doc.battery_level;
+    const battery_level = flt(frm.doc.battery_level);
     let color = 'green';
     let icon = '🔋';
     

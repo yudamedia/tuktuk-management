@@ -1,5 +1,22 @@
 // Create file: tuktuk_management/tuktuk_management/page/tuktuk_tracker/tuktuk_tracker.js
 
+// Ensure Frappe utility functions are available for type safety
+if (typeof flt === 'undefined') {
+    window.flt = function(value, precision = 2) {
+        if (value === null || value === undefined || value === '') return 0;
+        const num = parseFloat(value);
+        return isNaN(num) ? 0 : parseFloat(num.toFixed(precision));
+    };
+}
+
+if (typeof cint === 'undefined') {
+    window.cint = function(value) {
+        if (value === null || value === undefined || value === '') return 0;
+        const num = parseInt(value);
+        return isNaN(num) ? 0 : num;
+    };
+}
+
 frappe.pages['tuktuk-tracker'].on_page_load = function(wrapper) {
     var page = frappe.ui.make_app_page({
         parent: wrapper,
@@ -89,10 +106,11 @@ class TukTukTracker {
     
     getMarkerIcon(vehicle) {
         // Choose icon color based on battery level
+        const battery_level = flt(vehicle.battery_level);
         let color = 'green';
-        if (vehicle.battery_level <= 20) {
+        if (battery_level <= 20) {
             color = 'red';
-        } else if (vehicle.battery_level <= 70) {
+        } else if (battery_level <= 70) {
             color = 'orange';
         }
         
@@ -107,11 +125,12 @@ class TukTukTracker {
     }
     
     createPopupContent(vehicle) {
+        const battery_level = flt(vehicle.battery_level);
         return `
             <div class="tuktuk-popup">
                 <h4>${vehicle.tuktuk_id}</h4>
                 <p><strong>Status:</strong> ${vehicle.status}</p>
-                <p><strong>Battery:</strong> ${vehicle.battery_level}%</p>
+                <p><strong>Battery:</strong> ${battery_level}%</p>
                 <p><strong>Last Updated:</strong> ${frappe.datetime.str_to_user(vehicle.last_reported || '')}</p>
                 ${vehicle.status === 'Assigned' ? 
                     `<p><strong>Driver:</strong> ${vehicle.driver_name || 'Unknown'}</p>` : ''}
@@ -127,8 +146,9 @@ class TukTukTracker {
         $list.empty();
         
         vehicles.forEach(vehicle => {
-            const batteryClass = vehicle.battery_level <= 20 ? 'text-danger' : 
-                               vehicle.battery_level <= 70 ? 'text-warning' : 'text-success';
+            const battery_level = flt(vehicle.battery_level);
+            const batteryClass = battery_level <= 20 ? 'text-danger' : 
+                               battery_level <= 70 ? 'text-warning' : 'text-success';
             
             const $item = $(`
                 <div class="tuktuk-list-item" data-id="${vehicle.name}">
@@ -139,7 +159,7 @@ class TukTukTracker {
                         </div>
                         <div class="col-md-6 text-right">
                             <div class="battery-indicator ${batteryClass}">
-                                <i class="fa fa-battery-${Math.ceil(vehicle.battery_level / 25)}"></i> ${vehicle.battery_level}%
+                                <i class="fa fa-battery-${Math.ceil(battery_level / 25)}"></i> ${battery_level}%
                             </div>
                             <div class="text-muted small">
                                 ${frappe.datetime.str_to_user(vehicle.last_reported || '')}
@@ -181,11 +201,12 @@ class TukTukTracker {
             }
             
             // Apply battery filter
-            if (batteryFilter === 'Low' && vehicle.battery_level > 20) {
+            const battery_level = flt(vehicle.battery_level);
+            if (batteryFilter === 'Low' && battery_level > 20) {
                 show = false;
-            } else if (batteryFilter === 'Medium' && (vehicle.battery_level <= 20 || vehicle.battery_level > 70)) {
+            } else if (batteryFilter === 'Medium' && (battery_level <= 20 || battery_level > 70)) {
                 show = false;
-            } else if (batteryFilter === 'High' && vehicle.battery_level <= 70) {
+            } else if (batteryFilter === 'High' && battery_level <= 70) {
                 show = false;
             }
             

@@ -1,4 +1,22 @@
 // ~/frappe-bench/apps/tuktuk_management/tuktuk_management/public/js/tuktuk_driver.js
+// Enhanced TukTuk Driver client script with type safety
+
+// Ensure Frappe utility functions are available for type safety
+if (typeof flt === 'undefined') {
+    window.flt = function(value, precision = 2) {
+        if (value === null || value === undefined || value === '') return 0;
+        const num = parseFloat(value);
+        return isNaN(num) ? 0 : parseFloat(num.toFixed(precision));
+    };
+}
+
+if (typeof cint === 'undefined') {
+    window.cint = function(value) {
+        if (value === null || value === undefined || value === '') return 0;
+        const num = parseInt(value);
+        return isNaN(num) ? 0 : num;
+    };
+}
 
 frappe.ui.form.on('TukTuk Driver', {
     refresh: function(frm) {
@@ -48,8 +66,8 @@ frappe.ui.form.on('TukTuk Driver', {
                     if (r.message) {
                         const tuktuk = r.message;
                         frm.dashboard.add_indicator(__('TukTuk: {0} (Battery: {1}%)', 
-                            [tuktuk.tuktuk_id, tuktuk.battery_level]), 
-                            tuktuk.battery_level > 50 ? 'green' : 'orange');
+                            [tuktuk.tuktuk_id, flt(tuktuk.battery_level)]), 
+                            flt(tuktuk.battery_level) > 50 ? 'green' : 'orange');
                     }
                 }
             });
@@ -330,10 +348,11 @@ function check_tuktuk_status(frm) {
             callback: function(r) {
                 if (r.message) {
                     const tuktuk = r.message;
+                    const battery_level = flt(tuktuk.battery_level);
                     const message = `
                         <h4>TukTuk Status: ${tuktuk.tuktuk_id}</h4>
                         <p><strong>Status:</strong> ${tuktuk.status}</p>
-                        <p><strong>Battery Level:</strong> ${tuktuk.battery_level}%</p>
+                        <p><strong>Battery Level:</strong> ${battery_level}%</p>
                         <p><strong>Mpesa Account:</strong> ${tuktuk.mpesa_account}</p>
                         ${tuktuk.last_reported ? `<p><strong>Last Updated:</strong> ${tuktuk.last_reported}</p>` : ''}
                     `;
@@ -341,7 +360,7 @@ function check_tuktuk_status(frm) {
                     frappe.msgprint({
                         title: __('TukTuk Status'),
                         message: message,
-                        indicator: tuktuk.battery_level > 50 ? 'green' : 'orange'
+                        indicator: battery_level > 50 ? 'green' : 'orange'
                     });
                 }
             }

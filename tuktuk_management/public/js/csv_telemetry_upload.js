@@ -370,7 +370,7 @@ tuktuk_management.csv_upload = {
                 html += `
                     <tr>
                         <td>${detail.tuktuk_id || 'N/A'}</td>
-                        <td>${detail.battery_level !== undefined ? detail.battery_level + '%' : 'N/A'}</td>
+                        <td>${detail.battery_level !== undefined ? flt(detail.battery_level) + '%' : 'N/A'}</td>
                         <td>${detail.location || 'N/A'}</td>
                         <td>${detail.timestamp || 'Now'}</td>
                     </tr>
