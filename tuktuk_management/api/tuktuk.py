@@ -76,7 +76,7 @@ def check_battery_level(tuktuk_doc):
         if settings.enable_email_notifications:
             try:
                 frappe.sendmail(
-                    recipients=["manager@sunnytuktuk.com"],  # Update with actual email
+                    recipients=["team@sunnytuktuk.com"],  # Update with actual email
                     subject="Low Battery Alert",
                     message=message
                 )
@@ -690,7 +690,7 @@ def terminate_driver_with_deposit_refund(driver):
         
         # Notify management
         frappe.sendmail(
-            recipients=["manager@sunnytuktuk.com"],
+            recipients=["team@sunnytuktuk.com"],
             subject=f"Driver Termination: {driver.driver_name}",
             message=f"""
             Driver {driver.driver_name} has been terminated due to consecutive target misses.
@@ -804,7 +804,7 @@ def generate_daily_reports():
         
         # Email report to management
         frappe.sendmail(
-            recipients=["manager@sunnytuktuk.com"],
+            recipients=["team@sunnytuktuk.com"],
             subject=f"Daily Operations Report - {today}",
             message=report
         )
