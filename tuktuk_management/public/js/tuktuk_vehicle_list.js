@@ -1,8 +1,32 @@
 // ~/frappe-bench/apps/tuktuk_management/tuktuk_management/public/js/tuktuk_vehicle_list.js
-// Fixed TukTuk Vehicle List with proper initialization
+// Fixed TukTuk Vehicle List with proper initialization and type safety
+// 
+// TYPE SAFETY IMPROVEMENTS:
+// - All battery_level comparisons use flt() for proper float conversion
+// - All time-based calculations use flt() and cint() for proper numeric conversion
+// - Filter values are properly typed before comparison
+// - Prevents string vs integer comparison errors that can cause filter iterations to fail
 
-// FIRST: Define the listview settings
+// Ensure Frappe utility functions are available
+if (typeof flt === 'undefined') {
+    window.flt = function(value, precision = 2) {
+        if (value === null || value === undefined || value === '') return 0;
+        const num = parseFloat(value);
+        return isNaN(num) ? 0 : parseFloat(num.toFixed(precision));
+    };
+}
+
+if (typeof cint === 'undefined') {
+    window.cint = function(value) {
+        if (value === null || value === undefined || value === '') return 0;
+        const num = parseInt(value);
+        return isNaN(num) ? 0 : num;
+    };
+}
+
+// FIRST: Define the listview settings with error handling
 frappe.listview_settings['TukTuk Vehicle'] = {
+    
     // Add device mapping status to list view
     add_fields: ["device_id", "device_imei", "battery_level", "last_reported", "latitude", "longitude"],
     
@@ -10,9 +34,9 @@ frappe.listview_settings['TukTuk Vehicle'] = {
         // Color code based on device mapping and battery status
         if (!doc.device_id || !doc.device_imei) {
             return [__("No Device"), "red", "device_id,is,not set"];
-        } else if (doc.battery_level <= 10) {
+        } else if (flt(doc.battery_level) <= 10) {
             return [__("Critical Battery"), "red", "battery_level,<=,10"];
-        } else if (doc.battery_level <= 25) {
+        } else if (flt(doc.battery_level) <= 25) {
             return [__("Low Battery"), "orange", "battery_level,<=,25"];
         } else if (doc.status === "Available") {
             return [__("Available"), "green", "status,=,Available"];
@@ -31,19 +55,21 @@ frappe.listview_settings['TukTuk Vehicle'] = {
                 return '<span class="text-muted">N/A</span>';
             }
             
+            // Convert to float for proper comparison
+            const battery_level = flt(value);
             let color = 'success';
             let icon = '🔋';
             
-            if (value <= 10) {
+            if (battery_level <= 10) {
                 color = 'danger';
                 icon = '🪫';
-            } else if (value <= 25) {
+            } else if (battery_level <= 25) {
                 color = 'warning';
-            } else if (value <= 50) {
+            } else if (battery_level <= 50) {
                 color = 'info';
             }
             
-            return `<span class="badge badge-${color}">${icon} ${value}%</span>`;
+            return `<span class="badge badge-${color}">${icon} ${battery_level}%</span>`;
         },
         
         device_id: function(value, field, doc) {
@@ -52,7 +78,7 @@ frappe.listview_settings['TukTuk Vehicle'] = {
             }
             
             const connectivity = doc.last_reported ? 
-                (frappe.datetime.get_diff(frappe.datetime.now_datetime(), doc.last_reported) < 1 ? 
+                (flt(frappe.datetime.get_diff(frappe.datetime.now_datetime(), doc.last_reported)) < 1 ? 
                     '🟢' : '🟡') : '🔴';
             
             return `<span title="Device ID: ${value}\nIMEI: ${doc.device_imei || 'N/A'}">${connectivity} ${value}</span>`;
@@ -63,8 +89,8 @@ frappe.listview_settings['TukTuk Vehicle'] = {
                 return '<span class="text-muted">Never</span>';
             }
             
-            const diff = frappe.datetime.get_diff(frappe.datetime.now_datetime(), value);
-            const hours = Math.floor(diff / 3600);
+            const diff = flt(frappe.datetime.get_diff(frappe.datetime.now_datetime(), value));
+            const hours = cint(Math.floor(diff / 3600));
             
             let color = 'success';
             if (hours > 24) color = 'danger';
@@ -75,8 +101,17 @@ frappe.listview_settings['TukTuk Vehicle'] = {
     },
 
     onload: function(listview) {
-        console.log('🚗 TukTuk Vehicle list onload called');
-        setup_tuktuk_vehicle_actions(listview);
+        try {
+            console.log('🚗 TukTuk Vehicle list onload called');
+            setup_tuktuk_vehicle_actions(listview);
+        } catch (onload_error) {
+            console.error('Error in TukTuk Vehicle listview onload:', onload_error);
+            // Show user-friendly message but don't break the interface
+            frappe.show_alert({
+                message: __('Some advanced features may not be available'),
+                indicator: 'orange'
+            });
+        }
     },
 
     // Custom filters for device mapping
@@ -90,72 +125,110 @@ frappe.listview_settings['TukTuk Vehicle'] = {
     ]
 };
 
-// SECOND: Define the setup function
+// SECOND: Define the setup function with comprehensive error handling
 function setup_tuktuk_vehicle_actions(listview) {
-    console.log('🔧 Setting up TukTuk Vehicle actions...');
-    
-    if (!listview || !listview.page) {
-        console.log('❌ Listview or listview.page not available');
-        return;
-    }
-    
-    // Add bulk device mapping actions
-    if (frappe.user.has_role(['System Manager', 'Tuktuk Manager'])) {
-        console.log('✅ User has required roles, adding buttons...');
+    try {
+        console.log('🔧 Setting up TukTuk Vehicle actions...');
         
-        listview.page.add_action_item(__("🔄 Auto-Map All Devices"), function() {
-            bulk_auto_map_devices();
-        });
+        if (!listview || !listview.page) {
+            console.log('❌ Listview or listview.page not available');
+            return;
+        }
         
-        listview.page.add_action_item(__("✅ Validate All Mappings"), function() {
-            validate_all_device_mappings();
-        });
-        
-        listview.page.add_action_item(__("📊 Device Mapping Report"), function() {
-            show_device_mapping_report();
-        });
-        
-        // CSV UPLOAD BUTTON - with error handling
-        listview.page.add_action_item(__("📁 CSV Upload"), function() {
-            console.log('CSV Upload button clicked');
+        // Safety check for filter area to prevent iteration errors
+        if (listview.filter_area && typeof listview.filter_area.clear === 'function') {
             try {
-                if (typeof tuktuk_management !== 'undefined' && 
-                    tuktuk_management.csv_upload && 
-                    typeof tuktuk_management.csv_upload.show_upload_dialog === 'function') {
-                    
-                    console.log('✅ Opening CSV upload dialog');
-                    tuktuk_management.csv_upload.show_upload_dialog();
-                } else {
-                    console.log('❌ CSV upload module not available, showing fallback');
-                    show_csv_upload_fallback();
-                }
-            } catch (error) {
-                console.error('Error opening CSV upload:', error);
-                frappe.msgprint({
-                    title: __('CSV Upload Error'),
-                    message: __('There was an error opening the CSV upload dialog. Check console for details.'),
-                    indicator: 'red'
+                // Test filter area functionality with a safe operation
+                const test_filters = listview.filter_area.get();
+                console.log('✅ Filter area is functional, found', test_filters.length, 'existing filters');
+            } catch (filter_error) {
+                console.warn('⚠️ Filter area has issues, will skip advanced filtering:', filter_error);
+                // Continue without advanced filtering features
+            }
+        }
+        
+        // Add bulk device mapping actions
+        if (frappe.user.has_role(['System Manager', 'Tuktuk Manager'])) {
+            console.log('✅ User has required roles, adding buttons...');
+            
+            try {
+                listview.page.add_action_item(__("🔄 Auto-Map All Devices"), function() {
+                    bulk_auto_map_devices();
+                });
+                
+                listview.page.add_action_item(__("✅ Validate All Mappings"), function() {
+                    validate_all_device_mappings();
+                });
+                
+                listview.page.add_action_item(__("📊 Device Mapping Report"), function() {
+                    show_device_mapping_report();
+                });
+                
+                // CSV UPLOAD BUTTON - with error handling
+                listview.page.add_action_item(__("📁 CSV Upload"), function() {
+                    console.log('CSV Upload button clicked');
+                    try {
+                        if (typeof tuktuk_management !== 'undefined' && 
+                            tuktuk_management.csv_upload && 
+                            typeof tuktuk_management.csv_upload.show_upload_dialog === 'function') {
+                            
+                            console.log('✅ Opening CSV upload dialog');
+                            tuktuk_management.csv_upload.show_upload_dialog();
+                        } else {
+                            console.log('❌ CSV upload module not available, showing fallback');
+                            show_csv_upload_fallback();
+                        }
+                    } catch (error) {
+                        console.error('Error opening CSV upload:', error);
+                        frappe.msgprint({
+                            title: __('CSV Upload Error'),
+                            message: __('There was an error opening the CSV upload dialog. Check console for details.'),
+                            indicator: 'red'
+                        });
+                    }
+                });
+                
+                console.log('✅ All action buttons added successfully');
+            } catch (button_error) {
+                console.error('Error adding action buttons:', button_error);
+                frappe.show_alert({
+                    message: __('Some action buttons could not be loaded'),
+                    indicator: 'orange'
                 });
             }
-        });
+        } else {
+            console.log('❌ User does not have required roles');
+        }
         
-        console.log('✅ All action buttons added successfully');
-    } else {
-        console.log('❌ User does not have required roles');
-    }
-    
-    // Add refresh telematics data action (for all users)
-    listview.page.add_action_item(__("🔄 Refresh Telematics"), function() {
-        refresh_all_telematics_data();
-    });
-    
-    // Add filter buttons
-    try {
-        add_battery_filter_buttons(listview);
-        add_device_mapping_filters(listview);
-        console.log('✅ Filter buttons added');
-    } catch (error) {
-        console.error('Error adding filter buttons:', error);
+        // Add refresh telematics data action (for all users) - with error handling
+        try {
+            listview.page.add_action_item(__("🔄 Refresh Telematics"), function() {
+                refresh_all_telematics_data();
+            });
+        } catch (telematics_error) {
+            console.error('Error adding telematics refresh button:', telematics_error);
+        }
+        
+        // Add filter buttons with enhanced error handling
+        try {
+            if (listview.filter_area && typeof listview.filter_area.clear === 'function') {
+                add_battery_filter_buttons(listview);
+                add_device_mapping_filters(listview);
+                console.log('✅ Filter buttons added');
+            } else {
+                console.log('⚠️ Skipping filter buttons due to filter area issues');
+            }
+        } catch (error) {
+            console.error('Error adding filter buttons:', error);
+            // Continue without filter buttons rather than breaking the entire setup
+        }
+        
+    } catch (setup_error) {
+        console.error('Critical error in setup_tuktuk_vehicle_actions:', setup_error);
+        frappe.show_alert({
+            message: __('TukTuk Vehicle actions setup encountered an error. Basic functionality preserved.'),
+            indicator: 'red'
+        });
     }
 }
 
@@ -243,56 +316,107 @@ function process_csv_via_api(file_url) {
     });
 }
 
-// FOURTH: Force initialization on document ready
+// FOURTH: Force initialization on document ready with comprehensive error handling
 $(document).ready(function() {
-    console.log('🚀 Document ready - checking for TukTuk Vehicle list');
-    
-    // Wait a bit for page to load, then force setup if needed
-    setTimeout(function() {
-        if (window.location.href.includes('TukTuk%20Vehicle') || 
-            window.location.href.includes('TukTuk Vehicle') ||
-            (cur_list && cur_list.doctype === 'TukTuk Vehicle')) {
-            
-            console.log('📍 TukTuk Vehicle list detected');
-            
-            // Check if actions are already loaded
-            if (cur_list && cur_list.page && cur_list.page.menu) {
-                const existing_actions = cur_list.page.menu.find('a:contains("CSV Upload")');
-                
-                if (existing_actions.length === 0) {
-                    console.log('🔧 Actions not found, forcing setup...');
-                    setup_tuktuk_vehicle_actions(cur_list);
-                } else {
-                    console.log('✅ Actions already exist');
+    try {
+        console.log('🚀 Document ready - checking for TukTuk Vehicle list');
+        
+        // Wait a bit for page to load, then force setup if needed
+        setTimeout(function() {
+            try {
+                if (window.location.href.includes('TukTuk%20Vehicle') || 
+                    window.location.href.includes('TukTuk Vehicle') ||
+                    (cur_list && cur_list.doctype === 'TukTuk Vehicle')) {
+                    
+                    console.log('📍 TukTuk Vehicle list detected');
+                    
+                    // Check if actions are already loaded
+                    if (cur_list && cur_list.page && cur_list.page.menu) {
+                        try {
+                            const existing_actions = cur_list.page.menu.find('a:contains("CSV Upload")');
+                            
+                            if (existing_actions.length === 0) {
+                                console.log('🔧 Actions not found, forcing setup...');
+                                setup_tuktuk_vehicle_actions(cur_list);
+                            } else {
+                                console.log('✅ Actions already exist');
+                            }
+                        } catch (menu_error) {
+                            console.error('Error checking existing actions:', menu_error);
+                            // Try setup anyway
+                            setup_tuktuk_vehicle_actions(cur_list);
+                        }
+                    }
                 }
+            } catch (timeout_error) {
+                console.error('Error in first timeout setup:', timeout_error);
             }
-        }
-    }, 1000);
-    
-    // Also try again after a longer delay
-    setTimeout(function() {
-        if (cur_list && cur_list.doctype === 'TukTuk Vehicle') {
-            const existing_actions = cur_list.page.menu.find('a:contains("CSV Upload")');
-            if (existing_actions.length === 0) {
-                console.log('🔧 Second attempt - forcing setup...');
-                setup_tuktuk_vehicle_actions(cur_list);
+        }, 1000);
+        
+        // Also try again after a longer delay
+        setTimeout(function() {
+            try {
+                if (cur_list && cur_list.doctype === 'TukTuk Vehicle') {
+                    try {
+                        const existing_actions = cur_list.page.menu.find('a:contains("CSV Upload")');
+                        if (existing_actions.length === 0) {
+                            console.log('🔧 Second attempt - forcing setup...');
+                            setup_tuktuk_vehicle_actions(cur_list);
+                        }
+                    } catch (second_menu_error) {
+                        console.error('Error in second attempt menu check:', second_menu_error);
+                        // Try setup anyway
+                        setup_tuktuk_vehicle_actions(cur_list);
+                    }
+                }
+            } catch (second_timeout_error) {
+                console.error('Error in second timeout setup:', second_timeout_error);
             }
-        }
-    }, 3000);
+        }, 3000);
+        
+    } catch (document_ready_error) {
+        console.error('Critical error in document.ready for TukTuk Vehicle list:', document_ready_error);
+    }
 });
 
-// FIFTH: Listen for route changes
+// FIFTH: Listen for route changes with enhanced error handling
 $(document).on('page-change', function() {
     setTimeout(function() {
-        if (cur_list && cur_list.doctype === 'TukTuk Vehicle') {
-            console.log('📍 Page changed to TukTuk Vehicle list');
-            const existing_actions = cur_list.page.menu.find('a:contains("CSV Upload")');
-            if (existing_actions.length === 0) {
-                console.log('🔧 Page change - forcing setup...');
-                setup_tuktuk_vehicle_actions(cur_list);
+        try {
+            if (cur_list && cur_list.doctype === 'TukTuk Vehicle') {
+                console.log('📍 Page changed to TukTuk Vehicle list');
+                
+                try {
+                    const existing_actions = cur_list.page.menu.find('a:contains("CSV Upload")');
+                    if (existing_actions.length === 0) {
+                        console.log('🔧 Page change - forcing setup...');
+                        setup_tuktuk_vehicle_actions(cur_list);
+                    }
+                } catch (menu_check_error) {
+                    console.error('Error checking menu on page change:', menu_check_error);
+                    // Try setup anyway to ensure functionality
+                    setup_tuktuk_vehicle_actions(cur_list);
+                }
             }
+        } catch (page_change_error) {
+            console.error('Error handling page change for TukTuk Vehicle list:', page_change_error);
         }
     }, 500);
+    
+    // Additional safety check with longer delay
+    setTimeout(function() {
+        try {
+            if (cur_list && cur_list.doctype === 'TukTuk Vehicle') {
+                // Double-check setup after page change
+                if (cur_list.page && !cur_list.page.menu.find('a:contains("CSV Upload")').length) {
+                    console.log('🔧 Secondary page change setup...');
+                    setup_tuktuk_vehicle_actions(cur_list);
+                }
+            }
+        } catch (secondary_check_error) {
+            console.error('Error in secondary page change check:', secondary_check_error);
+        }
+    }, 1500);
 });
 
 // Bulk Device Mapping Functions
@@ -385,7 +509,8 @@ function show_validation_results_dialog(results) {
                 <ul class="mb-0">
         `;
         results.inactive_devices.forEach(inactive => {
-            content += `<li>${inactive.tuktuk_id}: Last seen ${inactive.hours_ago}h ago</li>`;
+            const hours_ago = cint(inactive.hours_ago);
+            content += `<li>${inactive.tuktuk_id}: Last seen ${hours_ago}h ago</li>`;
         });
         content += '</ul></div>';
     }
@@ -648,125 +773,211 @@ function refresh_all_telematics_data() {
 }
 
 function add_battery_filter_buttons(listview) {
-    // Add battery level filter buttons
-    listview.page.sidebar.find('.list-tags').append(`
-        <div class="battery-filters mt-3">
-            <h6>Battery Levels</h6>
-            <div class="btn-group-vertical btn-group-sm w-100" role="group">
-                <button type="button" class="btn btn-outline-danger btn-sm battery-filter" data-filter="critical">
-                    🪫 Critical (≤10%)
-                </button>
-                <button type="button" class="btn btn-outline-warning btn-sm battery-filter" data-filter="low">
-                    🔋 Low (≤25%)
-                </button>
-                <button type="button" class="btn btn-outline-info btn-sm battery-filter" data-filter="medium">
-                    🔋 Medium (26-50%)
-                </button>
-                <button type="button" class="btn btn-outline-success btn-sm battery-filter" data-filter="good">
-                    🔋 Good (>50%)
-                </button>
-                <button type="button" class="btn btn-outline-secondary btn-sm battery-filter" data-filter="unknown">
-                    ❓ Unknown
-                </button>
-            </div>
-        </div>
-    `);
-    
-    // Handle battery filter clicks
-    listview.page.sidebar.on('click', '.battery-filter', function() {
-        const filter_type = $(this).data('filter');
-        let filters = [];
-        
-        switch(filter_type) {
-            case 'critical':
-                filters = [['TukTuk Vehicle', 'battery_level', '<=', 10]];
-                break;
-            case 'low':
-                filters = [['TukTuk Vehicle', 'battery_level', '<=', 25]];
-                break;
-            case 'medium':
-                filters = [
-                    ['TukTuk Vehicle', 'battery_level', '>', 25],
-                    ['TukTuk Vehicle', 'battery_level', '<=', 50]
-                ];
-                break;
-            case 'good':
-                filters = [['TukTuk Vehicle', 'battery_level', '>', 50]];
-                break;
-            case 'unknown':
-                filters = [['TukTuk Vehicle', 'battery_level', 'is', 'not set']];
-                break;
+    try {
+        // Safety check for required elements
+        if (!listview || !listview.page || !listview.page.sidebar) {
+            console.warn('⚠️ Missing required elements for battery filter buttons');
+            return;
         }
         
-        listview.filter_area.clear();
-        filters.forEach(filter => {
-            listview.filter_area.add(filter);
+        // Add battery level filter buttons
+        listview.page.sidebar.find('.list-tags').append(`
+            <div class="battery-filters mt-3">
+                <h6>Battery Levels</h6>
+                <div class="btn-group-vertical btn-group-sm w-100" role="group">
+                    <button type="button" class="btn btn-outline-danger btn-sm battery-filter" data-filter="critical">
+                        🪫 Critical (≤10%)
+                    </button>
+                    <button type="button" class="btn btn-outline-warning btn-sm battery-filter" data-filter="low">
+                        🔋 Low (≤25%)
+                    </button>
+                    <button type="button" class="btn btn-outline-info btn-sm battery-filter" data-filter="medium">
+                        🔋 Medium (26-50%)
+                    </button>
+                    <button type="button" class="btn btn-outline-success btn-sm battery-filter" data-filter="good">
+                        🔋 Good (>50%)
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm battery-filter" data-filter="unknown">
+                        ❓ Unknown
+                    </button>
+                </div>
+            </div>
+        `);
+        
+        // Handle battery filter clicks with error handling
+        listview.page.sidebar.on('click', '.battery-filter', function() {
+            try {
+                const filter_type = $(this).data('filter');
+                let filters = [];
+                
+                switch(filter_type) {
+                    case 'critical':
+                        filters = [['TukTuk Vehicle', 'battery_level', '<=', flt(10)]];
+                        break;
+                    case 'low':
+                        filters = [['TukTuk Vehicle', 'battery_level', '<=', flt(25)]];
+                        break;
+                    case 'medium':
+                        filters = [
+                            ['TukTuk Vehicle', 'battery_level', '>', flt(25)],
+                            ['TukTuk Vehicle', 'battery_level', '<=', flt(50)]
+                        ];
+                        break;
+                    case 'good':
+                        filters = [['TukTuk Vehicle', 'battery_level', '>', flt(50)]];
+                        break;
+                    case 'unknown':
+                        filters = [['TukTuk Vehicle', 'battery_level', 'is', 'not set']];
+                        break;
+                }
+                
+                // Safe filter application with error handling
+                if (listview.filter_area && typeof listview.filter_area.clear === 'function') {
+                    try {
+                        listview.filter_area.clear();
+                        filters.forEach(filter => {
+                            listview.filter_area.add(filter);
+                        });
+                        
+                        // Update button states
+                        $('.battery-filter').removeClass('active');
+                        $(this).addClass('active');
+                        
+                        console.log('✅ Battery filter applied:', filter_type);
+                    } catch (filter_apply_error) {
+                        console.error('Error applying battery filter:', filter_apply_error);
+                        frappe.show_alert({
+                            message: __('Filter could not be applied due to system restrictions'),
+                            indicator: 'orange'
+                        });
+                    }
+                } else {
+                    console.warn('⚠️ Filter area not available for battery filtering');
+                    frappe.show_alert({
+                        message: __('Advanced filtering is not available in your current view'),
+                        indicator: 'orange'
+                    });
+                }
+            } catch (click_error) {
+                console.error('Error handling battery filter click:', click_error);
+            }
         });
         
-        // Update button states
-        $('.battery-filter').removeClass('active');
-        $(this).addClass('active');
-    });
+    } catch (battery_filter_error) {
+        console.error('Error adding battery filter buttons:', battery_filter_error);
+    }
 }
 
 function add_device_mapping_filters(listview) {
-    // Add device mapping filter buttons
-    listview.page.sidebar.find('.list-tags').append(`
-        <div class="device-filters mt-3">
-            <h6>Device Mapping</h6>
-            <div class="btn-group-vertical btn-group-sm w-100" role="group">
-                <button type="button" class="btn btn-outline-success btn-sm device-filter" data-filter="mapped">
-                    📱 Mapped
-                </button>
-                <button type="button" class="btn btn-outline-danger btn-sm device-filter" data-filter="unmapped">
-                    ❌ Unmapped
-                </button>
-                <button type="button" class="btn btn-outline-info btn-sm device-filter" data-filter="recent">
-                    🕒 Recent Updates
-                </button>
-                <button type="button" class="btn btn-outline-warning btn-sm device-filter" data-filter="stale">
-                    ⚠️ Stale Data
-                </button>
-            </div>
-        </div>
-    `);
-    
-    // Handle device filter clicks
-    listview.page.sidebar.on('click', '.device-filter', function() {
-        const filter_type = $(this).data('filter');
-        let filters = [];
-        
-        switch(filter_type) {
-            case 'mapped':
-                filters = [
-                    ['TukTuk Vehicle', 'device_id', 'is', 'set'],
-                    ['TukTuk Vehicle', 'device_imei', 'is', 'set']
-                ];
-                break;
-            case 'unmapped':
-                filters = [['TukTuk Vehicle', 'device_id', 'is', 'not set']];
-                break;
-            case 'recent':
-                // Updates within last 6 hours
-                const six_hours_ago = frappe.datetime.add_to_date(new Date(), {hours: -6});
-                filters = [['TukTuk Vehicle', 'last_reported', '>', six_hours_ago]];
-                break;
-            case 'stale':
-                // No updates in last 24 hours
-                const day_ago = frappe.datetime.add_to_date(new Date(), {days: -1});
-                filters = [['TukTuk Vehicle', 'last_reported', '<', day_ago]];
-                break;
+    try {
+        // Safety check for required elements
+        if (!listview || !listview.page || !listview.page.sidebar) {
+            console.warn('⚠️ Missing required elements for device mapping filter buttons');
+            return;
         }
         
-        listview.filter_area.clear();
-        filters.forEach(filter => {
-            listview.filter_area.add(filter);
+        // Add device mapping filter buttons
+        listview.page.sidebar.find('.list-tags').append(`
+            <div class="device-filters mt-3">
+                <h6>Device Mapping</h6>
+                <div class="btn-group-vertical btn-group-sm w-100" role="group">
+                    <button type="button" class="btn btn-outline-success btn-sm device-filter" data-filter="mapped">
+                        📱 Mapped
+                    </button>
+                    <button type="button" class="btn btn-outline-danger btn-sm device-filter" data-filter="unmapped">
+                        ❌ Unmapped
+                    </button>
+                    <button type="button" class="btn btn-outline-info btn-sm device-filter" data-filter="recent">
+                        🕒 Recent Updates
+                    </button>
+                    <button type="button" class="btn btn-outline-warning btn-sm device-filter" data-filter="stale">
+                        ⚠️ Stale Data
+                    </button>
+                </div>
+            </div>
+        `);
+        
+        // Handle device filter clicks with error handling
+        listview.page.sidebar.on('click', '.device-filter', function() {
+            try {
+                const filter_type = $(this).data('filter');
+                let filters = [];
+                
+                switch(filter_type) {
+                    case 'mapped':
+                        filters = [
+                            ['TukTuk Vehicle', 'device_id', 'is', 'set'],
+                            ['TukTuk Vehicle', 'device_imei', 'is', 'set']
+                        ];
+                        break;
+                    case 'unmapped':
+                        filters = [['TukTuk Vehicle', 'device_id', 'is', 'not set']];
+                        break;
+                    case 'recent':
+                        try {
+                            // Updates within last 6 hours
+                            const six_hours_ago = frappe.datetime.add_to_date(new Date(), {hours: -6});
+                            filters = [['TukTuk Vehicle', 'last_reported', '>', six_hours_ago]];
+                        } catch (date_error) {
+                            console.error('Error calculating recent date filter:', date_error);
+                            frappe.show_alert({
+                                message: __('Could not apply recent updates filter'),
+                                indicator: 'orange'
+                            });
+                            return;
+                        }
+                        break;
+                    case 'stale':
+                        try {
+                            // No updates in last 24 hours
+                            const day_ago = frappe.datetime.add_to_date(new Date(), {days: -1});
+                            filters = [['TukTuk Vehicle', 'last_reported', '<', day_ago]];
+                        } catch (date_error) {
+                            console.error('Error calculating stale date filter:', date_error);
+                            frappe.show_alert({
+                                message: __('Could not apply stale data filter'),
+                                indicator: 'orange'
+                            });
+                            return;
+                        }
+                        break;
+                }
+                
+                // Safe filter application with error handling
+                if (listview.filter_area && typeof listview.filter_area.clear === 'function') {
+                    try {
+                        listview.filter_area.clear();
+                        filters.forEach(filter => {
+                            listview.filter_area.add(filter);
+                        });
+                        
+                        // Update button states
+                        $('.device-filter').removeClass('active');
+                        $(this).addClass('active');
+                        
+                        console.log('✅ Device mapping filter applied:', filter_type);
+                    } catch (filter_apply_error) {
+                        console.error('Error applying device mapping filter:', filter_apply_error);
+                        frappe.show_alert({
+                            message: __('Filter could not be applied due to system restrictions'),
+                            indicator: 'orange'
+                        });
+                    }
+                } else {
+                    console.warn('⚠️ Filter area not available for device mapping filtering');
+                    frappe.show_alert({
+                        message: __('Advanced filtering is not available in your current view'),
+                        indicator: 'orange'
+                    });
+                }
+            } catch (click_error) {
+                console.error('Error handling device mapping filter click:', click_error);
+            }
         });
         
-        // Update button states
-        $('.device-filter').removeClass('active');
-        $(this).addClass('active');
-    });
+    } catch (device_filter_error) {
+        console.error('Error adding device mapping filter buttons:', device_filter_error);
+    }
 }
 
 // Custom column formatting for enhanced display

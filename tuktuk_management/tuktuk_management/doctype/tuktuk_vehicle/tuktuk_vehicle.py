@@ -66,29 +66,32 @@ class TukTukVehicle(Document):
                 frappe.throw("Hourly rental rate must be greater than 0")
     
     def validate_coordinates(self):
-        """Validate latitude and longitude"""
-        if self.current_latitude is not None:
-            lat = flt(self.current_latitude)
+        """Validate latitude and longitude - FIXED FIELD NAMES"""
+        # Use correct field names from DocType: 'latitude' and 'longitude'
+        if hasattr(self, 'latitude') and self.latitude is not None:
+            lat = flt(self.latitude)
             if not (-90 <= lat <= 90):
                 frappe.throw("Latitude must be between -90 and 90 degrees")
         
-        if self.current_longitude is not None:
-            lng = flt(self.current_longitude)
+        if hasattr(self, 'longitude') and self.longitude is not None:
+            lng = flt(self.longitude)
             if not (-180 <= lng <= 180):
                 frappe.throw("Longitude must be between -180 and 180 degrees")
     
     def sync_geolocation_with_coordinates(self):
-        """Sync geolocation field with individual coordinates"""
-        if self.current_latitude and self.current_longitude:
+        """Sync geolocation field with individual coordinates - FIXED FIELD NAMES"""
+        # Use correct field names from DocType: 'latitude' and 'longitude'
+        if (hasattr(self, 'latitude') and hasattr(self, 'longitude') and 
+            self.latitude and self.longitude):
             # Create geolocation data for maps
-            self.geolocation = json.dumps({
+            self.current_location = json.dumps({
                 "type": "FeatureCollection",
                 "features": [{
                     "type": "Feature",
                     "properties": {},
                     "geometry": {
                         "type": "Point",
-                        "coordinates": [flt(self.current_longitude), flt(self.current_latitude)]
+                        "coordinates": [flt(self.longitude), flt(self.latitude)]
                     }
                 }]
             })
@@ -105,27 +108,33 @@ class TukTukVehicle(Document):
     
     def get_battery_status(self):
         """Get battery status information"""
-        from tuktuk_management.api.battery_utils import BatteryConverter
-        
-        if self.battery_level is not None:
-            return BatteryConverter.get_battery_status(self.battery_level)
+        try:
+            from tuktuk_management.api.battery_utils import BatteryConverter
+            
+            if self.battery_level is not None:
+                return BatteryConverter.get_battery_status(self.battery_level)
+        except ImportError:
+            pass
         
         return {"status": "Unknown", "color": "gray", "action": "No data", "priority": "none"}
     
     def get_estimated_range(self):
         """Get estimated range based on current battery level"""
-        from tuktuk_management.api.battery_utils import BatteryConverter
-        
-        if self.battery_level is not None:
-            return BatteryConverter.estimate_range_km(self.battery_level)
+        try:
+            from tuktuk_management.api.battery_utils import BatteryConverter
+            
+            if self.battery_level is not None:
+                return BatteryConverter.estimate_range_km(self.battery_level)
+        except ImportError:
+            pass
         
         return 0.0
     
     def update_battery_from_voltage(self, voltage):
         """Update battery level from voltage reading"""
-        from tuktuk_management.api.battery_utils import BatteryConverter
-        
         try:
+            from tuktuk_management.api.battery_utils import BatteryConverter
+            
             # Store raw voltage
             self.battery_voltage = flt(voltage)
             
