@@ -20,11 +20,11 @@ class TukTukSettings(Document):
             frappe.throw("Global fare percentage must be between 1 and 100")
             
         # Validate rental rates
-        if self.global_rental_initial and self.global_rental_initial <= 0:
-            frappe.throw("Global rental initial rate must be greater than 0")
+        if self.global_rental_initial and self.global_rental_initial < 0:
+            frappe.throw("Global rental initial rate must not be negative")
             
-        if self.global_rental_hourly and self.global_rental_hourly <= 0:
-            frappe.throw("Global rental hourly rate must be greater than 0")
+        if self.global_rental_hourly and self.global_rental_hourly < 0:
+            frappe.throw("Global rental hourly rate must not be negative")
             
         # Validate bonus settings
         if self.bonus_enabled and self.bonus_amount and self.bonus_amount <= 0:

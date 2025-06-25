@@ -570,10 +570,10 @@ def validate_vehicle(doc, method):
             frappe.throw("Battery level must be a number between 0 and 100")
     
     # Validate rental rates if set
-    if doc.rental_rate_initial and doc.rental_rate_initial <= 0:
-        frappe.throw("Initial rental rate must be greater than 0")
-    if doc.rental_rate_hourly and doc.rental_rate_hourly <= 0:
-        frappe.throw("Hourly rental rate must be greater than 0")
+    if doc.rental_rate_initial and doc.rental_rate_initial < 0:
+        frappe.throw("Initial rental rate must not be negative")
+    if doc.rental_rate_hourly and doc.rental_rate_hourly < 0:
+        frappe.throw("Hourly rental rate must not be negative")
 
 def handle_driver_update(doc, method):
     """Handle updates to driver record"""

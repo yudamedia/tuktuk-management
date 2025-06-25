@@ -58,12 +58,12 @@ class TukTukVehicle(Document):
     def validate_rental_rates(self):
         """Validate rental rate values"""
         if self.rental_rate_initial is not None:
-            if flt(self.rental_rate_initial) <= 0:
-                frappe.throw("Initial rental rate must be greater than 0")
+            if flt(self.rental_rate_initial) < 0:
+                frappe.throw("Initial rental rate must not be negative")
         
         if self.rental_rate_hourly is not None:
-            if flt(self.rental_rate_hourly) <= 0:
-                frappe.throw("Hourly rental rate must be greater than 0")
+            if flt(self.rental_rate_hourly) < 0:
+                frappe.throw("Hourly rental rate must not be negative")
     
     def validate_coordinates(self):
         """Validate latitude and longitude - FIXED FIELD NAMES"""
