@@ -274,7 +274,7 @@ def send_tuktuk_manager_welcome_email(email, full_name, password):
         # Also create a communication record for tracking
         communication = frappe.get_doc({
             "doctype": "Communication",
-            "communication_type": "Email",
+            "communication_type": "Communication",
             "communication_medium": "Email",
             "sent_or_received": "Sent",
             "email_status": "Sent",
