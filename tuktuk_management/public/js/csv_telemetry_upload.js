@@ -337,55 +337,33 @@ tuktuk_management.csv_upload = {
                 `;
             });
             
+            html += `
+                            </tbody>
+                        </table>
+                    </div>
+            `;
+            
             if (results.errors.length > 10) {
-                html += `<tr><td colspan="2"><em>... and ${results.errors.length - 10} more errors</em></td></tr>`;
+                html += `<p class="text-muted small">Showing first 10 errors. Total: ${results.errors.length}</p>`;
             }
             
-            html += `
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            `;
+            html += `</div>`;
         }
         
-        if (results.success_details && results.success_details.length > 0) {
+        if (results.summary) {
             html += `
                 <div class="mt-4">
-                    <h6 class="text-success">Recent Updates:</h6>
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped">
-                            <thead>
-                                <tr>
-                                    <th>TukTuk ID</th>
-                                    <th>Battery Level</th>
-                                    <th>Location</th>
-                                    <th>Updated</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-            `;
-            
-            results.success_details.slice(0, 5).forEach(detail => {
-                html += `
-                    <tr>
-                        <td>${detail.tuktuk_id || 'N/A'}</td>
-                        <td>${detail.battery_level !== undefined ? flt(detail.battery_level) + '%' : 'N/A'}</td>
-                        <td>${detail.location || 'N/A'}</td>
-                        <td>${detail.timestamp || 'Now'}</td>
-                    </tr>
-                `;
-            });
-            
-            html += `
-                            </tbody>
-                        </table>
-                    </div>
+                    <h6>Processing Summary:</h6>
+                    <ul class="list-unstyled">
+                        <li><strong>File Format:</strong> ${results.summary.format_type || 'Unknown'}</li>
+                        <li><strong>Processing Time:</strong> ${results.summary.processing_time || 'N/A'}</li>
+                        <li><strong>Data Source:</strong> ${results.summary.data_source || 'CSV Upload'}</li>
+                    </ul>
                 </div>
             `;
         }
         
-        html += '</div>';
+        html += `</div>`;
         return html;
     },
     
@@ -396,22 +374,24 @@ tuktuk_management.csv_upload = {
                 format_type: format_type
             },
             callback: function(r) {
-                if (r.message && r.message.success) {
-                    const headers = r.message.headers;
-                    const csv_content = headers.join(',') + '\n';
+                if (r.message) {
+                    // Create and download the template
+                    const csvContent = r.message.content;
+                    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
                     
-                    // Create and download CSV file
-                    const blob = new Blob([csv_content], { type: 'text/csv;charset=utf-8;' });
-                    const link = document.createElement('a');
-                    
-                    if (link.download !== undefined) {
-                        const url = URL.createObjectURL(blob);
-                        link.setAttribute('href', url);
-                        link.setAttribute('download', `${format_type}_template.csv`);
-                        link.style.visibility = 'hidden';
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
+                    if (navigator.msSaveBlob) { // IE 10+
+                        navigator.msSaveBlob(blob, `${format_type}_template.csv`);
+                    } else {
+                        const link = document.createElement('a');
+                        if (link.download !== undefined) {
+                            const url = URL.createObjectURL(blob);
+                            link.setAttribute('href', url);
+                            link.setAttribute('download', `${format_type}_template.csv`);
+                            link.style.visibility = 'hidden';
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                        }
                     }
                 }
             }
@@ -419,21 +399,45 @@ tuktuk_management.csv_upload = {
     }
 };
 
-// Extend the TukTuk Vehicle list view
-const original_onload = frappe.listview_settings['TukTuk Vehicle'] && 
-                       frappe.listview_settings['TukTuk Vehicle'].onload || function() {};
-
-frappe.listview_settings['TukTuk Vehicle'].onload = function(listview) {
-    // Call original onload if it exists
-    original_onload.call(this, listview);
-    
-    // Add CSV upload button
-    if (frappe.user.has_role(['System Manager', 'Tuktuk Manager'])) {
-        listview.page.add_action_item(__("CSV Upload"), function() {
-            tuktuk_management.csv_upload.show_upload_dialog();
-        });
+// FIXED: Safer extension of the TukTuk Vehicle list view
+$(document).ready(function() {
+    // Ensure frappe.listview_settings exists
+    if (typeof frappe !== 'undefined' && frappe.listview_settings) {
+        
+        // Initialize TukTuk Vehicle listview settings if it doesn't exist
+        if (!frappe.listview_settings['TukTuk Vehicle']) {
+            frappe.listview_settings['TukTuk Vehicle'] = {};
+        }
+        
+        // Store original onload if it exists
+        const original_onload = frappe.listview_settings['TukTuk Vehicle'].onload || function() {};
+        
+        // SAFE: Set the onload function with proper error handling
+        frappe.listview_settings['TukTuk Vehicle'].onload = function(listview) {
+            try {
+                // Call original onload if it exists
+                if (typeof original_onload === 'function') {
+                    original_onload.call(this, listview);
+                }
+                
+                // Add CSV upload button with role check
+                if (frappe.user && frappe.user.has_role && 
+                    frappe.user.has_role(['System Manager', 'Tuktuk Manager'])) {
+                    
+                    if (listview && listview.page && listview.page.add_action_item) {
+                        listview.page.add_action_item(__("CSV Upload"), function() {
+                            if (tuktuk_management && tuktuk_management.csv_upload) {
+                                tuktuk_management.csv_upload.show_upload_dialog();
+                            }
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error('Error in TukTuk Vehicle listview onload:', error);
+            }
+        };
     }
-};
+});
 
 // Add CSS for better styling
 $(document).ready(function() {
