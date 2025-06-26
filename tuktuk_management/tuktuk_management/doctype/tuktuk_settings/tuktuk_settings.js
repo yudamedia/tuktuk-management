@@ -4,9 +4,12 @@
 // In tuktuk_settings.js
 frappe.ui.form.on("TukTuk Settings", {
     refresh: function(frm) {
-        frm.add_custom_button(__('Setup Daraja Integration'), function() {
-            setup_daraja_integration();
-        });
+        // Only show Setup Daraja Integration button to System Managers
+        if (frappe.user.has_role('System Manager')) {
+            frm.add_custom_button(__('Setup Daraja Integration'), function() {
+                setup_daraja_integration();
+            });
+        }
     }
 });
 
