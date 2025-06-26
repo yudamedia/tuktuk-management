@@ -35,25 +35,7 @@ tuktuk_management.csv_upload = {
                 {
                     fieldtype: 'HTML',
                     fieldname: 'template_download',
-                    options: `
-                        <div class="mt-3">
-                            <h6>CSV Templates:</h6>
-                            <div class="btn-group btn-group-sm" role="group">
-                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="tuktuk_management.csv_upload.download_template('telemetry_export')">
-                                    Telemetry Export
-                                </button>
-                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="tuktuk_management.csv_upload.download_template('battery_update')">
-                                    Battery Update
-                                </button>
-                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="tuktuk_management.csv_upload.download_template('location_update')">
-                                    Location Update
-                                </button>
-                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="tuktuk_management.csv_upload.download_template('vehicle_data')">
-                                    Vehicle Data
-                                </button>
-                            </div>
-                        </div>
-                    `
+                    options: '<div id="csv-template-buttons"></div>'
                 },
                 {
                     fieldtype: 'HTML',
@@ -66,10 +48,24 @@ tuktuk_management.csv_upload = {
             },
             primary_action_label: __('Upload and Process'),
             secondary_action: function(values) {
-                if (values.csv_file) {
-                    tuktuk_management.csv_upload.validate_csv_file(values.csv_file);
+                // Get the file URL properly
+                const file_url = dialog.get_value('csv_file');
+                console.log('File URL from dialog:', file_url); // Debug log
+                
+                if (file_url && file_url.trim() !== '') {
+                    tuktuk_management.csv_upload.validate_csv_file(file_url);
                 } else {
-                    frappe.msgprint(__('Please select a CSV file first'));
+                    // Try to get file URL from the attachment field differently
+                    const attach_field = dialog.fields_dict.csv_file;
+                    if (attach_field && attach_field.get_value()) {
+                        tuktuk_management.csv_upload.validate_csv_file(attach_field.get_value());
+                    } else {
+                        frappe.msgprint({
+                            title: __('No File Selected'),
+                            message: __('Please select a CSV file first before validating.'),
+                            indicator: 'orange'
+                        });
+                    }
                 }
             },
             secondary_action_label: __('Validate CSV')
@@ -77,20 +73,71 @@ tuktuk_management.csv_upload = {
         
         dialog.show();
         
-        // Add file change handler for auto-validation
+        // Add template buttons after dialog is shown
+        setTimeout(() => {
+            tuktuk_management.csv_upload.add_template_buttons();
+        }, 100);
+        
+        // Add file change handler for auto-validation after file upload completes
         dialog.fields_dict.csv_file.$input.on('change', function() {
-            const file_url = dialog.get_value('csv_file');
-            if (file_url) {
-                setTimeout(() => {
-                    tuktuk_management.csv_upload.validate_csv_file(file_url);
-                }, 500);
-            }
+            setTimeout(() => {
+                const file_url = dialog.get_value('csv_file');
+                console.log('File change detected, URL:', file_url); // Debug log
+                if (file_url && file_url.trim() !== '') {
+                    // Auto-validate after a small delay to ensure file upload is complete
+                    setTimeout(() => {
+                        tuktuk_management.csv_upload.validate_csv_file(file_url);
+                    }, 1000);
+                }
+            }, 500);
         });
         
         return dialog;
     },
     
+    add_template_buttons: function() {
+        const container = document.getElementById('csv-template-buttons');
+        if (container) {
+            container.innerHTML = `
+                <div class="mt-3">
+                    <h6>CSV Templates:</h6>
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="template-telemetry">
+                            Telemetry Export
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="template-battery">
+                            Battery Update
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="template-location">
+                            Location Update
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="template-vehicle">
+                            Vehicle Data
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            // Add event listeners
+            document.getElementById('template-telemetry').onclick = () => tuktuk_management.csv_upload.download_template('telemetry_export');
+            document.getElementById('template-battery').onclick = () => tuktuk_management.csv_upload.download_template('battery_update');
+            document.getElementById('template-location').onclick = () => tuktuk_management.csv_upload.download_template('location_update');
+            document.getElementById('template-vehicle').onclick = () => tuktuk_management.csv_upload.download_template('vehicle_data');
+        }
+    },
+    
     validate_csv_file: function(file_url) {
+        console.log('Validating CSV file with URL:', file_url); // Debug log
+        
+        if (!file_url || file_url.trim() === '') {
+            frappe.msgprint({
+                title: __('No File Selected'),
+                message: __('Please select a CSV file first before validating.'),
+                indicator: 'orange'
+            });
+            return;
+        }
+        
         frappe.show_alert({
             message: __('Validating CSV file...'),
             indicator: 'blue'
@@ -103,6 +150,7 @@ tuktuk_management.csv_upload = {
                 file_url: file_url
             },
             callback: function(r) {
+                console.log('File read response:', r); // Debug log
                 if (r.message) {
                     // Validate CSV content
                     frappe.call({
@@ -111,15 +159,31 @@ tuktuk_management.csv_upload = {
                             csv_content: r.message
                         },
                         callback: function(validation_result) {
+                            console.log('Validation result:', validation_result); // Debug log
                             tuktuk_management.csv_upload.show_validation_results(validation_result.message);
+                        },
+                        error: function(error) {
+                            console.error('Validation error:', error); // Debug log
+                            frappe.msgprint({
+                                title: __('Validation Error'),
+                                message: error.message || __('Failed to validate CSV file'),
+                                indicator: 'red'
+                            });
                         }
+                    });
+                } else {
+                    frappe.msgprint({
+                        title: __('File Read Error'),
+                        message: __('Could not read the CSV file content. Please try again.'),
+                        indicator: 'red'
                     });
                 }
             },
             error: function(error) {
+                console.error('File read error:', error); // Debug log
                 frappe.msgprint({
                     title: __('File Read Error'),
-                    message: error.message,
+                    message: error.message || __('Failed to read the CSV file'),
                     indicator: 'red'
                 });
             }
@@ -128,6 +192,16 @@ tuktuk_management.csv_upload = {
     
     show_validation_results: function(validation_data) {
         const results_div = document.getElementById('csv-validation-results');
+        
+        if (!validation_data) {
+            results_div.innerHTML = `
+                <div class="alert alert-warning mt-3">
+                    <h6><i class="fa fa-exclamation-triangle"></i> No Validation Data</h6>
+                    <p>Could not get validation results. Please try again.</p>
+                </div>
+            `;
+            return;
+        }
         
         if (!validation_data.valid) {
             results_div.innerHTML = `
@@ -141,34 +215,50 @@ tuktuk_management.csv_upload = {
             return;
         }
         
-        const format_info = validation_data.format;
-        const processing_time = Math.ceil(validation_data.estimated_processing_time);
+        const detected_format = validation_data.detected_format || 'Unknown';
         
         results_div.innerHTML = `
             <div class="alert alert-success mt-3">
                 <h6><i class="fa fa-check-circle"></i> Validation Successful</h6>
                 <div class="row">
                     <div class="col-md-6">
-                        <p><strong>Detected Format:</strong> ${format_info.type.replace('_', ' ').toUpperCase()}</p>
+                        <p><strong>Detected Format:</strong> ${detected_format.replace('_', ' ').toUpperCase()}</p>
                         <p><strong>Total Rows:</strong> ${validation_data.row_count}</p>
-                        <p><strong>Estimated Processing Time:</strong> ~${processing_time} seconds</p>
+                        <p><strong>Columns:</strong> ${validation_data.headers ? validation_data.headers.length : 'Unknown'}</p>
                     </div>
                     <div class="col-md-6">
-                        <p><strong>Column Mappings:</strong></p>
+                        <p><strong>Sample Headers:</strong></p>
                         <ul class="small mb-0">
-                            ${Object.entries(format_info.mappings).map(([key, index]) => 
-                                `<li>${key}: Column ${index + 1} (${validation_data.headers[index]})</li>`
-                            ).join('')}
+                            ${validation_data.headers ? 
+                                validation_data.headers.slice(0, 5).map((header, index) => 
+                                    `<li>Column ${index + 1}: ${header}</li>`
+                                ).join('') : 
+                                '<li>No headers detected</li>'
+                            }
+                            ${validation_data.headers && validation_data.headers.length > 5 ? 
+                                `<li>... and ${validation_data.headers.length - 5} more columns</li>` : ''}
                         </ul>
                     </div>
+                </div>
+                <div class="mt-2">
+                    <small class="text-muted">
+                        ✅ CSV file is ready for processing. Click "Upload and Process" to continue.
+                    </small>
                 </div>
             </div>
         `;
     },
     
     process_csv_upload: function(values, dialog) {
-        if (!values.csv_file) {
-            frappe.msgprint(__('Please select a CSV file'));
+        const file_url = dialog.get_value('csv_file');
+        console.log('Processing CSV with URL:', file_url); // Debug log
+        
+        if (!file_url || file_url.trim() === '') {
+            frappe.msgprint({
+                title: __('No File Selected'),
+                message: __('Please select a CSV file first'),
+                indicator: 'orange'
+            });
             return;
         }
         
@@ -182,7 +272,7 @@ tuktuk_management.csv_upload = {
         frappe.call({
             method: 'tuktuk_management.api.csv_telemetry.read_file_content',
             args: {
-                file_url: values.csv_file
+                file_url: file_url
             },
             callback: function(r) {
                 if (r.message) {
@@ -195,16 +285,31 @@ tuktuk_management.csv_upload = {
                         },
                         callback: function(result) {
                             progress_dialog.hide();
-                            tuktuk_management.csv_upload.show_results_dialog(result.message);
+                            if (result.message) {
+                                tuktuk_management.csv_upload.show_results_dialog(result.message);
+                            } else {
+                                frappe.msgprint({
+                                    title: __('Upload Failed'),
+                                    message: __('No results returned from CSV processing'),
+                                    indicator: 'red'
+                                });
+                            }
                         },
                         error: function(error) {
                             progress_dialog.hide();
                             frappe.msgprint({
                                 title: __('Upload Failed'),
-                                message: error.message,
+                                message: error.message || __('Failed to process CSV file'),
                                 indicator: 'red'
                             });
                         }
+                    });
+                } else {
+                    progress_dialog.hide();
+                    frappe.msgprint({
+                        title: __('File Read Error'),
+                        message: __('Could not read the CSV file content'),
+                        indicator: 'red'
                     });
                 }
             },
@@ -212,7 +317,7 @@ tuktuk_management.csv_upload = {
                 progress_dialog.hide();
                 frappe.msgprint({
                     title: __('File Read Error'),
-                    message: error.message,
+                    message: error.message || __('Failed to read the CSV file'),
                     indicator: 'red'
                 });
             }
@@ -220,40 +325,140 @@ tuktuk_management.csv_upload = {
     },
     
     show_progress_dialog: function() {
-        return new frappe.ui.Dialog({
-            title: __('Processing CSV Upload'),
-            indicator: 'blue',
+        const progress_dialog = new frappe.ui.Dialog({
+            title: __('Processing CSV'),
+            size: 'small',
             fields: [
                 {
                     fieldtype: 'HTML',
                     fieldname: 'progress_html',
                     options: `
-                        <div class="text-center p-4">
+                        <div class="text-center">
                             <div class="spinner-border text-primary mb-3" role="status">
                                 <span class="sr-only">Loading...</span>
                             </div>
-                            <h5>Processing CSV file...</h5>
-                            <p class="text-muted">This may take a few moments depending on file size.</p>
+                            <p class="text-muted">Processing your CSV file...</p>
+                            <p class="small">This may take a few minutes depending on file size.</p>
                         </div>
                     `
                 }
             ]
         });
+        
+        progress_dialog.show();
+        progress_dialog.$wrapper.find('.btn-modal-close').hide(); // Hide close button
+        
+        return progress_dialog;
     },
     
     show_results_dialog: function(results) {
-        const dialog = new frappe.ui.Dialog({
+        const success_rate = results.total_rows > 0 ? 
+            Math.round((results.updated / results.total_rows) * 100) : 0;
+        
+        const results_dialog = new frappe.ui.Dialog({
             title: __('CSV Upload Results'),
             size: 'large',
             fields: [
                 {
                     fieldtype: 'HTML',
-                    fieldname: 'results_html',
-                    options: tuktuk_management.csv_upload.generate_results_html(results)
+                    fieldname: 'results_summary',
+                    options: `
+                        <div class="csv-upload-results">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="card text-center border-primary">
+                                        <div class="card-body">
+                                            <h4 class="text-primary">${results.total_rows}</h4>
+                                            <small>Total Rows</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card text-center border-success">
+                                        <div class="card-body">
+                                            <h4 class="text-success">${results.updated}</h4>
+                                            <small>Updated</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card text-center border-danger">
+                                        <div class="card-body">
+                                            <h4 class="text-danger">${results.failed}</h4>
+                                            <small>Failed</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card text-center border-warning">
+                                        <div class="card-body">
+                                            <h4 class="text-warning">${results.skipped}</h4>
+                                            <small>Skipped</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-3">
+                                <div class="progress">
+                                    <div class="progress-bar bg-success" role="progressbar" 
+                                         style="width: ${success_rate}%" 
+                                         aria-valuenow="${success_rate}" aria-valuemin="0" aria-valuemax="100">
+                                        ${success_rate}% Success Rate
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            ${results.errors && results.errors.length > 0 ? `
+                                <div class="mt-3">
+                                    <h6 class="text-danger">Errors:</h6>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-striped">
+                                            <tbody>
+                                                ${results.errors.slice(0, 10).map(error => 
+                                                    `<tr><td class="small text-danger">${error}</td></tr>`
+                                                ).join('')}
+                                                ${results.errors.length > 10 ? 
+                                                    `<tr><td class="small text-muted">... and ${results.errors.length - 10} more errors</td></tr>` : ''}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            ` : ''}
+                            
+                            ${results.success_details && results.success_details.length > 0 ? `
+                                <div class="mt-3">
+                                    <h6 class="text-success">Successfully Updated TukTuks:</h6>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th>TukTuk ID</th>
+                                                    <th>Battery Level</th>
+                                                    <th>Updated</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                ${results.success_details.slice(0, 10).map(detail => `
+                                                    <tr>
+                                                        <td class="small">${detail.tuktuk_id || 'N/A'}</td>
+                                                        <td class="small">${detail.battery_level ? detail.battery_level + '%' : 'N/A'}</td>
+                                                        <td class="small">${detail.timestamp || 'N/A'}</td>
+                                                    </tr>
+                                                `).join('')}
+                                                ${results.success_details.length > 10 ? 
+                                                    `<tr><td colspan="3" class="small text-muted">... and ${results.success_details.length - 10} more updates</td></tr>` : ''}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `
                 }
             ],
             primary_action: function() {
-                dialog.hide();
+                results_dialog.hide();
                 // Refresh the list view
                 if (cur_list) {
                     cur_list.refresh();
@@ -262,109 +467,7 @@ tuktuk_management.csv_upload = {
             primary_action_label: __('Close')
         });
         
-        dialog.show();
-    },
-    
-    generate_results_html: function(results) {
-        const success_percentage = results.total_rows > 0 ? 
-            Math.round((results.updated / results.total_rows) * 100) : 0;
-        
-        let html = `
-            <div class="csv-upload-results">
-                <div class="row mb-4">
-                    <div class="col-md-3">
-                        <div class="card text-center">
-                            <div class="card-body">
-                                <h4 class="text-primary">${results.total_rows}</h4>
-                                <small>Total Rows</small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card text-center">
-                            <div class="card-body">
-                                <h4 class="text-success">${results.updated}</h4>
-                                <small>Updated</small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card text-center">
-                            <div class="card-body">
-                                <h4 class="text-danger">${results.failed}</h4>
-                                <small>Failed</small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card text-center">
-                            <div class="card-body">
-                                <h4 class="text-warning">${results.skipped}</h4>
-                                <small>Skipped</small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="progress mb-3">
-                    <div class="progress-bar bg-success" style="width: ${success_percentage}%">
-                        ${success_percentage}% Success
-                    </div>
-                </div>
-        `;
-        
-        if (results.errors && results.errors.length > 0) {
-            html += `
-                <div class="mt-4">
-                    <h6 class="text-danger">Errors (${results.errors.length}):</h6>
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped">
-                            <thead>
-                                <tr>
-                                    <th>Row</th>
-                                    <th>Error</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-            `;
-            
-            results.errors.slice(0, 10).forEach(error => {
-                html += `
-                    <tr>
-                        <td>${error.row || 'N/A'}</td>
-                        <td>${error.message || error}</td>
-                    </tr>
-                `;
-            });
-            
-            html += `
-                            </tbody>
-                        </table>
-                    </div>
-            `;
-            
-            if (results.errors.length > 10) {
-                html += `<p class="text-muted small">Showing first 10 errors. Total: ${results.errors.length}</p>`;
-            }
-            
-            html += `</div>`;
-        }
-        
-        if (results.summary) {
-            html += `
-                <div class="mt-4">
-                    <h6>Processing Summary:</h6>
-                    <ul class="list-unstyled">
-                        <li><strong>File Format:</strong> ${results.summary.format_type || 'Unknown'}</li>
-                        <li><strong>Processing Time:</strong> ${results.summary.processing_time || 'N/A'}</li>
-                        <li><strong>Data Source:</strong> ${results.summary.data_source || 'CSV Upload'}</li>
-                    </ul>
-                </div>
-            `;
-        }
-        
-        html += `</div>`;
-        return html;
+        results_dialog.show();
     },
     
     download_template: function(format_type) {
@@ -375,69 +478,25 @@ tuktuk_management.csv_upload = {
             },
             callback: function(r) {
                 if (r.message) {
-                    // Create and download the template
-                    const csvContent = r.message.content;
-                    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                    const blob = new Blob([r.message.content], { type: 'text/csv' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = r.message.filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
                     
-                    if (navigator.msSaveBlob) { // IE 10+
-                        navigator.msSaveBlob(blob, `${format_type}_template.csv`);
-                    } else {
-                        const link = document.createElement('a');
-                        if (link.download !== undefined) {
-                            const url = URL.createObjectURL(blob);
-                            link.setAttribute('href', url);
-                            link.setAttribute('download', `${format_type}_template.csv`);
-                            link.style.visibility = 'hidden';
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                        }
-                    }
+                    frappe.show_alert({
+                        message: __('Template downloaded successfully'),
+                        indicator: 'green'
+                    });
                 }
             }
         });
     }
 };
-
-// FIXED: Safer extension of the TukTuk Vehicle list view
-$(document).ready(function() {
-    // Ensure frappe.listview_settings exists
-    if (typeof frappe !== 'undefined' && frappe.listview_settings) {
-        
-        // Initialize TukTuk Vehicle listview settings if it doesn't exist
-        if (!frappe.listview_settings['TukTuk Vehicle']) {
-            frappe.listview_settings['TukTuk Vehicle'] = {};
-        }
-        
-        // Store original onload if it exists
-        const original_onload = frappe.listview_settings['TukTuk Vehicle'].onload || function() {};
-        
-        // SAFE: Set the onload function with proper error handling
-        frappe.listview_settings['TukTuk Vehicle'].onload = function(listview) {
-            try {
-                // Call original onload if it exists
-                if (typeof original_onload === 'function') {
-                    original_onload.call(this, listview);
-                }
-                
-                // Add CSV upload button with role check
-                if (frappe.user && frappe.user.has_role && 
-                    frappe.user.has_role(['System Manager', 'Tuktuk Manager'])) {
-                    
-                    if (listview && listview.page && listview.page.add_action_item) {
-                        listview.page.add_action_item(__("CSV Upload"), function() {
-                            if (tuktuk_management && tuktuk_management.csv_upload) {
-                                tuktuk_management.csv_upload.show_upload_dialog();
-                            }
-                        });
-                    }
-                }
-            } catch (error) {
-                console.error('Error in TukTuk Vehicle listview onload:', error);
-            }
-        };
-    }
-});
 
 // Add CSS for better styling
 $(document).ready(function() {
@@ -486,6 +545,10 @@ $(document).ready(function() {
                 
                 #csv-validation-results .alert-danger {
                     border-left-color: #dc3545;
+                }
+                
+                #csv-validation-results .alert-warning {
+                    border-left-color: #ffc107;
                 }
             </style>
         `);

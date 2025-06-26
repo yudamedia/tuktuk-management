@@ -55,6 +55,56 @@ def read_file_content(file_url):
         frappe.throw(_("Failed to read file: {0}").format(str(e)))
 
 @frappe.whitelist()
+def validate_csv_before_upload(csv_content):
+    """
+    Validate CSV content before processing
+    
+    Args:
+        csv_content: CSV file content as string
+    
+    Returns:
+        Dictionary with validation results
+    """
+    try:
+        # Parse CSV content
+        csv_reader = csv.reader(io.StringIO(csv_content))
+        
+        # Get header row
+        headers = []
+        try:
+            headers = next(csv_reader)
+            headers = [h.strip() for h in headers]
+        except StopIteration:
+            return {"valid": False, "error": "CSV file is empty or invalid"}
+        
+        if not headers:
+            return {"valid": False, "error": "No headers found in CSV"}
+        
+        # Count rows
+        row_count = 0
+        for row in csv_reader:
+            if row:  # Skip empty rows
+                row_count += 1
+        
+        if row_count == 0:
+            return {"valid": False, "error": "No data rows found in CSV"}
+        
+        # Detect format
+        headers_lower = [h.strip().lower() for h in headers]
+        csv_format = detect_csv_format(headers_lower)
+        
+        return {
+            "valid": True,
+            "headers": headers,
+            "row_count": row_count,
+            "detected_format": csv_format.get('type', 'Unknown') if csv_format else 'Unknown',
+            "message": f"CSV is valid with {row_count} data rows and {len(headers)} columns"
+        }
+        
+    except Exception as e:
+        return {"valid": False, "error": f"CSV validation failed: {str(e)}"}
+
+@frappe.whitelist()
 def upload_telemetry_csv_data(csv_content, mapping_type="auto"):
     """
     Upload and process telemetry data from CSV
@@ -94,60 +144,42 @@ def upload_telemetry_csv_data(csv_content, mapping_type="auto"):
         if not csv_format:
             frappe.throw(_("Unrecognized CSV format. Please check the column headers."))
         
-        frappe.publish_realtime(
-            "csv_upload_progress",
-            {"status": "processing", "format": csv_format["type"]},
-            user=frappe.session.user
-        )
+        results["csv_format"] = csv_format
         
-        # Process each row
-        row_number = 1
+        # Process data rows
+        row_number = 1  # Start from 1 (after header)
+        
         for row in csv_reader:
             row_number += 1
             results["total_rows"] += 1
             
+            if not row or all(not cell.strip() for cell in row):
+                results["skipped"] += 1
+                continue
+            
             try:
-                if not row or all(not cell.strip() for cell in row):
-                    results["skipped"] += 1
-                    continue
-                
-                # Process based on detected format
+                # Process row based on detected format
                 if csv_format["type"] == "telemetry_export":
-                    success = process_telemetry_export_row(row, csv_format["mappings"], results)
+                    success = process_telemetry_export_row(row, headers, csv_format["mappings"], results)
                 elif csv_format["type"] == "battery_update":
-                    success = process_battery_update_row(row, csv_format["mappings"], results)
+                    success = process_battery_update_row(row, headers, csv_format["mappings"], results)
                 elif csv_format["type"] == "location_update":
-                    success = process_location_update_row(row, csv_format["mappings"], results)
+                    success = process_location_update_row(row, headers, csv_format["mappings"], results)
                 elif csv_format["type"] == "vehicle_data":
-                    success = process_vehicle_data_row(row, csv_format["mappings"], results)
+                    success = process_vehicle_data_row(row, headers, csv_format["mappings"], results)
                 else:
-                    success = process_generic_row(row, csv_format["mappings"], results)
+                    # Try generic processing
+                    success = process_generic_row(row, headers, results)
                 
                 if success:
+                    results["processed"] += 1
                     results["updated"] += 1
                 else:
                     results["failed"] += 1
-                
-                results["processed"] += 1
-                
-                # Publish progress every 10 rows
-                if results["processed"] % 10 == 0:
-                    frappe.publish_realtime(
-                        "csv_upload_progress",
-                        {
-                            "status": "processing",
-                            "processed": results["processed"],
-                            "total": results["total_rows"]
-                        },
-                        user=frappe.session.user
-                    )
-                
+                    
             except Exception as e:
                 results["failed"] += 1
-                results["errors"].append({
-                    "row": row_number,
-                    "message": str(e)
-                })
+                results["errors"].append(f"Row {row_number}: {str(e)}")
                 frappe.log_error(f"CSV row processing error: {str(e)}")
         
         # Update settings with last upload time
@@ -184,7 +216,7 @@ def detect_csv_format(headers):
     # Define format patterns
     formats = {
         "telemetry_export": {
-            "required_fields": ["device id", "imei", "vehicle number"],
+            "required_fields": ["device id", "imei", "device name"],
             "optional_fields": ["voltage", "latitude", "longitude", "battery level"],
             "mappings": {}
         },
@@ -214,17 +246,17 @@ def detect_csv_format(headers):
             # Check for required fields
             for req_field in format_def["required_fields"]:
                 if req_field in header or header in req_field:
-                    mappings[req_field.replace(" ", "_")] = i
+                    mappings[req_field] = i
                     required_found += 1
                     break
             
             # Check for optional fields
             for opt_field in format_def["optional_fields"]:
                 if opt_field in header or header in opt_field:
-                    mappings[opt_field.replace(" ", "_")] = i
+                    mappings[opt_field] = i
                     break
         
-        # If we found all required fields, this is our format
+        # If all required fields found, this is likely the format
         if required_found >= len(format_def["required_fields"]):
             return {
                 "type": format_type,
@@ -232,160 +264,231 @@ def detect_csv_format(headers):
                 "confidence": required_found / len(format_def["required_fields"])
             }
     
+    # If no exact match, try generic matching
+    return detect_generic_format(headers)
+
+def detect_generic_format(headers):
+    """
+    Detect generic format when specific patterns don't match
+    """
+    mappings = {}
+    
+    # Common field mappings
+    field_mappings = {
+        "device_imei": ["imei", "device imei", "device_imei"],
+        "device_id": ["device id", "deviceid", "device_id"],
+        "device_name": ["device name", "name", "vehicle"],
+        "latitude": ["latitude", "lat"],
+        "longitude": ["longitude", "lng", "lon"],
+        "voltage": ["voltage", "battery voltage"],
+        "speed": ["speed"],
+        "course": ["course", "direction", "heading"],
+        "satellite": ["satellite", "satellites", "sat"],
+        "last_gps_time": ["last gps time", "gps time", "timestamp"]
+    }
+    
+    for i, header in enumerate(headers):
+        for field, patterns in field_mappings.items():
+            if any(pattern in header for pattern in patterns):
+                mappings[field] = i
+                break
+    
+    if mappings:
+        return {
+            "type": "generic_telemetry",
+            "mappings": mappings,
+            "confidence": 0.5
+        }
+    
     return None
 
-def process_battery_update_row(row, mappings, results):
-    """Process a row from battery update format"""
+def process_telemetry_export_row(row, headers, mappings, results):
+    """Process a row from telemetry export CSV"""
     try:
-        tuktuk_id = row[mappings.get("tuktuk_id", 0)].strip() if mappings.get("tuktuk_id") is not None else ""
-        battery_level = flt(row[mappings.get("battery_level", 1)]) if mappings.get("battery_level") is not None else 0
+        # Extract key identifiers
+        device_id = str(row[mappings.get("device id", 0)]).strip() if mappings.get("device id") is not None else ""
+        device_imei = str(row[mappings.get("imei", 1)]).strip() if mappings.get("imei") is not None else ""
+        device_name = str(row[mappings.get("device name", 4)]).strip() if mappings.get("device name") is not None else ""
         
-        if not tuktuk_id:
-            results["warnings"].append("Missing TukTuk ID in battery update row")
+        # Find matching TukTuk Vehicle
+        tuktuk_doc = None
+        
+        # Try to find by device_id first
+        if device_id:
+            tuktuk_doc = frappe.db.get_value("TukTuk Vehicle", 
+                                           {"device_id": device_id}, 
+                                           ["name", "tuktuk_id", "device_id", "device_imei"])
+        
+        # Try to find by IMEI if device_id didn't work
+        if not tuktuk_doc and device_imei:
+            tuktuk_doc = frappe.db.get_value("TukTuk Vehicle", 
+                                           {"device_imei": device_imei}, 
+                                           ["name", "tuktuk_id", "device_id", "device_imei"])
+        
+        # Try to find by device name
+        if not tuktuk_doc and device_name:
+            tuktuk_doc = frappe.db.get_value("TukTuk Vehicle", 
+                                           {"tuktuk_id": device_name}, 
+                                           ["name", "tuktuk_id", "device_id", "device_imei"])
+        
+        if not tuktuk_doc:
+            results["warnings"].append(f"No matching TukTuk found for Device ID: {device_id}, IMEI: {device_imei}, Name: {device_name}")
             return False
         
-        # Find TukTuk
-        tuktuk = frappe.db.get_value("TukTuk Vehicle", {"tuktuk_id": tuktuk_id}, "name")
-        if not tuktuk:
-            results["warnings"].append(f"TukTuk not found: {tuktuk_id}")
-            return False
+        # Get the document for updating
+        doc = frappe.get_doc("TukTuk Vehicle", tuktuk_doc[0])
+        updated = False
         
-        # Update battery level
-        if 0 <= battery_level <= 100:
-            doc = frappe.get_doc("TukTuk Vehicle", tuktuk)
-            doc.battery_level = battery_level
-            doc.last_telemetry_update = now_datetime()
+        # Update fields based on available data
+        if mappings.get("voltage") is not None and len(row) > mappings["voltage"]:
+            voltage = flt(row[mappings["voltage"]])
+            if voltage > 0:
+                doc.battery_voltage = voltage
+                # Estimate battery level from voltage (12V system assumed)
+                battery_percentage = min(100, max(0, ((voltage - 11.8) / (12.6 - 11.8)) * 100))
+                doc.battery_level = battery_percentage
+                updated = True
+        
+        if mappings.get("latitude") is not None and len(row) > mappings["latitude"]:
+            lat = flt(row[mappings["latitude"]])
+            if lat != 0:
+                doc.latitude = lat
+                updated = True
+        
+        if mappings.get("longitude") is not None and len(row) > mappings["longitude"]:
+            lng = flt(row[mappings["longitude"]])
+            if lng != 0:
+                doc.longitude = lng
+                updated = True
+        
+        if updated:
+            doc.last_reported = now_datetime()  # Use correct field name
             doc.save(ignore_permissions=True)
             
             results["success_details"].append({
-                "tuktuk_id": tuktuk_id,
-                "battery_level": battery_level,
-                "timestamp": doc.last_telemetry_update
+                "tuktuk_id": doc.tuktuk_id,
+                "device_id": device_id,
+                "imei": device_imei,
+                "battery_level": doc.battery_level,
+                "timestamp": doc.last_reported
             })
             
             return True
         else:
-            results["warnings"].append(f"Invalid battery level: {battery_level} for TukTuk: {tuktuk_id}")
+            results["skipped"] += 1
             return False
             
+    except Exception as e:
+        frappe.log_error(f"Error processing telemetry export row: {str(e)}")
+        return False
+
+def process_battery_update_row(row, headers, mappings, results):
+    """Process a row from battery update CSV"""
+    try:
+        tuktuk_id = str(row[mappings.get("tuktuk id", 0)]).strip() if mappings.get("tuktuk id") is not None else ""
+        battery_level = flt(row[mappings.get("battery level", 1)]) if mappings.get("battery level") is not None else 0
+        
+        if not tuktuk_id or battery_level <= 0:
+            return False
+        
+        # Find TukTuk Vehicle
+        doc = frappe.get_doc("TukTuk Vehicle", {"tuktuk_id": tuktuk_id})
+        if not doc:
+            results["warnings"].append(f"TukTuk {tuktuk_id} not found")
+            return False
+        
+        doc.battery_level = battery_level
+        doc.last_reported = now_datetime()
+        doc.save(ignore_permissions=True)
+        
+        results["success_details"].append({
+            "tuktuk_id": tuktuk_id,
+            "battery_level": battery_level,
+            "timestamp": doc.last_reported
+        })
+        
+        return True
+        
     except Exception as e:
         frappe.log_error(f"Error processing battery update row: {str(e)}")
         return False
 
-def process_location_update_row(row, mappings, results):
-    """Process a row from location update format"""
+def process_location_update_row(row, headers, mappings, results):
+    """Process a row from location update CSV"""
     try:
-        tuktuk_id = row[mappings.get("tuktuk_id", 0)].strip() if mappings.get("tuktuk_id") is not None else ""
+        tuktuk_id = str(row[mappings.get("tuktuk id", 0)]).strip() if mappings.get("tuktuk id") is not None else ""
         latitude = flt(row[mappings.get("latitude", 1)]) if mappings.get("latitude") is not None else 0
         longitude = flt(row[mappings.get("longitude", 2)]) if mappings.get("longitude") is not None else 0
         
-        if not tuktuk_id:
-            results["warnings"].append("Missing TukTuk ID in location update row")
+        if not tuktuk_id or latitude == 0 or longitude == 0:
             return False
         
-        # Find TukTuk
-        tuktuk = frappe.db.get_value("TukTuk Vehicle", {"tuktuk_id": tuktuk_id}, "name")
-        if not tuktuk:
-            results["warnings"].append(f"TukTuk not found: {tuktuk_id}")
+        # Find TukTuk Vehicle
+        doc = frappe.get_doc("TukTuk Vehicle", {"tuktuk_id": tuktuk_id})
+        if not doc:
+            results["warnings"].append(f"TukTuk {tuktuk_id} not found")
             return False
         
-        # Update location
-        if latitude and longitude:
-            doc = frappe.get_doc("TukTuk Vehicle", tuktuk)
-            doc.current_latitude = latitude
-            doc.current_longitude = longitude
-            
-            # Update address if provided
-            if mappings.get("address") is not None and len(row) > mappings["address"]:
-                doc.current_address = row[mappings["address"]].strip()
-            
-            doc.last_telemetry_update = now_datetime()
-            doc.save(ignore_permissions=True)
-            
-            results["success_details"].append({
-                "tuktuk_id": tuktuk_id,
-                "location": f"{latitude}, {longitude}",
-                "timestamp": doc.last_telemetry_update
-            })
-            
-            return True
-        else:
-            results["warnings"].append(f"Invalid coordinates for TukTuk: {tuktuk_id}")
-            return False
-            
+        doc.latitude = latitude
+        doc.longitude = longitude
+        doc.last_reported = now_datetime()
+        doc.save(ignore_permissions=True)
+        
+        results["success_details"].append({
+            "tuktuk_id": tuktuk_id,
+            "latitude": latitude,
+            "longitude": longitude,
+            "timestamp": doc.last_reported
+        })
+        
+        return True
+        
     except Exception as e:
         frappe.log_error(f"Error processing location update row: {str(e)}")
         return False
 
-def process_vehicle_data_row(row, mappings, results):
-    """Process a row from vehicle data format"""
+def process_vehicle_data_row(row, headers, mappings, results):
+    """Process a row from vehicle data CSV"""
     try:
-        tuktuk_id = row[mappings.get("tuktuk_id", 0)].strip() if mappings.get("tuktuk_id") is not None else ""
+        tuktuk_id = str(row[mappings.get("tuktuk id", 0)]).strip() if mappings.get("tuktuk id") is not None else ""
         
         if not tuktuk_id:
-            results["warnings"].append("Missing TukTuk ID in vehicle data row")
             return False
         
-        # Find TukTuk
-        tuktuk = frappe.db.get_value("TukTuk Vehicle", {"tuktuk_id": tuktuk_id}, "name")
-        if not tuktuk:
-            results["warnings"].append(f"TukTuk not found: {tuktuk_id}")
+        # Find TukTuk Vehicle
+        doc = frappe.get_doc("TukTuk Vehicle", {"tuktuk_id": tuktuk_id})
+        if not doc:
+            results["warnings"].append(f"TukTuk {tuktuk_id} not found")
             return False
         
-        # Update TukTuk with available data
-        doc = frappe.get_doc("TukTuk Vehicle", tuktuk)
         updated = False
         
-        # Update device_id if provided
-        if mappings.get("device_id") is not None and len(row) > mappings["device_id"]:
-            device_id = row[mappings["device_id"]].strip()
-            if device_id and device_id != doc.device_id:
-                doc.device_id = device_id
-                updated = True
-        
-        # Update IMEI if provided
-        if mappings.get("imei") is not None and len(row) > mappings["imei"]:
-            imei = row[mappings["imei"]].strip()
-            if imei and imei != doc.imei:
-                doc.imei = imei
-                updated = True
-        
-        # Update battery level if provided
-        if mappings.get("battery_level") is not None and len(row) > mappings["battery_level"]:
-            battery_level = flt(row[mappings["battery_level"]])
-            if 0 <= battery_level <= 100:
+        # Update available fields
+        if mappings.get("battery level") is not None and len(row) > mappings["battery level"]:
+            battery_level = flt(row[mappings["battery level"]])
+            if battery_level > 0:
                 doc.battery_level = battery_level
                 updated = True
         
-        # Update location if provided
         if mappings.get("latitude") is not None and len(row) > mappings["latitude"]:
-            latitude = flt(row[mappings["latitude"]])
-            if latitude:
-                doc.current_latitude = latitude
+            lat = flt(row[mappings["latitude"]])
+            if lat != 0:
+                doc.latitude = lat
                 updated = True
         
         if mappings.get("longitude") is not None and len(row) > mappings["longitude"]:
-            longitude = flt(row[mappings["longitude"]])
-            if longitude:
-                doc.current_longitude = longitude
-                updated = True
-        
-        # Update speed if provided
-        if mappings.get("speed") is not None and len(row) > mappings["speed"]:
-            speed = flt(row[mappings["speed"]])
-            if speed >= 0:
-                doc.current_speed = speed
+            lng = flt(row[mappings["longitude"]])
+            if lng != 0:
+                doc.longitude = lng
                 updated = True
         
         if updated:
-            doc.last_telemetry_update = now_datetime()
+            doc.last_reported = now_datetime()
             doc.save(ignore_permissions=True)
             
             results["success_details"].append({
                 "tuktuk_id": tuktuk_id,
-                "battery_level": doc.battery_level,
-                "location": f"{doc.current_latitude}, {doc.current_longitude}" if doc.current_latitude and doc.current_longitude else None,
-                "timestamp": doc.last_telemetry_update
+                "timestamp": doc.last_reported
             })
             
             return True
@@ -397,50 +500,44 @@ def process_vehicle_data_row(row, mappings, results):
         frappe.log_error(f"Error processing vehicle data row: {str(e)}")
         return False
 
-def process_generic_row(row, mappings, results):
+def process_generic_row(row, headers, results):
     """Process a generic row when format is unknown"""
     try:
-        # Try to find any identifier (TukTuk ID, Device ID, IMEI)
-        tuktuk = None
+        # Try to find any identifier that matches our TukTuk records
+        identifiers = []
+        
+        # Look for potential identifiers in the row
+        for i, cell in enumerate(row):
+            if cell and str(cell).strip():
+                cell_value = str(cell).strip()
+                # Skip obviously non-identifier values (coordinates, timestamps, etc.)
+                if not any(char in cell_value for char in ['.', ':', '-']) or len(cell_value) < 3:
+                    continue
+                identifiers.append((i, cell_value))
+        
+        # Try to find a matching TukTuk Vehicle
+        doc = None
         identifier = None
         
-        for i, cell in enumerate(row):
-            cell = cell.strip()
-            if not cell:
-                continue
-            
-            # Try as TukTuk ID
-            tuktuk_doc = frappe.db.get_value("TukTuk Vehicle", {"tuktuk_id": cell}, "name")
-            if tuktuk_doc:
-                tuktuk = tuktuk_doc
-                identifier = f"TukTuk ID: {cell}"
-                break
-            
-            # Try as Device ID
-            tuktuk_doc = frappe.db.get_value("TukTuk Vehicle", {"device_id": cell}, "name")
-            if tuktuk_doc:
-                tuktuk = tuktuk_doc
-                identifier = f"Device ID: {cell}"
-                break
-            
-            # Try as IMEI
-            tuktuk_doc = frappe.db.get_value("TukTuk Vehicle", {"imei": cell}, "name")
-            if tuktuk_doc:
-                tuktuk = tuktuk_doc
-                identifier = f"IMEI: {cell}"
+        for idx, identifier_value in identifiers:
+            # Try different fields
+            for field in ["tuktuk_id", "device_id", "device_imei"]:
+                doc = frappe.db.get_value("TukTuk Vehicle", {field: identifier_value}, "name")
+                if doc:
+                    doc = frappe.get_doc("TukTuk Vehicle", doc)
+                    identifier = identifier_value
+                    break
+            if doc:
                 break
         
-        if not tuktuk:
-            results["warnings"].append("No matching TukTuk found in generic row")
+        if not doc:
             return False
         
-        # Update with whatever data we can find
-        doc = frappe.get_doc("TukTuk Vehicle", tuktuk)
         updated = False
         
-        # Look for numeric values that could be battery level
-        for cell in row:
-            if cell.strip().replace('.', '').isdigit():
+        # Look for numeric values that could be battery level or voltage
+        for i, cell in enumerate(row):
+            if cell and str(cell).replace('.', '').replace(',', '').isdigit():
                 value = flt(cell)
                 if 0 <= value <= 100:  # Likely battery level
                     doc.battery_level = value
@@ -448,7 +545,7 @@ def process_generic_row(row, mappings, results):
                     break
         
         if updated:
-            doc.last_telemetry_update = now_datetime()
+            doc.last_reported = now_datetime()
             doc.save(ignore_permissions=True)
             
             results["success_details"].append({
@@ -494,160 +591,44 @@ def get_csv_template(format_type="telemetry_export"):
         if format_type not in templates:
             format_type = "telemetry_export"
         
+        # Create CSV content
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(templates[format_type])
+        
+        # Add sample data row
+        if format_type == "telemetry_export":
+            writer.writerow([
+                "12345", "123456789012345", "TT001", "D001", "DL123",
+                "KCA 001A", "Fleet A", "Group 1", "John Doe", "254712345678",
+                "Online", "GPS", "254712345678", "2024-01-01", "2025-12-31",
+                "39.6629", "-4.0435", "0", "0", "1200", "8",
+                "85", "2024-12-26 10:30:00", "ON", "ON",
+                "ON", "2024-12-26 10:30:00", "0", "12.4", "Active"
+            ])
+        elif format_type == "battery_update":
+            writer.writerow(["TT001", "85", "12.4", "2024-12-26 10:30:00"])
+        elif format_type == "location_update":
+            writer.writerow(["TT001", "-4.0435", "39.6629", "Diani Beach", "2024-12-26 10:30:00"])
+        elif format_type == "vehicle_data":
+            writer.writerow(["TT001", "12345", "123456789012345", "85", "-4.0435", "39.6629", "0", "Active"])
+        
+        content = output.getvalue()
+        output.close()
+        
         return {
-            "success": True,
-            "headers": templates[format_type],
-            "format_type": format_type
+            "content": content,
+            "filename": f"tuktuk_{format_type}_template.csv",
+            "format": format_type
         }
         
     except Exception as e:
-        frappe.throw(_("Failed to generate template: {0}").format(str(e)))
+        frappe.throw(_("Failed to generate CSV template: {0}").format(str(e)))
 
 @frappe.whitelist()
-def validate_csv_before_upload(csv_content):
-    """Validate CSV content before processing"""
-    try:
-        # Parse CSV to check format
-        csv_reader = csv.reader(io.StringIO(csv_content))
-        headers = next(csv_reader, [])
-        
-        if not headers:
-            return {
-                "valid": False,
-                "error": "CSV file is empty or has no headers"
-            }
-        
-        # Detect format
-        csv_format = detect_csv_format([h.strip().lower() for h in headers])
-        
-        if not csv_format:
-            return {
-                "valid": False,
-                "error": "Unrecognized CSV format",
-                "headers": headers
-            }
-        
-        # Count rows
-        row_count = sum(1 for row in csv_reader if row)
-        
-        return {
-            "valid": True,
-            "format": csv_format,
-            "headers": headers,
-            "row_count": row_count,
-            "estimated_processing_time": row_count * 0.5  # seconds
-        }
-        
-    except Exception as e:
-        return {
-            "valid": False,
-            "error": str(e)
-        }
-
-@frappe.whitelist()
-def get_upload_statistics():
-    """Get statistics about TukTuk vehicles and CSV upload readiness"""
-    try:
-        # Get total vehicles
-        total_vehicles = frappe.db.count("TukTuk Vehicle")
-        
-        # Get vehicles with device mapping
-        mapped_vehicles = frappe.db.count("TukTuk Vehicle", {
-            "device_id": ["!=", ""]
-        }) + frappe.db.count("TukTuk Vehicle", {
-            "imei": ["!=", ""]
-        })
-        
-        # Get recently updated vehicles (last 7 days)
-        from frappe.utils import add_days, nowdate
-        week_ago = add_days(nowdate(), -7)
-        recent_updates = frappe.db.count("TukTuk Vehicle", {
-            "last_telemetry_update": [">=", week_ago]
-        })
-        
-        # Get battery level distribution
-        battery_stats = frappe.db.sql("""
-            SELECT 
-                CASE 
-                    WHEN battery_level >= 80 THEN 'High (80%+)'
-                    WHEN battery_level >= 50 THEN 'Medium (50-79%)'
-                    WHEN battery_level >= 20 THEN 'Low (20-49%)'
-                    WHEN battery_level > 0 THEN 'Critical (<20%)'
-                    ELSE 'Unknown'
-                END as battery_status,
-                COUNT(*) as count
-            FROM `tabTukTuk Vehicle`
-            GROUP BY battery_status
-        """, as_dict=True)
-        
-        # Get last bulk update info
-        last_bulk_update = frappe.db.get_value("Singles", 
-                                             {"doctype": "TukTuk Settings", "field": "last_telemetry_update"}, 
-                                             "value") or "Never"
-        
-        return {
-            "success": True,
-            "statistics": {
-                "total_vehicles": total_vehicles,
-                "mapped_vehicles": mapped_vehicles,
-                "unmapped_vehicles": total_vehicles - mapped_vehicles,
-                "mapping_percentage": round((mapped_vehicles / total_vehicles) * 100, 1) if total_vehicles > 0 else 0,
-                "recent_updates": recent_updates,
-                "battery_distribution": {item["battery_status"]: item["count"] for item in battery_stats},
-                "last_bulk_update": last_bulk_update,
-                "ready_for_csv_upload": mapped_vehicles > 0
-            }
-        }
-        
-    except Exception as e:
-        frappe.throw(_("Failed to get statistics: {0}").format(str(e)))_telemetry_export_row(row, mappings, results):
-    """Process a row from telemetry export format"""
-    try:
-        device_id = row[mappings.get("device_id", 0)].strip() if mappings.get("device_id") is not None else ""
-        imei = row[mappings.get("imei", 1)].strip() if mappings.get("imei") is not None else ""
-        vehicle_number = row[mappings.get("vehicle_number", 2)].strip() if mappings.get("vehicle_number") is not None else ""
-        
-        # Find TukTuk by device_id, imei, or vehicle_number
-        tuktuk = None
-        if device_id:
-            tuktuk = frappe.db.get_value("TukTuk Vehicle", {"device_id": device_id}, "name")
-        if not tuktuk and imei:
-            tuktuk = frappe.db.get_value("TukTuk Vehicle", {"imei": imei}, "name")
-        if not tuktuk and vehicle_number:
-            tuktuk = frappe.db.get_value("TukTuk Vehicle", {"tuktuk_id": vehicle_number}, "name")
-        
-        if not tuktuk:
-            results["warnings"].append(f"TukTuk not found for Device ID: {device_id}, IMEI: {imei}, Vehicle: {vehicle_number}")
-            return False
-        
-        # Update TukTuk with available data
-        doc = frappe.get_doc("TukTuk Vehicle", tuktuk)
-        
-        if mappings.get("battery_level") is not None and len(row) > mappings["battery_level"]:
-            battery_level = flt(row[mappings["battery_level"]])
-            if 0 <= battery_level <= 100:
-                doc.battery_level = battery_level
-        
-        if mappings.get("latitude") is not None and len(row) > mappings["latitude"]:
-            doc.current_latitude = flt(row[mappings["latitude"]])
-        
-        if mappings.get("longitude") is not None and len(row) > mappings["longitude"]:
-            doc.current_longitude = flt(row[mappings["longitude"]])
-        
-        doc.last_telemetry_update = now_datetime()
-        doc.save(ignore_permissions=True)
-        
-        results["success_details"].append({
-            "tuktuk_id": doc.tuktuk_id,
-            "battery_level": doc.battery_level,
-            "location": f"{doc.current_latitude}, {doc.current_longitude}" if doc.current_latitude and doc.current_longitude else None,
-            "timestamp": doc.last_telemetry_update
-        })
-        
-        return True
-        
-    except Exception as e:
-        frappe.log_error(f"Error processing telemetry export row: {str(e)}")
-        return False
-
-def process
+def get_upload_status():
+    """Get the status of ongoing CSV uploads"""
+    return {
+        "status": "ready",
+        "message": "System ready for CSV upload"
+    }
