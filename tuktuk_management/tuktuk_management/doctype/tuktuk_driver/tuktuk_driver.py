@@ -233,12 +233,13 @@ def validate_email(doc):
             frappe.throw("Invalid email format")
 
 def validate_license(doc):
-    """Validate driving license format"""
+    """Validate driving license - ensure it's provided"""
     if not doc.driver_license:
         frappe.throw("Driving License is required")
-        
-    if not re.match(r'^[A-Z]\d{6}$', doc.driver_license.upper()):
-        frappe.throw("Invalid driving license format. Must be letter followed by 6 digits (e.g., B123456)")
+    
+    # Remove pattern validation as Kenyan driving licenses have no uniform format
+    # Just ensure the license number is not empty and trim whitespace
+    doc.driver_license = doc.driver_license.strip()
 
 def validate_emergency_contact(doc):
     """Validate emergency contact details"""

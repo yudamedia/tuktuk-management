@@ -49,7 +49,7 @@
 
 /* Style the main number display in number cards */
 .widget.number-widget-box .widget-content {
-    font-size: 56px !important;
+    font-size: 76px !important;
     font-weight: 700 !important;
     line-height: 1 !important;
     color: #2c3e50 !important;
@@ -101,7 +101,7 @@
     font-weight: 600 !important;
     transition: all 0.3s ease !important;
     cursor: pointer !important;
-    min-height: 80px !important;
+    min-height: 60px !important;
     display: flex !important;
     flex-direction: column !important;
     align-items: center !important;
