@@ -89,7 +89,7 @@
     background: linear-gradient(135deg, rgba(243, 156, 18, 0.05) 0%, rgba(255,255,255,1) 100%) !important;
 }
 
-/* Style the shortcut buttons (Rentals, Transactions, Settings) - Make them clearly visible */
+/* Style the shortcut buttons with icons */
 .widget.shortcut-widget-box {
     background: #f8f9fa !important;
     color: black !important;
@@ -101,8 +101,9 @@
     font-weight: 600 !important;
     transition: all 0.3s ease !important;
     cursor: pointer !important;
-    min-height: 50px !important;
+    min-height: 80px !important;
     display: flex !important;
+    flex-direction: column !important;
     align-items: center !important;
     justify-content: center !important;
     /* Apply hover effect as default state */
@@ -117,12 +118,26 @@
     background: #f0f1f3 !important;
 }
 
-/* Individual button colors with subtle backgrounds */
+/* Add icons using CSS pseudo-elements */
+.widget.shortcut-widget-box::before {
+    content: '';
+    font-size: 24px !important;
+    margin-bottom: 8px !important;
+    display: block !important;
+    line-height: 1 !important;
+}
+
+/* Individual button colors and icons */
 .ce-block:nth-child(6) .widget.shortcut-widget-box {
     background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.05) 100%) !important;
     border-left: 4px solid #667eea !important;
     color: #667eea !important;
     box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2) !important;
+}
+
+.ce-block:nth-child(6) .widget.shortcut-widget-box::before {
+    content: '📅' !important; /* Calendar icon for Rentals */
+    font-size: 28px !important;
 }
 
 .ce-block:nth-child(7) .widget.shortcut-widget-box {
@@ -132,11 +147,21 @@
     box-shadow: 0 4px 12px rgba(245, 87, 108, 0.2) !important;
 }
 
+.ce-block:nth-child(7) .widget.shortcut-widget-box::before {
+    content: '💳' !important; /* Credit card icon for Transactions */
+    font-size: 28px !important;
+}
+
 .ce-block:nth-child(8) .widget.shortcut-widget-box {
     background: linear-gradient(135deg, rgba(79, 172, 254, 0.1) 0%, rgba(0, 242, 254, 0.05) 100%) !important;
     border-left: 4px solid #4facfe !important;
     color: #4facfe !important;
     box-shadow: 0 4px 12px rgba(79, 172, 254, 0.2) !important;
+}
+
+.ce-block:nth-child(8) .widget.shortcut-widget-box::before {
+    content: '⚙️' !important; /* Gear icon for Settings */
+    font-size: 28px !important;
 }
 
 /* Enhanced hover states for each button */
