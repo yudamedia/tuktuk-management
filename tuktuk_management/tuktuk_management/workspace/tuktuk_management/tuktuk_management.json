@@ -1,6 +1,6 @@
 {
  "charts": [],
- "content": "[{\"id\":\"getting_started\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Tuktuk Management</span>\",\"col\":12}},{\"id\":\"shortcuts\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Total Tuktuks\",\"col\":3}},{\"id\":\"shortcuts_3\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Active Rentals\",\"col\":3}},{\"id\":\"shortcuts_4\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Assigned Tuktuks\",\"col\":3}},{\"id\":\"O5QP8FQ8wa\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Drivers\",\"col\":3}},{\"id\":\"spacer\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"gQSQTu-My9\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"System Settings\",\"col\":4}},{\"id\":\"TbZ8n6QFHn\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Rentals\",\"col\":4}},{\"id\":\"IYPznHCI0T\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"quick_lists\",\"type\":\"quick_list\",\"data\":{\"quick_list_name\":\"Low Battery Tuktuks\",\"col\":4}},{\"id\":\"quick_lists_2\",\"type\":\"quick_list\",\"data\":{\"quick_list_name\":\"Drivers Near Target\",\"col\":4}},{\"id\":\"quick_lists_3\",\"type\":\"quick_list\",\"data\":{\"quick_list_name\":\"Recent Transactions\",\"col\":4}}]",
+ "content": "[{\"id\":\"header_title\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Tuktuk Management Dashboard</span>\",\"col\":12}},{\"id\":\"_2I0EP2sfb\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Total Tuktuks\",\"col\":4}},{\"id\":\"hXhP_DwW2F\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Total Drivers\",\"col\":4}},{\"id\":\"32xV_R8vPw\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Assigned Tuktuks\",\"col\":4}},{\"id\":\"spacer_1\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"button_row_1\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Rentals\",\"col\":4}},{\"id\":\"button_row_2\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Transactions\",\"col\":4}},{\"id\":\"button_row_3\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Settings\",\"col\":4}},{\"id\":\"spacer_2\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"quick_lists_1\",\"type\":\"quick_list\",\"data\":{\"quick_list_name\":\"Low Battery Tuktuks\",\"col\":4}},{\"id\":\"quick_lists_2\",\"type\":\"quick_list\",\"data\":{\"quick_list_name\":\"Drivers Near Target\",\"col\":4}},{\"id\":\"quick_lists_3\",\"type\":\"quick_list\",\"data\":{\"quick_list_name\":\"Recent Transactions\",\"col\":4}}]",
  "creation": "2024-12-15 01:46:09.600902",
  "custom_blocks": [],
  "docstatus": 0,
@@ -12,11 +12,24 @@
  "is_hidden": 0,
  "label": "Tuktuk Management",
  "links": [],
- "modified": "2025-06-13 04:02:45.645524",
+ "modified": "2025-06-27 06:15:43.429969",
  "modified_by": "Administrator",
  "module": "Tuktuk Management",
  "name": "Tuktuk Management",
- "number_cards": [],
+ "number_cards": [
+  {
+   "label": "Total Tuktuks",
+   "number_card_name": "Total Tuktuks"
+  },
+  {
+   "label": "Total Drivers",
+   "number_card_name": "Total Drivers"
+  },
+  {
+   "label": "Assigned Tuktuks",
+   "number_card_name": "Assigned Tuktuks"
+  }
+ ],
  "owner": "Administrator",
  "public": 1,
  "quick_lists": [
@@ -40,30 +53,7 @@
  "sequence_id": 1.0,
  "shortcuts": [
   {
-   "color": "Grey",
-   "doc_view": "List",
-   "label": "System Settings",
-   "link_to": "TukTuk Settings",
-   "type": "DocType"
-  },
-  {
-   "color": "Grey",
-   "doc_view": "List",
-   "label": "Drivers",
-   "link_to": "TukTuk Driver",
-   "stats_filter": "[]",
-   "type": "DocType"
-  },
-  {
-   "color": "blue",
-   "doc_view": "",
-   "label": "Total Tuktuks",
-   "link_to": "TukTuk Vehicle",
-   "stats_filter": "{}",
-   "type": "DocType"
-  },
-  {
-   "color": "Grey",
+   "color": "purple",
    "doc_view": "List",
    "label": "Rentals",
    "link_to": "TukTuk Rental",
@@ -71,19 +61,19 @@
    "type": "DocType"
   },
   {
-   "color": "green",
-   "doc_view": "",
-   "label": "Assigned Tuktuks",
-   "link_to": "TukTuk Vehicle",
-   "stats_filter": "{\"status\": \"Assigned\"}",
+   "color": "teal",
+   "doc_view": "List",
+   "label": "Transactions",
+   "link_to": "TukTuk Transaction",
+   "stats_filter": "[]",
    "type": "DocType"
   },
   {
-   "color": "orange",
-   "doc_view": "",
-   "label": "Active Rentals",
-   "link_to": "TukTuk Rental",
-   "stats_filter": "{\"status\": \"Active\"}",
+   "color": "grey",
+   "doc_view": "List",
+   "label": "Settings",
+   "link_to": "TukTuk Settings",
+   "stats_filter": "[]",
    "type": "DocType"
   }
  ],
