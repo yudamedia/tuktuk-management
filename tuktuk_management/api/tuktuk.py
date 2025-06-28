@@ -210,6 +210,9 @@ def mpesa_validation(**kwargs):
 def mpesa_confirmation(**kwargs):
     """M-Pesa confirmation endpoint - FIXED VERSION"""
     try:
+        # Set ignore permissions for all database operations in this webhook
+        frappe.flags.ignore_permissions = True
+        
         # Extract transaction details
         transaction_id = kwargs.get('TransID')
         amount = float(kwargs.get('TransAmount', 0))
@@ -269,7 +272,7 @@ def mpesa_confirmation(**kwargs):
         
         # Update driver balance
         driver.current_balance += target_contribution
-        driver.save()
+        driver.save(ignore_permissions=True)
         
         # Send payment to driver
         try:
@@ -288,6 +291,9 @@ def mpesa_confirmation(**kwargs):
     except Exception as e:
         frappe.log_error(f"M-Pesa Confirmation Error: {str(e)}")
         return {"ResultCode": "0", "ResultDesc": "Success"}
+    finally:
+        # Reset ignore permissions flag
+        frappe.flags.ignore_permissions = False
 
 # Alternative endpoints without "mpesa" in URL (for Daraja compatibility)
 @frappe.whitelist(allow_guest=True)
