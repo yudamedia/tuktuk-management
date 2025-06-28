@@ -123,7 +123,7 @@ def get_access_token():
         return None
 
 def register_c2b_url():
-    """Register callback URLs for C2B transactions - PRODUCTION VERSION"""
+    """Register callback URLs for C2B transactions - FIXED VERSION"""
     settings = frappe.get_single("TukTuk Settings")
     access_token = get_access_token()
     
@@ -141,8 +141,8 @@ def register_c2b_url():
     # Use YOUR production shortcode (paybill)
     shortcode = settings.mpesa_paybill or "4165253"
     
-    # Your production ERPNext site URL
-    base_url = frappe.utils.get_url()
+    # FIXED: Use hardcoded correct URL instead of frappe.utils.get_url()
+    base_url = "https://console.sunnytuktuk.com"  # Hardcode without :8000
     
     payload = {
         "ShortCode": shortcode,
@@ -151,12 +151,23 @@ def register_c2b_url():
         "ValidationURL": f"{base_url}/api/method/tuktuk_management.api.tuktuk.payment_validation"
     }
     
+    # Log what we're registering
+    frappe.msgprint(f"🔗 Registering URLs:")
+    frappe.msgprint(f"Validation: {payload['ValidationURL']}")
+    frappe.msgprint(f"Confirmation: {payload['ConfirmationURL']}")
+    
     try:
         response = requests.post(api_url, json=payload, headers=headers, timeout=30)
         result = response.json()
         
-        if response.status_code == 200 and result.get("ResponseCode") == "0":
-            frappe.msgprint(f"✅ Production C2B URL registration successful: {result.get('ResponseDescription')}")
+        # FIXED: Handle both "0" and "00000000" response codes
+        success_codes = ["0", "00000000"]
+        response_code = result.get("ResponseCode", "")
+        
+        if response.status_code == 200 and response_code in success_codes:
+            frappe.msgprint(f"✅ Production C2B URL registration successful!")
+            frappe.msgprint(f"Response: {result.get('ResponseDescription', 'Success')}")
+            frappe.log_error("Production C2B Registration Success", f"URLs registered successfully: {result}")
             return True
         else:
             frappe.log_error("Production C2B Registration Failed", f"Response: {result}")
@@ -167,6 +178,30 @@ def register_c2b_url():
         frappe.log_error("Production C2B Registration Error", str(e))
         frappe.throw(f"Production C2B registration error: {str(e)}")
         return False
+
+# Also add this function to check current site URL configuration
+@frappe.whitelist()
+def check_site_url_config():
+    """Check and display current site URL configuration"""
+    try:
+        current_url = frappe.utils.get_url()
+        
+        frappe.msgprint(f"Current site URL: {current_url}")
+        
+        if ":8000" in current_url:
+            frappe.msgprint("⚠️ WARNING: Site URL contains :8000 port!")
+            frappe.msgprint("This needs to be fixed in your site configuration.")
+            
+            # Show how to fix it
+            frappe.msgprint("To fix: Update site_config.json with correct host_name")
+            
+        return {
+            "url": current_url,
+            "has_port": ":8000" in current_url
+        }
+        
+    except Exception as e:
+        frappe.throw(f"URL check failed: {str(e)}")        
 
 # ===== WEBHOOK ENDPOINTS (FIXED VERSIONS) =====
 
