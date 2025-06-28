@@ -12,7 +12,8 @@ app_include_css = [
 app_include_js = [
     "/assets/tuktuk_management/js/tuktuk_management.js",
     "/assets/tuktuk_management/js/tuktuk_tracker.js",
-    "/assets/tuktuk_management/js/csv_telemetry_upload.js"
+    "/assets/tuktuk_management/js/csv_telemetry_upload.js",
+    "assets/tuktuk_management/js/tuktuk_transaction_list.js"
 ]
 
 app_icon = "octicon octicon-file-directory"
