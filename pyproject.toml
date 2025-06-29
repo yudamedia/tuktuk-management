@@ -56,9 +56,9 @@ serialize = ["{major}.{minor}.{patch}"]
 search = "version = '{current_version}'"
 replace = "version = '{new_version}'"
 
-[tool.bumpversion.file:pyproject.toml]
-search = 'version = "0.1.4"'
-replace = 'version = "0.1.4"'
+[tool.bumpversion.file:setup.py]
+search = "version='0.1.4'"
+replace = "version='{new_version}'"
 
 [tool.bumpversion.file:setup.py]
 search = "version='0.1.1'"
