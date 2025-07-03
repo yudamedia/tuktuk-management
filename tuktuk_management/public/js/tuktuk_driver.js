@@ -709,8 +709,8 @@ function view_login_details(frm) {
                 <tr><td><strong>Driver Name:</strong></td><td>${frm.doc.driver_name}</td></tr>
                 <tr><td><strong>Login Email:</strong></td><td>${frm.doc.user_account}</td></tr>
                 <tr><td><strong>Phone Number:</strong></td><td>${frm.doc.driver_primary_phone}</td></tr>
-                <tr><td><strong>Portal URL:</strong></td><td><a href="https://sunnytuktuk.com/driver-dashboard" target="_blank">https://sunnytuktuk.com/driver-dashboard</a></td></tr>
-                <tr><td><strong>Full System URL:</strong></td><td><a href="https://sunnytuktuk.com/app" target="_blank">https://sunnytuktuk.com/app</a></td></tr>
+                <tr><td><strong>Portal URL:</strong></td><td><a href="https://console.sunnytuktuk.com/driver-dashboard" target="_blank">https://console.sunnytuktuk.com/driver-dashboard</a></td></tr>
+                <tr><td><strong>Full System URL:</strong></td><td><a href="https://console.sunnytuktuk.com/app" target="_blank">https://console.sunnytuktuk.com/app</a></td></tr>
             </table>
             <div class="alert alert-info">
                 <strong>Note:</strong> Password information is available in the Notification Log after account creation or reset.
