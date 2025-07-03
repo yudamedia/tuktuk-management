@@ -1,10 +1,10 @@
 # Sunny TukTuk Management System
 
-A comprehensive ERPNext 15 application for managing electric tuktuks, drivers, payments, and operations in Diani Beach, Kenya.
+A comprehensive Frappe application for managing electric tuktuks, drivers, payments, and operations in Diani Beach, Kenya.
 
 ## Overview
 
-Sunny TukTuk is a fleet management system designed for 21 battery-powered, solar-charged tuktuks operating as taxis in the Diani Beach area. The system handles everything from driver assignments and daily targets to Mpesa payment processing and battery management.
+Sunny TukTuk is a fleet management system designed for electric-charged tuktuks operating as taxis in the Diani Beach area. The system handles everything from driver assignments and daily targets to Mpesa payment processing and battery management.
 
 ## System Architecture
 
