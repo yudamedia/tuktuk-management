@@ -29,8 +29,6 @@ whitelisted_methods = [
     "tuktuk_management.api.tuktuk.payment_confirmation",
     "tuktuk_management.api.tuktuk.transaction_validation",
     "tuktuk_management.api.tuktuk.transaction_confirmation",    
-    "tuktuk_management.api.tuktuk.b2c_result",
-    "tuktuk_management.api.tuktuk.b2c_timeout",
     "tuktuk_management.api.tuktuk.setup_daraja_integration",
     "tuktuk_management.api.tuktuk.test_payment_simulation",
     # "tuktuk_management.api.tuktuk.create_test_data",
@@ -39,6 +37,14 @@ whitelisted_methods = [
     "tuktuk_management.api.tuktuk.assign_test_driver",
     "tuktuk_management.api.tuktuk.get_system_status",
     "tuktuk_management.api.tuktuk.check_daraja_connection",
+
+    # B2C endpoints from sendpay.py
+    "tuktuk_management.api.sendpay.b2c_result",
+    "tuktuk_management.api.sendpay.b2c_timeout",
+    "tuktuk_management.api.sendpay.setup_b2c_credentials",
+    "tuktuk_management.api.sendpay.test_b2c_payment",
+    "tuktuk_management.api.sendpay.get_b2c_requirements",
+
     # "tuktuk_management.api.tuktuk.create_simple_test_driver",
     # From telematics.py
     "tuktuk_management.api.telematics.telematics_webhook",

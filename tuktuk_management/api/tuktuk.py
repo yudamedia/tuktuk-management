@@ -8,6 +8,9 @@ import requests
 import base64
 import json
 
+# Import B2C payment function from sendpay module
+from tuktuk_management.api.sendpay import send_mpesa_payment
+
 # PRODUCTION Daraja API Configuration
 PRODUCTION_BASE_URL = "https://api.safaricom.co.ke"
 SANDBOX_BASE_URL = "https://sandbox.safaricom.co.ke"
@@ -309,7 +312,7 @@ def mpesa_confirmation(**kwargs):
         driver.current_balance += target_contribution
         driver.save(ignore_permissions=True)
         
-        # Send payment to driver
+        # Send payment to driver using imported function
         try:
             if send_mpesa_payment(driver.mpesa_number, driver_share, "FARE"):
                 frappe.log_error("M-Pesa Payment Success", f"Sent {driver_share} KSH to driver {driver.driver_name}")
@@ -329,7 +332,6 @@ def mpesa_confirmation(**kwargs):
     finally:
         # Reset ignore permissions flag
         frappe.flags.ignore_permissions = False
-
 # Alternative endpoints without "mpesa" in URL (for Daraja compatibility)
 @frappe.whitelist(allow_guest=True)
 def payment_validation(**kwargs):
