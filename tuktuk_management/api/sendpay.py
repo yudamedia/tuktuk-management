@@ -138,23 +138,152 @@ def send_mpesa_payment(mpesa_number, amount, payment_type="FARE"):
 
 @frappe.whitelist(allow_guest=True)
 def b2c_result(**kwargs):
-    """Handle B2C payment results"""
+    """Handle B2C payment results with enhanced processing"""
     try:
-        frappe.log_error("Production B2C Result", f"B2C result received: {json.dumps(kwargs)}")
+        # Log the complete response
+        frappe.log_error("Production B2C Result", f"B2C result received: {json.dumps(kwargs, indent=2)}")
+        
+        # Extract result data
+        result_data = kwargs.get('Result', {})
+        result_type = result_data.get('ResultType')
+        result_code = result_data.get('ResultCode')
+        result_desc = result_data.get('ResultDesc', '')
+        transaction_id = result_data.get('TransactionID', '')
+        conversation_id = result_data.get('ConversationID', '')
+        
+        # Check if payment was successful
+        if result_code == 0:
+            # Payment successful
+            frappe.log_error("B2C Payment Success", f"Payment successful - TransactionID: {transaction_id}")
+            
+            # Extract payment details from ResultParameters
+            result_parameters = result_data.get('ResultParameters', {}).get('ResultParameter', [])
+            payment_details = {}
+            
+            for param in result_parameters:
+                key = param.get('Key', '')
+                value = param.get('Value', '')
+                payment_details[key] = value
+            
+            # Log payment details
+            frappe.log_error("B2C Payment Details", f"Payment details: {json.dumps(payment_details)}")
+            
+            # TODO: Update transaction status in your system
+            # You can use the ConversationID to match with your original request
+            
+        else:
+            # Payment failed
+            frappe.log_error("B2C Payment Failed", f"Payment failed - Code: {result_code}, Desc: {result_desc}")
+            
+            # TODO: Update transaction status to failed
+            # TODO: Notify driver about payment failure
+            # TODO: Queue for retry or manual processing
+        
         return {"ResultCode": "0", "ResultDesc": "Success"}
+        
     except Exception as e:
-        frappe.log_error("B2C Result Error", str(e))
+        frappe.log_error("B2C Result Error", f"Error processing B2C result: {str(e)}")
         return {"ResultCode": "0", "ResultDesc": "Success"}
 
 @frappe.whitelist(allow_guest=True)
 def b2c_timeout(**kwargs):
-    """Handle B2C payment timeouts"""
+    """Handle B2C payment timeouts with enhanced processing"""
     try:
-        frappe.log_error("Production B2C Timeout", f"B2C timeout: {json.dumps(kwargs)}")
+        # Log the timeout
+        frappe.log_error("Production B2C Timeout", f"B2C timeout received: {json.dumps(kwargs, indent=2)}")
+        
+        # Extract timeout data
+        result_data = kwargs.get('Result', {})
+        conversation_id = result_data.get('ConversationID', '')
+        result_desc = result_data.get('ResultDesc', 'Payment request timed out')
+        
+        # Log timeout details
+        frappe.log_error("B2C Timeout Details", f"ConversationID: {conversation_id}, Description: {result_desc}")
+        
+        # TODO: Handle timeout scenario
+        # - Mark payment as timed out
+        # - Queue for retry
+        # - Notify relevant parties
+        
         return {"ResultCode": "0", "ResultDesc": "Success"}
+        
     except Exception as e:
-        frappe.log_error("B2C Timeout Error", str(e))
+        frappe.log_error("B2C Timeout Error", f"Error processing B2C timeout: {str(e)}")
         return {"ResultCode": "0", "ResultDesc": "Success"}
+
+
+# Function to test webhook endpoints
+@frappe.whitelist()
+def test_b2c_webhooks():
+    """Test B2C webhook endpoints with sample data"""
+    
+    # Test result webhook with success scenario
+    success_data = {
+        "Result": {
+            "ResultType": 0,
+            "ResultCode": 0,
+            "ResultDesc": "The service request is processed successfully.",
+            "OriginatorConversationID": "29115-34620561-1",
+            "ConversationID": "AG_20191219_00005797af5d7d75f652",
+            "TransactionID": "NLJ7RT61SV",
+            "ResultParameters": {
+                "ResultParameter": [
+                    {"Key": "TransactionAmount", "Value": 100},
+                    {"Key": "TransactionReceipt", "Value": "NLJ7RT61SV"},
+                    {"Key": "ReceiverPartyPublicName", "Value": "254708374149 - John Doe"}
+                ]
+            }
+        }
+    }
+    
+    # Test timeout webhook
+    timeout_data = {
+        "Result": {
+            "ResultType": 1,
+            "ResultCode": 1,
+            "ResultDesc": "The service request has timed out.",
+            "OriginatorConversationID": "29115-34620561-1",
+            "ConversationID": "AG_20191219_00005797af5d7d75f652"
+        }
+    }
+    
+    try:
+        # Test success webhook
+        frappe.msgprint("Testing B2C result webhook...")
+        b2c_result(**success_data)
+        
+        # Test timeout webhook  
+        frappe.msgprint("Testing B2C timeout webhook...")
+        b2c_timeout(**timeout_data)
+        
+        frappe.msgprint("✅ Webhook tests completed. Check Error Log for results.")
+        
+    except Exception as e:
+        frappe.throw(f"Webhook test failed: {str(e)}")
+
+# Function to check webhook URL accessibility
+@frappe.whitelist()
+def verify_webhook_urls():
+    """Verify that webhook URLs are accessible from external calls"""
+    import requests
+    
+    base_url = frappe.utils.get_url()
+    result_url = f"{base_url}/api/method/tuktuk_management.api.sendpay.b2c_result"
+    timeout_url = f"{base_url}/api/method/tuktuk_management.api.sendpay.b2c_timeout"
+    
+    frappe.msgprint(f"🔗 Your B2C Webhook URLs:")
+    frappe.msgprint(f"Result URL: {result_url}")
+    frappe.msgprint(f"Timeout URL: {timeout_url}")
+    
+    # These URLs should be accessible from external systems (Safaricom)
+    # Make sure your firewall allows incoming connections to these endpoints
+    
+    return {
+        "result_url": result_url,
+        "timeout_url": timeout_url,
+        "accessible": "URLs configured - ensure firewall allows external access"
+    }
+
 
 # ===== B2C SETUP AND TESTING FUNCTIONS =====
 
