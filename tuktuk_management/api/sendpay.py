@@ -318,33 +318,34 @@ def setup_b2c_credentials():
 
 @frappe.whitelist()
 def test_b2c_payment():
-    """Test B2C payment with a small amount"""
+    """Test B2C payment with a small amount - FIXED VERSION"""
     try:
-        # Find a test driver
+        # Find a test driver - FIXED: Remove status filter that doesn't exist
         test_driver = frappe.get_all(
             "TukTuk Driver",
-            filters={"status": "Active"},
             fields=["driver_name", "mpesa_number"],
             limit=1
         )
         
         if not test_driver:
-            frappe.throw("No active drivers found for testing")
+            frappe.throw("No drivers found for testing. Please create a driver first.")
             
         driver = test_driver[0]
         test_amount = 1.0  # 1 KSH test amount
         
         frappe.msgprint(f"🧪 Testing B2C payment of {test_amount} KSH to {driver.driver_name}")
+        frappe.msgprint(f"Phone: {driver.mpesa_number}")
         
         # Attempt the payment
         success = send_mpesa_payment(driver.mpesa_number, test_amount, "TEST")
         
         if success:
             frappe.msgprint("✅ B2C test payment initiated successfully!")
-            frappe.msgprint("Check the Error Log for the API response details")
+            frappe.msgprint("🔍 Check the Error Log for API response details")
+            frappe.msgprint("📱 Check your phone for MPesa SMS confirmation")
         else:
             frappe.msgprint("❌ B2C test payment failed")
-            frappe.msgprint("Check the Error Log for error details")
+            frappe.msgprint("🔍 Check the Error Log for error details")
             
         return success
         
@@ -388,3 +389,72 @@ def get_b2c_requirements():
     
     frappe.msgprint(requirements)
     return requirements
+
+# Alternative direct test function
+@frappe.whitelist()
+def direct_b2c_test(phone_number=None, amount=1.0):
+    """Direct B2C test with specific phone number"""
+    try:
+        if not phone_number:
+            # Use a default test number or get from settings
+            settings = frappe.get_single("TukTuk Settings")
+            
+            # Try to get a driver's phone number
+            drivers = frappe.get_all(
+                "TukTuk Driver", 
+                fields=["mpesa_number"],
+                limit=1
+            )
+            
+            if drivers:
+                phone_number = drivers[0].mpesa_number
+            else:
+                frappe.throw("Please provide a phone number or create a driver first")
+        
+        frappe.msgprint(f"🧪 Testing B2C payment: {amount} KSH to {phone_number}")
+        
+        # Test the payment
+        success = send_mpesa_payment(phone_number, amount, "DIRECT_TEST")
+        
+        if success:
+            frappe.msgprint("✅ B2C payment request successful!")
+            frappe.msgprint("📱 Check phone for MPesa SMS")
+            frappe.msgprint("🔍 Check Error Log for 'Production B2C Success'")
+        else:
+            frappe.msgprint("❌ B2C payment request failed")
+            frappe.msgprint("🔍 Check Error Log for error details")
+            
+        return success
+        
+    except Exception as e:
+        frappe.throw(f"Direct B2C test failed: {str(e)}")
+
+# Simplified B2C test without database queries
+@frappe.whitelist() 
+def simple_b2c_test():
+    """Simple B2C test without querying drivers"""
+    try:
+        # Use a test phone number directly
+        test_phone = "254708374149"  # Replace with your phone number
+        test_amount = 1.0
+        
+        frappe.msgprint(f"🧪 Testing B2C with {test_amount} KSH to {test_phone}")
+        frappe.msgprint("📝 Note: Replace test_phone in the function with your actual number")
+        
+        # Test the B2C payment
+        success = send_mpesa_payment(test_phone, test_amount, "SIMPLE_TEST")
+        
+        if success:
+            frappe.msgprint("✅ B2C API call successful!")
+            frappe.msgprint("🎉 This means Safaricom has enabled B2C for your app!")
+            frappe.msgprint("📱 Check your phone for 1 KSH MPesa credit")
+        else:
+            frappe.msgprint("❌ B2C API call failed")
+            frappe.msgprint("📋 Check Error Log for specific error details")
+            
+        return success
+        
+    except Exception as e:
+        frappe.log_error("Simple B2C Test Error", str(e))
+        frappe.msgprint(f"❌ Test error: {str(e)}")
+        return False    
