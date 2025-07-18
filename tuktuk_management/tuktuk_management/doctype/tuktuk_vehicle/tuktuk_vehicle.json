@@ -11,6 +11,7 @@
   "tuktuk_make",
   "column_break_general",
   "status",
+  "assigned_driver_name",
   "mpesa_account",
   "battery_section",
   "battery_level",
@@ -76,6 +77,13 @@
    "in_list_view": 1,
    "label": "Status",
    "options": "Available\nAssigned\nCharging\nMaintenance\nOffline"
+  },
+  {
+   "fieldname": "assigned_driver_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Assigned Driver",
+   "read_only": 1
   },
   {
    "description": "3-digit Mpesa account number",

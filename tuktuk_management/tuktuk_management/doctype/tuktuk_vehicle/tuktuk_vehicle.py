@@ -16,6 +16,7 @@ class TukTukVehicle(Document):
         self.validate_rental_rates()
         self.validate_coordinates()
         self.sync_geolocation_with_coordinates()
+        self.update_assigned_driver_name()
     
     def validate_tuktuk_id(self):
         """Validate TukTuk ID format"""
@@ -149,3 +150,34 @@ class TukTukVehicle(Document):
         except Exception as e:
             frappe.logger().error(f"Battery voltage update failed: {str(e)}")
             return False
+
+    def get_assigned_driver(self):
+        """Get the currently assigned driver for this vehicle"""
+        # First check for active rentals
+        active_rental = frappe.db.get_value(
+            "TukTuk Rental",
+            {
+                "rented_tuktuk": self.name,
+                "status": "Active"
+            },
+            "driver"
+        )
+        
+        if active_rental:
+            return frappe.db.get_value("TukTuk Driver", active_rental, "driver_name")
+        
+        # If no active rental, check for static assignment
+        static_assignment = frappe.db.get_value(
+            "TukTuk Driver",
+            {
+                "assigned_tuktuk": self.name
+            },
+            "driver_name"
+        )
+        
+        return static_assignment
+
+    def update_assigned_driver_name(self):
+        """Update the assigned driver name field"""
+        driver_name = self.get_assigned_driver()
+        self.assigned_driver_name = driver_name if driver_name else ""

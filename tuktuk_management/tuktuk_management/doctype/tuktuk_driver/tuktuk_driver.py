@@ -73,13 +73,14 @@ class TukTukDriver(Document):
         })
         
     def handle_tuktuk_assignment(self):
-        """Update TukTuk status when assigned to driver"""
+        """Update TukTuk status and assigned driver when assigned to driver"""
         if self.has_value_changed('assigned_tuktuk'):
             # Clear old assignment
             old_value = frappe.db.get_value("TukTuk Driver", self.name, "assigned_tuktuk")
             if old_value:
                 old_tuktuk = frappe.get_doc("TukTuk Vehicle", old_value)
                 old_tuktuk.status = "Available"
+                old_tuktuk.update_assigned_driver_name()
                 old_tuktuk.save()
                 
             # Set new assignment
@@ -88,6 +89,7 @@ class TukTukDriver(Document):
                 if new_tuktuk.status != "Available":
                     frappe.throw(f"TukTuk {self.assigned_tuktuk} is not available for assignment")
                 new_tuktuk.status = "Assigned"
+                new_tuktuk.update_assigned_driver_name()
                 new_tuktuk.save()
     
     def process_target_miss_deduction(self, missed_amount):
