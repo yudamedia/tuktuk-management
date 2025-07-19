@@ -390,6 +390,7 @@ def get_b2c_requirements():
     frappe.msgprint(requirements)
     return requirements
 
+
 # Alternative direct test function
 @frappe.whitelist()
 def direct_b2c_test(phone_number=None, amount=1.0):
@@ -458,3 +459,65 @@ def simple_b2c_test():
         frappe.log_error("Simple B2C Test Error", str(e))
         frappe.msgprint(f"❌ Test error: {str(e)}")
         return False    
+
+@frappe.whitelist()
+def test_b2c_webhooks():
+    """Test B2C webhook endpoints with sample data"""
+    
+    # Test result webhook with success scenario
+    success_data = {
+        "Result": {
+            "ResultType": 0,
+            "ResultCode": 0,
+            "ResultDesc": "The service request is processed successfully.",
+            "OriginatorConversationID": "29115-34620561-1",
+            "ConversationID": "AG_20191219_00005797af5d7d75f652",
+            "TransactionID": "NLJ7RT61SV",
+            "ResultParameters": {
+                "ResultParameter": [
+                    {"Key": "TransactionAmount", "Value": 100},
+                    {"Key": "TransactionReceipt", "Value": "NLJ7RT61SV"},
+                    {"Key": "ReceiverPartyPublicName", "Value": "254708374149 - John Doe"}
+                ]
+            }
+        }
+    }
+    
+    # Test timeout webhook
+    timeout_data = {
+        "Result": {
+            "ResultType": 1,
+            "ResultCode": 1,
+            "ResultDesc": "The service request has timed out.",
+            "OriginatorConversationID": "29115-34620561-1",
+            "ConversationID": "AG_20191219_00005797af5d7d75f652"
+        }
+    }
+    
+    try:
+        frappe.msgprint("Testing B2C result webhook...")
+        b2c_result(**success_data)
+        frappe.msgprint("Testing B2C timeout webhook...")
+        b2c_timeout(**timeout_data)
+        frappe.msgprint("✅ Webhook tests completed. Check Error Log for results.")
+        return True
+    except Exception as e:
+        frappe.throw(f"Webhook test failed: {str(e)}")
+
+@frappe.whitelist()
+def verify_webhook_urls():
+    """Verify that webhook URLs are accessible from external calls"""
+    base_url = frappe.utils.get_url()
+    result_url = f"{base_url}/api/method/tuktuk_management.api.sendpay.b2c_result"
+    timeout_url = f"{base_url}/api/method/tuktuk_management.api.sendpay.b2c_timeout"
+    
+    frappe.msgprint(f"🔗 Your B2C Webhook URLs:")
+    frappe.msgprint(f"Result URL: {result_url}")
+    frappe.msgprint(f"Timeout URL: {timeout_url}")
+    
+    return {
+        "result_url": result_url,
+        "timeout_url": timeout_url,
+        "status": "URLs configured"
+    }
+
