@@ -246,7 +246,7 @@ def mpesa_validation(**kwargs):
 
 @frappe.whitelist(allow_guest=True)
 def mpesa_confirmation(**kwargs):
-    """M-Pesa confirmation endpoint - FIXED VERSION"""
+    """M-Pesa confirmation endpoint - FIXED VERSION to prevent duplicates"""
     try:
         # Set ignore permissions for all database operations in this webhook
         frappe.flags.ignore_permissions = True
@@ -260,6 +260,13 @@ def mpesa_confirmation(**kwargs):
         first_name = kwargs.get('FirstName', '')
         last_name = kwargs.get('LastName', '')
         
+        # CRITICAL FIX: Check if transaction already exists FIRST
+        existing_transaction = frappe.db.exists("TukTuk Transaction", {"transaction_id": transaction_id})
+        if existing_transaction:
+            frappe.log_error("Duplicate Transaction Prevented", 
+                            f"Transaction {transaction_id} already processed. Skipping duplicate.")
+            return {"ResultCode": "0", "ResultDesc": "Success"}
+        
         # Find the tuktuk
         tuktuk = frappe.db.get_value("TukTuk Vehicle", {"mpesa_account": account_number}, "name")
         if not tuktuk:
@@ -270,11 +277,6 @@ def mpesa_confirmation(**kwargs):
         driver_name = frappe.db.get_value("TukTuk Driver", {"assigned_tuktuk": tuktuk}, "name")
         if not driver_name:
             frappe.log_error(f"M-Pesa Confirmation: No driver assigned to tuktuk: {tuktuk}")
-            return {"ResultCode": "0", "ResultDesc": "Success"}
-        
-        # Check if transaction already exists
-        if frappe.db.exists("TukTuk Transaction", {"transaction_id": transaction_id}):
-            frappe.log_error(f"M-Pesa Confirmation: Transaction already processed: {transaction_id}")
             return {"ResultCode": "0", "ResultDesc": "Success"}
         
         # CRITICAL FIX: Get driver and settings for calculations
@@ -292,37 +294,60 @@ def mpesa_confirmation(**kwargs):
             driver_share = amount * (percentage / 100)
             target_contribution = amount - driver_share
         
-        # Create transaction with calculated fields
-        transaction = frappe.get_doc({
-            "doctype": "TukTuk Transaction",
-            "transaction_id": transaction_id,
-            "tuktuk": tuktuk,
-            "driver": driver_name,
-            "amount": amount,
-            "driver_share": driver_share,  # CRITICAL: Set before insert
-            "target_contribution": target_contribution,  # CRITICAL: Set before insert
-            "customer_phone": customer_phone,
-            "timestamp": now_datetime(),
-            "payment_status": "Completed"
-        })
+        # CRITICAL FIX: Use database transaction to ensure atomicity
+        with frappe.db.transaction():
+            # Double-check for duplicate within transaction
+            if frappe.db.exists("TukTuk Transaction", {"transaction_id": transaction_id}):
+                frappe.log_error("Duplicate Transaction in Transaction Block", 
+                                f"Transaction {transaction_id} already exists. Aborting.")
+                return {"ResultCode": "0", "ResultDesc": "Success"}
+            
+            # Create transaction with calculated fields
+            transaction = frappe.get_doc({
+                "doctype": "TukTuk Transaction",
+                "transaction_id": transaction_id,
+                "tuktuk": tuktuk,
+                "driver": driver_name,
+                "amount": amount,
+                "driver_share": driver_share,
+                "target_contribution": target_contribution,
+                "customer_phone": customer_phone,
+                "timestamp": now_datetime(),
+                "payment_status": "Pending"  # Start as pending
+            })
+            
+            transaction.insert(ignore_permissions=True)
+            
+            # Update driver balance only after successful transaction creation
+            if target_contribution > 0:
+                driver.current_balance += target_contribution
+                driver.save(ignore_permissions=True)
+            
+            # Mark transaction as completed after successful driver update
+            transaction.payment_status = "Completed"
+            transaction.save(ignore_permissions=True)
         
-        transaction.insert(ignore_permissions=True)
-        
-        # Update driver balance
-        driver.current_balance += target_contribution
-        driver.save(ignore_permissions=True)
-        
-        # Send payment to driver using imported function
+        # Send payment to driver ONLY after successful database operations
+        payment_success = False
         try:
             if send_mpesa_payment(driver.mpesa_number, driver_share, "FARE"):
-                frappe.log_error("M-Pesa Payment Success", f"Sent {driver_share} KSH to driver {driver.driver_name}")
+                payment_success = True
+                frappe.log_error("M-Pesa Payment Success", 
+                               f"Sent {driver_share} KSH to driver {driver.driver_name}")
             else:
-                frappe.log_error("M-Pesa Payment Failed", f"Failed to send {driver_share} KSH to driver {driver.driver_name}")
+                frappe.log_error("M-Pesa Payment Failed", 
+                               f"Failed to send {driver_share} KSH to driver {driver.driver_name}")
         except Exception as payment_error:
             frappe.log_error("M-Pesa B2C Error", f"B2C payment failed: {str(payment_error)}")
         
+        # Update transaction with payment result
+        if not payment_success:
+            transaction.add_comment('Comment', 'Driver payment failed but transaction recorded')
+            transaction.save(ignore_permissions=True)
+        
         frappe.db.commit()
-        frappe.log_error("M-Pesa Transaction Success", f"Transaction {transaction_id} processed successfully")
+        frappe.log_error("M-Pesa Transaction Success", 
+                        f"Transaction {transaction_id} processed successfully")
         
         return {"ResultCode": "0", "ResultDesc": "Success"}
         
@@ -332,6 +357,7 @@ def mpesa_confirmation(**kwargs):
     finally:
         # Reset ignore permissions flag
         frappe.flags.ignore_permissions = False
+
 # Alternative endpoints without "mpesa" in URL (for Daraja compatibility)
 @frappe.whitelist(allow_guest=True)
 def payment_validation(**kwargs):
@@ -340,9 +366,17 @@ def payment_validation(**kwargs):
 
 @frappe.whitelist(allow_guest=True) 
 def payment_confirmation(**kwargs):
-    """Alternative confirmation endpoint without 'mpesa' in URL"""
+    """Alternative confirmation endpoint - prevents duplicates"""
+    transaction_id = kwargs.get('TransID', 'unknown')
+    
+    # Check if already processed by either endpoint
+    if frappe.db.exists("TukTuk Transaction", {"transaction_id": transaction_id}):
+        frappe.log_error("Duplicate Endpoint Call Prevented", 
+                        f"Transaction {transaction_id} already processed via mpesa_confirmation")
+        return {"ResultCode": "0", "ResultDesc": "Success"}
+    
+    # If not processed, call the main function
     return mpesa_confirmation(**kwargs)
-
 
 # ===== ENHANCED PAYMENT HANDLING WITH DEPOSITS =====
 
