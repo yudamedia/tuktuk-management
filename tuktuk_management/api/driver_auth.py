@@ -82,7 +82,7 @@ def send_tuktuk_driver_login_sms(phone, email, password, tuktuk_driver_name):
     message = f"""Welcome to Sunny TukTuk, {tuktuk_driver_name}!
 
 Your login details:
-Website: https://sunnytuktuk.com
+Website: https://console.sunnytuktuk.com
 Email: {email}
 Password: {password}
 
