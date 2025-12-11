@@ -217,7 +217,7 @@ def detect_csv_format(headers):
     formats = {
         "telemetry_export": {
             "required_fields": ["device id", "imei", "device name"],
-            "optional_fields": ["voltage", "latitude", "longitude", "battery level"],
+            "optional_fields": ["voltage", "latitude", "longitude", "battery level", "mileage"],
             "mappings": {}
         },
         "battery_update": {
@@ -284,7 +284,8 @@ def detect_generic_format(headers):
         "speed": ["speed"],
         "course": ["course", "direction", "heading"],
         "satellite": ["satellite", "satellites", "sat"],
-        "last_gps_time": ["last gps time", "gps time", "timestamp"]
+        "last_gps_time": ["last gps time", "gps time", "timestamp"],
+        "mileage": ["mileage", "total mileage", "odometer"]
     }
     
     for i, header in enumerate(headers):
@@ -359,6 +360,13 @@ def process_telemetry_export_row(row, headers, mappings, results):
             lng = flt(row[mappings["longitude"]])
             if lng != 0:
                 doc.longitude = lng
+                updated = True
+        
+        if mappings.get("mileage") is not None and len(row) > mappings["mileage"]:
+            mileage = flt(row[mappings["mileage"]])
+            if mileage > 0:
+                # Convert from meters to kilometers (divide by 1000)
+                doc.mileage = mileage / 1000
                 updated = True
         
         if updated:
@@ -575,7 +583,7 @@ def get_csv_template(format_type="telemetry_export"):
                 "Device Status", "Device Type", "SIM No", "Installation Date", "Expiry Date", 
                 "Longitude", "Latitude", "Speed", "Course", "Altitude", "Satellite", 
                 "GPS Signal Strength", "Last GPS Time", "AC Status", "Power Status", 
-                "GPS Status", "Last Online Time", "Is Car Go", "Voltage", "Status"
+                "GPS Status", "Last Online Time", "Is Car Go", "Voltage", "Mileage", "Status"
             ],
             "battery_update": [
                 "TukTuk ID", "Battery Level", "Voltage", "Timestamp"
@@ -604,7 +612,7 @@ def get_csv_template(format_type="telemetry_export"):
                 "Online", "GPS", "254712345678", "2024-01-01", "2025-12-31",
                 "39.6629", "-4.0435", "0", "0", "1200", "8",
                 "85", "2024-12-26 10:30:00", "ON", "ON",
-                "ON", "2024-12-26 10:30:00", "0", "12.4", "Active"
+                "ON", "2024-12-26 10:30:00", "0", "12.4", "1250.50", "Active"
             ])
         elif format_type == "battery_update":
             writer.writerow(["TT001", "85", "12.4", "2024-12-26 10:30:00"])

@@ -37,10 +37,10 @@ class TukTukSettingsOverride(Document):
             # Additional validation can be added here
             pass
             
-        # Ensure global targets are positive
+        # Always ensure global targets are positive (target tracking continues regardless of sharing setting)
         if self.global_daily_target and self.global_daily_target <= 0:
             frappe.throw("Global daily target must be greater than 0")
-            
+
         if self.global_fare_percentage and (self.global_fare_percentage <= 0 or self.global_fare_percentage > 100):
             frappe.throw("Global fare percentage must be between 1 and 100")
     

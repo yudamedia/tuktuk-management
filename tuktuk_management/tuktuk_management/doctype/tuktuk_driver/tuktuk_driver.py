@@ -18,10 +18,29 @@ class TukTukDriver(Document):
     def before_save(self):
         self.set_full_name()
         self.handle_deposit_changes()
+        self.update_left_to_target()
         
     def set_full_name(self):
         parts = [self.driver_first_name, self.driver_middle_name, self.driver_last_name]
         self.driver_name = ' '.join(filter(None, parts))
+        
+    def update_left_to_target(self):
+        """Calculate and update the countdown to daily target"""
+        # Skip automatic update if manually set during reset
+        if self.flags.get('skip_left_to_target_update'):
+            return
+        
+        # If driver is unassigned, don't calculate target (they are on pause)
+        if not self.assigned_tuktuk:
+            self.left_to_target = 0
+            return
+            
+        settings = frappe.get_single("TukTuk Settings")
+        target = flt(self.daily_target or settings.global_daily_target)
+        current = flt(self.current_balance or 0)
+        
+        # Countdown stops at zero (doesn't go negative)
+        self.left_to_target = max(0, target - current)
         
     def on_update(self):
         self.handle_tuktuk_assignment()
@@ -75,8 +94,11 @@ class TukTukDriver(Document):
     def handle_tuktuk_assignment(self):
         """Update TukTuk status and assigned driver when assigned to driver"""
         if self.has_value_changed('assigned_tuktuk'):
-            # Clear old assignment
+            # Get old value before clearing to detect reassignment
             old_value = frappe.db.get_value("TukTuk Driver", self.name, "assigned_tuktuk")
+            is_reassignment = bool(old_value and self.assigned_tuktuk)
+            
+            # Clear old assignment
             if old_value:
                 old_tuktuk = frappe.get_doc("TukTuk Vehicle", old_value)
                 old_tuktuk.status = "Available"
@@ -88,9 +110,33 @@ class TukTukDriver(Document):
                 new_tuktuk = frappe.get_doc("TukTuk Vehicle", self.assigned_tuktuk)
                 if new_tuktuk.status != "Available":
                     frappe.throw(f"TukTuk {self.assigned_tuktuk} is not available for assignment")
+                
+                # CRITICAL FIX: Check if tuktuk is already assigned to another driver
+                existing_driver = frappe.db.get_value(
+                    "TukTuk Driver",
+                    {"assigned_tuktuk": self.assigned_tuktuk, "name": ["!=", self.name]},
+                    "name"
+                )
+                if existing_driver:
+                    existing_driver_name = frappe.db.get_value("TukTuk Driver", existing_driver, "driver_name")
+                    frappe.throw(f"TukTuk {self.assigned_tuktuk} is already assigned to driver {existing_driver_name}")
+                
                 new_tuktuk.status = "Assigned"
                 new_tuktuk.update_assigned_driver_name()
                 new_tuktuk.save()
+                
+                # If this is a reassignment during operating hours, preserve balance and target
+                if is_reassignment:
+                    from tuktuk_management.api.tuktuk import is_within_operating_hours
+                    if is_within_operating_hours():
+                        # Preserve balance and target tracking during reassignment
+                        frappe.msgprint(f"Driver {self.driver_name} reassigned to new TukTuk. Balance and target tracking preserved.")
+                        return  # Exit early to preserve balance/target
+            else:
+                # Driver became unassigned - reset target tracking (they are on pause)
+                self.current_balance = 0
+                self.left_to_target = 0
+                frappe.msgprint(f"Driver {self.driver_name} is now unassigned and paused from daily targets")
     
     def process_target_miss_deduction(self, missed_amount):
         """Process deduction from deposit for missed targets (only if driver allows it)"""
@@ -182,6 +228,67 @@ class TukTukDriver(Document):
         
         self.save()
         frappe.msgprint(f"Driver exit processed. Refund amount: {self.refund_amount} KSH")
+    
+    def restore_terminated_driver(self):
+        """Restore a terminated driver by reversing the termination process"""
+        # Check if driver has been terminated or has refund data
+        if not self.exit_date and not self.refund_amount:
+            frappe.throw(f"Driver {self.driver_name} has not been terminated or has no refund data to restore")
+        
+        # Store the refund amount (this was their original deposit balance)
+        original_deposit = flt(self.refund_amount) if self.refund_amount else 0
+        
+        # Log the restoration action
+        frappe.log_error(
+            f"Restoring terminated driver: {self.driver_name} (ID: {self.name})\n"
+            f"Exit Date: {self.exit_date}\n"
+            f"Original Deposit to Restore: {original_deposit} KSH\n"
+            f"Consecutive Misses Before: {self.consecutive_misses}\n"
+            f"Current Balance Before: {self.current_balance}\n"
+            f"Restored By: {frappe.session.user}",
+            "Driver Restoration"
+        )
+        
+        # Remove "Refund" type transactions from deposit_transactions child table
+        transactions_to_remove = []
+        for transaction in self.deposit_transactions:
+            if transaction.transaction_type == "Refund":
+                transactions_to_remove.append(transaction)
+        
+        for transaction in transactions_to_remove:
+            self.remove(transaction)
+        
+        # Restore the deposit balance
+        self.current_deposit_balance = original_deposit
+        
+        # Add a restoration transaction record for audit trail (using "Adjustment" type which is allowed)
+        if original_deposit > 0:
+            self.add_deposit_transaction(
+                transaction_type="Adjustment",
+                amount=original_deposit,
+                description=f"Driver restoration - reversed termination from {self.exit_date or 'manual deletion'}. Restored by {frappe.session.user}"
+            )
+        
+        # Clear termination-related fields
+        self.exit_date = None
+        self.refund_amount = 0
+        self.refund_status = None
+        
+        # Reset performance tracking
+        self.consecutive_misses = 0
+        self.current_balance = 0
+        
+        # Save the document
+        self.save()
+        
+        frappe.msgprint(f"✅ Driver {self.driver_name} has been successfully restored with deposit balance of {original_deposit} KSH")
+        
+        return {
+            "success": True,
+            "driver_name": self.driver_name,
+            "restored_deposit": original_deposit,
+            "message": "Driver successfully restored"
+        }
 
 # Validation functions (existing ones remain the same)
 def validate_age(doc):

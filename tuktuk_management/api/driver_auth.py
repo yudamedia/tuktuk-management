@@ -2,7 +2,7 @@
 
 import frappe
 from frappe import _
-from frappe.utils import now_datetime, today, get_datetime, add_to_date
+from frappe.utils import now_datetime, today, get_datetime, add_to_date, format_date, format_datetime
 import re
 import random
 import string
@@ -10,17 +10,23 @@ import string
 # ===== TUKTUK DRIVER USER ACCOUNT MANAGEMENT =====
 
 @frappe.whitelist()
-def create_tuktuk_driver_user_account(tuktuk_driver_name, email=None, phone=None):
+def create_tuktuk_driver_user_account(tuktuk_driver_name):
     """Create user account for tuktuk driver login"""
     try:
         tuktuk_driver = frappe.get_doc("TukTuk Driver", tuktuk_driver_name)
         
-        # Use driver email or create one from phone
-        user_email = email or tuktuk_driver.driver_email
-        if not user_email and phone:
-            user_email = f"{phone}@sunnytuktuk.com"
-        elif not user_email:
-            user_email = f"{tuktuk_driver.driver_national_id}@sunnytuktuk.com"
+        # Extract number from driver name by stripping "DRV-" prefix
+        if not tuktuk_driver_name.startswith("DRV-"):
+            frappe.throw(f"Invalid driver name format. Expected format: DRV-112###, got: {tuktuk_driver_name}")
+        
+        driver_number = tuktuk_driver_name.replace("DRV-", "", 1)
+        
+        # Validate that we got a number
+        if not driver_number.isdigit():
+            frappe.throw(f"Invalid driver name format. Expected numbers after 'DRV-', got: {driver_number}")
+        
+        # Create user email from the extracted number
+        user_email = f"{driver_number}@sunnytuktuk.com"
         
         # Check if user already exists
         if frappe.db.exists("User", user_email):
@@ -34,6 +40,7 @@ def create_tuktuk_driver_user_account(tuktuk_driver_name, email=None, phone=None
         user = frappe.get_doc({
             "doctype": "User",
             "email": user_email,
+            "username": driver_number,
             "first_name": tuktuk_driver.driver_first_name,
             "last_name": tuktuk_driver.driver_last_name,
             "full_name": tuktuk_driver.driver_name,
@@ -114,7 +121,7 @@ def create_all_tuktuk_driver_accounts():
     try:
         tuktuk_drivers = frappe.get_all("TukTuk Driver",
                                 filters={"user_account": ["in", ["", None]]},
-                                fields=["name", "driver_name", "driver_email", "driver_primary_phone"])
+                                fields=["name", "driver_name"])
         
         if not tuktuk_drivers:
             frappe.msgprint("All TukTuk drivers already have user accounts!")
@@ -125,11 +132,7 @@ def create_all_tuktuk_driver_accounts():
         
         for tuktuk_driver in tuktuk_drivers:
             try:
-                email = create_tuktuk_driver_user_account(
-                    tuktuk_driver.name, 
-                    tuktuk_driver.driver_email, 
-                    tuktuk_driver.driver_primary_phone
-                )
+                email = create_tuktuk_driver_user_account(tuktuk_driver.name)
                 created_accounts.append({
                     "tuktuk_driver": tuktuk_driver.driver_name,
                     "email": email
@@ -226,17 +229,26 @@ def get_tuktuk_driver_dashboard_data():
                                      order_by="timestamp desc",
                                      limit=10)
         
+        # Format transaction timestamps for template
+        for transaction in transactions:
+            transaction.timestamp_formatted = format_datetime(transaction.timestamp, "dd MMM yyyy, hh:mm a")
+        
         # Get current rentals
         rentals = frappe.get_all("TukTuk Rental",
                                 filters={"driver": tuktuk_driver.name, "status": "Active"},
                                 fields=["rented_tuktuk", "start_time", "rental_fee"])
+        
+        # Format rental start times for template
+        for rental in rentals:
+            rental.start_time_formatted = format_datetime(rental.start_time, "dd MMM yyyy, hh:mm a")
         
         # Calculate today's earnings
         today_transactions = frappe.get_all("TukTuk Transaction",
                                            filters={
                                                "driver": tuktuk_driver.name,
                                                "timestamp": [">=", today()],
-                                               "payment_status": "Completed"
+                                               "payment_status": "Completed",
+                                               "transaction_type": ["not in", ["Adjustment", "Driver Repayment"]]  # Exclude adjustments and repayments from earnings
                                            },
                                            fields=["driver_share", "target_contribution"])
         
@@ -246,9 +258,12 @@ def get_tuktuk_driver_dashboard_data():
         # Get settings for target calculation
         settings = frappe.get_single("TukTuk Settings")
         daily_target = tuktuk_driver.daily_target or settings.global_daily_target
-        
-        # Calculate target progress
-        target_progress = min((tuktuk_driver.current_balance / daily_target) * 100, 100) if daily_target > 0 else 0
+
+        # Calculate target progress always (for dashboard display) regardless of sharing setting
+        if daily_target > 0:
+            target_progress = min((tuktuk_driver.current_balance / daily_target) * 100, 100)
+        else:
+            target_progress = 0
         
         return {
             "tuktuk_driver": {
@@ -264,6 +279,7 @@ def get_tuktuk_driver_dashboard_data():
             "today_target_contribution": today_target_contribution,
             "daily_target": daily_target,
             "target_progress": target_progress,
+            "today_date": format_date(today(), "dd MMM yyyy"),
             "operating_hours": {
                 "start": settings.operating_hours_start,
                 "end": settings.operating_hours_end

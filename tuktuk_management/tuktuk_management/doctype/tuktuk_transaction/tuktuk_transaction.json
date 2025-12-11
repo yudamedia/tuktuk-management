@@ -5,6 +5,7 @@
  "engine": "InnoDB",
  "field_order": [
   "transaction_id",
+  "transaction_type",
   "tuktuk",
   "driver",
   "column_break_1",
@@ -14,7 +15,8 @@
   "section_break_1",
   "customer_phone",
   "timestamp",
-  "payment_status"
+  "payment_status",
+  "b2c_payment_sent"
  ],
  "fields": [
   {
@@ -23,6 +25,14 @@
    "label": "Mpesa Transaction ID",
    "reqd": 1,
    "unique": 1
+  },
+  {
+   "default": "Payment",
+   "fieldname": "transaction_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Transaction Type",
+   "options": "Payment\nAdjustment\nDriver Repayment"
   },
   {
    "fieldname": "tuktuk",
@@ -84,6 +94,13 @@
    "in_list_view": 1,
    "label": "Payment Status",
    "options": "Pending\nCompleted\nFailed"
+  },
+  {
+   "default": "0",
+   "fieldname": "b2c_payment_sent",
+   "fieldtype": "Check",
+   "label": "B2C Payment Sent",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,

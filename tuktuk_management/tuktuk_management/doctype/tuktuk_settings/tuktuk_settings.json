@@ -1,287 +1,384 @@
 {
-  "actions": [],
-  "creation": "2024-11-26 12:00:00",
-  "doctype": "DocType",
-  "engine": "InnoDB",
-  "field_order": [
-   "operating_hours_tab",
-   "operating_hours_section",
-   "operating_hours_start",
-   "operating_hours_end",
-   "global_targets_tab",
-   "section_break_targets",
-   "global_daily_target",
-   "global_fare_percentage",
-   "rental_rates_tab",
-   "section_break_rental",
-   "global_rental_initial",
-   "global_rental_hourly",
-   "bonuses_tab",
-   "section_break_bonus",
-   "bonus_enabled",
-   "bonus_amount",
-   "mpesa_settings_tab",
-   "section_break_mpesa",
-   "mpesa_paybill",
-   "mpesa_api_key",
-   "mpesa_api_secret",
-   "column_break_lhxy",
-   "b2c_enabled",
-   "mpesa_initiator_name",
-   "mpesa_security_credential",
-   "mpesa_initiator_password",
-   "notifications_tab",
-   "section_break_notifications",
-   "enable_sms_notifications",
-   "enable_email_notifications",
-   "telematics_tab",
-   "telematics_section",
-   "telematics_api_url",
-   "telematics_api_key",
-   "telematics_api_secret",
-   "update_interval"
-  ],
-  "fields": [
-   {
-    "fieldname": "operating_hours_section",
-    "fieldtype": "Section Break",
-    "label": "Operating Hours"
-   },
-   {
-    "default": "06:00:00",
-    "fieldname": "operating_hours_start",
-    "fieldtype": "Time",
-    "in_list_view": 1,
-    "label": "Operating Hours Start",
-    "reqd": 1
-   },
-   {
-    "default": "00:00:00",
-    "fieldname": "operating_hours_end",
-    "fieldtype": "Time",
-    "in_list_view": 1,
-    "label": "Operating Hours End",
-    "reqd": 1
-   },
-   {
-    "fieldname": "section_break_targets",
-    "fieldtype": "Section Break",
-    "label": "Global Targets"
-   },
-   {
-    "default": "3000",
-    "fieldname": "global_daily_target",
-    "fieldtype": "Currency",
-    "in_list_view": 1,
-    "label": "Global Daily Target",
-    "reqd": 1
-   },
-   {
-    "default": "50",
-    "description": "This is the percent of fare revenue sent to the driver after a trip payment by the customer.",
-    "fieldname": "global_fare_percentage",
-    "fieldtype": "Percent",
-    "in_list_view": 1,
-    "label": "Global Fare Percentage",
-    "reqd": 1
-   },
-   {
-    "fieldname": "section_break_bonus",
-    "fieldtype": "Section Break",
-    "label": "Bonus Settings"
-   },
-   {
-    "default": "0",
-    "fieldname": "bonus_enabled",
-    "fieldtype": "Check",
-    "label": "Enable Daily Target Bonus"
-   },
-   {
-    "depends_on": "bonus_enabled",
-    "fieldname": "bonus_amount",
-    "fieldtype": "Currency",
-    "label": "Daily Target Bonus Amount"
-   },
-   {
-    "fieldname": "section_break_rental",
-    "fieldtype": "Section Break",
-    "label": "Rental Settings"
-   },
-   {
-    "fieldname": "global_rental_initial",
-    "fieldtype": "Currency",
-    "label": "Global Rental Rate (First 2 Hours)",
-    "reqd": 1
-   },
-   {
-    "fieldname": "global_rental_hourly",
-    "fieldtype": "Currency",
-    "label": "Global Rental Rate (Per Hour After)",
-    "reqd": 1
-   },
-   {
-    "fieldname": "section_break_mpesa",
-    "fieldtype": "Section Break",
-    "label": "Mpesa Settings"
-   },
-   {
-    "fieldname": "mpesa_paybill",
-    "fieldtype": "Data",
-    "label": "Mpesa Paybill Number",
-    "reqd": 1
-   },
-   {
-    "fieldname": "mpesa_api_key",
-    "fieldtype": "Password",
-    "label": "Mpesa API Key",
-    "reqd": 1
-   },
-   {
-    "fieldname": "mpesa_api_secret",
-    "fieldtype": "Password",
-    "label": "Mpesa API Secret",
-    "reqd": 1
-   },
-   {
-    "fieldname": "section_break_notifications",
-    "fieldtype": "Section Break",
-    "label": "Notification Settings"
-   },
-   {
-    "default": "0",
-    "fieldname": "enable_sms_notifications",
-    "fieldtype": "Check",
-    "label": "Enable SMS Notifications"
-   },
-   {
-    "default": "0",
-    "fieldname": "enable_email_notifications",
-    "fieldtype": "Check",
-    "label": "Enable Email Notifications"
-   },
-   {
-    "fieldname": "operating_hours_tab",
-    "fieldtype": "Tab Break",
-    "label": "Operating Hours"
-   },
-   {
-    "fieldname": "global_targets_tab",
-    "fieldtype": "Tab Break",
-    "label": "Global Targets"
-   },
-   {
-    "fieldname": "rental_rates_tab",
-    "fieldtype": "Tab Break",
-    "label": "Rental Rates"
-   },
-   {
-    "fieldname": "bonuses_tab",
-    "fieldtype": "Tab Break",
-    "label": "Bonuses"
-   },
-   {
-    "fieldname": "mpesa_settings_tab",
-    "fieldtype": "Tab Break",
-    "label": "MPesa Settings"
-   },
-   {
-    "fieldname": "notifications_tab",
-    "fieldtype": "Tab Break",
-    "label": "Notifications"
-   },
-   {
-    "fieldname": "telematics_tab",
-    "fieldtype": "Tab Break",
-    "label": "Telematics Settings"
-   },
-   {
-    "fieldname": "telematics_section",
-    "fieldtype": "Section Break",
-    "label": "GrowTRi API Configuration"
-   },
-   {
-    "description": "Base URL for the GrowTRi API",
-    "fieldname": "telematics_api_url",
-    "fieldtype": "Data",
-    "label": "Telematics API URL"
-   },
-   {
-    "fieldname": "telematics_api_key",
-    "fieldtype": "Password",
-    "label": "API Key"
-   },
-   {
-    "fieldname": "telematics_api_secret",
-    "fieldtype": "Password",
-    "label": "API Secret"
-   },
-   {
-    "default": "5",
-    "description": "How often to poll for updates if webhook is not available",
-    "fieldname": "update_interval",
-    "fieldtype": "Int",
-    "label": "Update Interval (minutes)"
-   },
-   {
-    "fieldname": "column_break_lhxy",
-    "fieldtype": "Column Break"
-   },
-   {
-    "default": "0",
-    "description": "Enable automatic payments to drivers via B2C",
-    "fieldname": "b2c_enabled",
-    "fieldtype": "Check",
-    "label": "Enable B2C Payments"
-   },
-   {
-    "description": "Your Initiator Name from Safaricom for B2C transactions",
-    "fieldname": "mpesa_initiator_name",
-    "fieldtype": "Password",
-    "label": "MPesa Initiator Name"
-   },
-   {
-    "description": "Your Security Credential from Safaricom for B2C transactions",
-    "fieldname": "mpesa_security_credential",
-    "fieldtype": "Password",
-    "label": "MPesa Security Credential"
-   },
-   {
-    "description": "Your Initiator Password (used to generate Security Credential)",
-    "fieldname": "mpesa_initiator_password",
-    "fieldtype": "Password",
-    "label": "MPesa Initiator Password"
-   }
-  ],
-  "issingle": 1,
-  "links": [],
-  "modified": "2025-07-06 04:00:57.193418",
-  "modified_by": "Administrator",
-  "module": "Tuktuk Management",
-  "name": "TukTuk Settings",
-  "owner": "Administrator",
-  "permissions": [
-   {
-    "create": 1,
-    "delete": 1,
-    "email": 1,
-    "print": 1,
-    "read": 1,
-    "role": "System Manager",
-    "share": 1,
-    "write": 1
-   },
-   {
-    "email": 1,
-    "print": 1,
-    "read": 1,
-    "role": "Tuktuk Manager",
-    "share": 1,
-    "write": 1
-   }
-  ],
-  "row_format": "Dynamic",
-  "sort_field": "modified",
-  "sort_order": "DESC",
-  "states": [],
-  "track_changes": 1
+ "actions": [],
+ "creation": "2024-11-26 12:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "operating_hours_tab",
+  "operating_hours_section",
+  "operating_hours_start",
+  "operating_hours_end",
+  "global_targets_tab",
+  "section_break_targets",
+  "instant_payouts_enabled",
+  "global_fare_percentage",
+  "column_break_cfhv",
+  "enable_target_sharing",
+  "global_daily_target",
+  "last_daily_reset_date",
+  "rental_rates_tab",
+  "section_break_rental",
+  "global_rental_initial",
+  "global_rental_hourly",
+  "bonuses_tab",
+  "section_break_bonus",
+  "bonus_enabled",
+  "bonus_amount",
+  "mpesa_settings_tab",
+  "section_break_mpesa",
+  "mpesa_paybill",
+  "mpesa_api_key",
+  "mpesa_api_secret",
+  "column_break_lhxy",
+  "b2c_enabled",
+  "mpesa_initiator_name",
+  "mpesa_security_credential",
+  "mpesa_initiator_password",
+ "notifications_tab",
+ "section_break_notifications",
+ "enable_sms_notifications",
+ "enable_email_notifications",
+ "sms_provider",
+ "column_break_sms_provider",
+ "textbee_api_key",
+ "section_break_textsms",
+ "textsms_api_key",
+ "textsms_partner_id",
+ "column_break_textsms",
+ "textsms_sender_id",
+ "telematics_tab",
+  "telematics_section",
+  "telematics_api_url",
+  "telematics_api_key",
+  "telematics_api_secret",
+  "update_interval"
+ ],
+ "fields": [
+  {
+   "fieldname": "operating_hours_section",
+   "fieldtype": "Section Break",
+   "label": "Operating Hours"
+  },
+  {
+   "default": "0",
+   "description": "When enabled, driver fare shares are paid instantly on each customer payment (unless driver-level switch overrides).",
+   "fieldname": "instant_payouts_enabled",
+   "fieldtype": "Check",
+   "label": "Enable Instant Driver Payouts"
+  },
+  {
+   "default": "06:00:00",
+   "fieldname": "operating_hours_start",
+   "fieldtype": "Time",
+   "in_list_view": 1,
+   "label": "Operating Hours Start",
+   "reqd": 1
+  },
+  {
+   "default": "00:00:00",
+   "fieldname": "operating_hours_end",
+   "fieldtype": "Time",
+   "in_list_view": 1,
+   "label": "Operating Hours End",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_targets",
+   "fieldtype": "Section Break",
+   "label": "Global Targets"
+  },
+  {
+   "default": "1",
+   "description": "Enable target-based revenue sharing system. When disabled, drivers get fixed percentage of all fares.",
+   "fieldname": "enable_target_sharing",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Enable Target Sharing System"
+  },
+  {
+   "default": "3000",
+   "fieldname": "global_daily_target",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Global Daily Target",
+   "reqd": 1
+  },
+  {
+   "description": "Last date when daily targets were reset (internal tracking field)",
+   "fieldname": "last_daily_reset_date",
+   "fieldtype": "Date",
+   "label": "Last Daily Reset Date",
+   "read_only": 1
+  },
+  {
+   "default": "50",
+   "description": "This is the percent of fare revenue sent to the driver after a trip payment by the customer.",
+   "fieldname": "global_fare_percentage",
+   "fieldtype": "Percent",
+   "in_list_view": 1,
+   "label": "Global Fare Percentage",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_bonus",
+   "fieldtype": "Section Break",
+   "label": "Bonus Settings"
+  },
+  {
+   "default": "0",
+   "fieldname": "bonus_enabled",
+   "fieldtype": "Check",
+   "label": "Enable Daily Target Bonus"
+  },
+  {
+   "depends_on": "bonus_enabled",
+   "fieldname": "bonus_amount",
+   "fieldtype": "Currency",
+   "label": "Daily Target Bonus Amount"
+  },
+  {
+   "fieldname": "section_break_rental",
+   "fieldtype": "Section Break",
+   "label": "Rental Settings"
+  },
+  {
+   "fieldname": "global_rental_initial",
+   "fieldtype": "Currency",
+   "label": "Global Rental Rate (First 2 Hours)",
+   "reqd": 1
+  },
+  {
+   "fieldname": "global_rental_hourly",
+   "fieldtype": "Currency",
+   "label": "Global Rental Rate (Per Hour After)",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_mpesa",
+   "fieldtype": "Section Break",
+   "label": "Mpesa Settings"
+  },
+  {
+   "fieldname": "mpesa_paybill",
+   "fieldtype": "Data",
+   "label": "Mpesa Paybill Number",
+   "reqd": 1
+  },
+  {
+   "fieldname": "mpesa_api_key",
+   "fieldtype": "Password",
+   "label": "Mpesa API Key",
+   "reqd": 1
+  },
+  {
+   "fieldname": "mpesa_api_secret",
+   "fieldtype": "Password",
+   "label": "Mpesa API Secret",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_notifications",
+   "fieldtype": "Section Break",
+   "label": "Notification Settings"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_sms_notifications",
+   "fieldtype": "Check",
+   "label": "Enable SMS Notifications"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_email_notifications",
+   "fieldtype": "Check",
+   "label": "Enable Email Notifications"
+  },
+  {
+   "default": "TextBee",
+   "description": "Select SMS provider for sending notifications",
+   "fieldname": "sms_provider",
+   "fieldtype": "Select",
+   "label": "SMS Provider",
+   "options": "TextBee\nTextSMS"
+  },
+  {
+   "fieldname": "column_break_sms_provider",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.sms_provider=='TextBee'",
+   "description": "API key for TextBee SMS service (used for driver target reminders)",
+   "fieldname": "textbee_api_key",
+   "fieldtype": "Password",
+   "label": "TextBee API Key"
+  },
+  {
+   "depends_on": "eval:doc.sms_provider=='TextSMS'",
+   "fieldname": "section_break_textsms",
+   "fieldtype": "Section Break",
+   "label": "TextSMS Configuration"
+  },
+  {
+   "depends_on": "eval:doc.sms_provider=='TextSMS'",
+   "description": "API key from TextSMS.co.ke",
+   "fieldname": "textsms_api_key",
+   "fieldtype": "Password",
+   "label": "TextSMS API Key"
+  },
+  {
+   "depends_on": "eval:doc.sms_provider=='TextSMS'",
+   "description": "Partner ID from TextSMS.co.ke",
+   "fieldname": "textsms_partner_id",
+   "fieldtype": "Data",
+   "label": "TextSMS Partner ID"
+  },
+  {
+   "fieldname": "column_break_textsms",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.sms_provider=='TextSMS'",
+   "description": "Sender ID/Shortcode for outgoing SMS messages",
+   "fieldname": "textsms_sender_id",
+   "fieldtype": "Data",
+   "label": "TextSMS Sender ID"
+  },
+  {
+   "fieldname": "operating_hours_tab",
+   "fieldtype": "Tab Break",
+   "label": "Operating Hours"
+  },
+  {
+   "fieldname": "global_targets_tab",
+   "fieldtype": "Tab Break",
+   "label": "Targets & Payouts"
+  },
+  {
+   "fieldname": "rental_rates_tab",
+   "fieldtype": "Tab Break",
+   "label": "Rental Rates"
+  },
+  {
+   "fieldname": "bonuses_tab",
+   "fieldtype": "Tab Break",
+   "label": "Bonuses"
+  },
+  {
+   "fieldname": "mpesa_settings_tab",
+   "fieldtype": "Tab Break",
+   "label": "MPesa Settings"
+  },
+  {
+   "fieldname": "notifications_tab",
+   "fieldtype": "Tab Break",
+   "label": "Notifications"
+  },
+  {
+   "fieldname": "telematics_tab",
+   "fieldtype": "Tab Break",
+   "label": "Telematics Settings"
+  },
+  {
+   "fieldname": "telematics_section",
+   "fieldtype": "Section Break",
+   "label": "GrowTRi API Configuration"
+  },
+  {
+   "description": "Base URL for the GrowTRi API",
+   "fieldname": "telematics_api_url",
+   "fieldtype": "Data",
+   "label": "Telematics API URL"
+  },
+  {
+   "fieldname": "telematics_api_key",
+   "fieldtype": "Password",
+   "label": "API Key"
+  },
+  {
+   "fieldname": "telematics_api_secret",
+   "fieldtype": "Password",
+   "label": "API Secret"
+  },
+  {
+   "default": "5",
+   "description": "How often to poll for updates if webhook is not available",
+   "fieldname": "update_interval",
+   "fieldtype": "Int",
+   "label": "Update Interval (minutes)"
+  },
+  {
+   "fieldname": "column_break_lhxy",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "description": "Enable automatic payments to drivers via B2C",
+   "fieldname": "b2c_enabled",
+   "fieldtype": "Check",
+   "label": "Enable B2C Payments"
+  },
+  {
+   "description": "Your Initiator Name from Safaricom for B2C transactions",
+   "fieldname": "mpesa_initiator_name",
+   "fieldtype": "Password",
+   "label": "MPesa Initiator Name"
+  },
+  {
+   "description": "Your Security Credential from Safaricom for B2C transactions",
+   "fieldname": "mpesa_security_credential",
+   "fieldtype": "Password",
+   "label": "MPesa Security Credential"
+  },
+  {
+   "description": "Your Initiator Password (used to generate Security Credential)",
+   "fieldname": "mpesa_initiator_password",
+   "fieldtype": "Password",
+   "label": "MPesa Initiator Password"
+  },
+  {
+   "fieldname": "column_break_cfhv",
+   "fieldtype": "Column Break"
+  }
+ ],
+ "issingle": 1,
+ "links": [],
+ "modified": "2025-10-19 05:19:10.953173",
+ "modified_by": "Administrator",
+ "module": "Tuktuk Management",
+ "name": "TukTuk Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+ {
+  "email": 1,
+  "print": 1,
+  "read": 1,
+  "role": "Tuktuk Manager",
+  "share": 1,
+  "write": 1
+ },
+ {
+  "create": 1,
+  "email": 1,
+  "print": 1,
+  "read": 1,
+  "role": "Tuktuk Executive",
+  "share": 1,
+  "write": 1
  }
+],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

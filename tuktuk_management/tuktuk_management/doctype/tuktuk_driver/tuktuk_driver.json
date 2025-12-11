@@ -1,396 +1,437 @@
 {
-    "actions": [],
-    "allow_import": 1,
-    "allow_rename": 1,
-    "autoname": "format:DRV-112{###}",
-    "creation": "2024-11-26 12:00:00",
-    "doctype": "DocType",
-    "engine": "InnoDB",
-    "field_order": [
-        "driver_information_tab",
-        "section_driver_information", 
-        "driver_first_name",
-        "driver_middle_name",
-        "driver_last_name",
-        "column_break_qtxl",
-        "driver_dob",
-        "driver_national_id", 
-        "driver_license",
-        "column_break_hyib",
-        "driver_address",
-        "driver_contacts_section",
-        "driver_primary_phone",
-        "column_break_odhg",
-        "driver_secondary_phone",
-        "column_break_qmal",
-        "driver_email",
-        "user_account",
-        "driver_emergency_contact_section",
-        "driver_emergency_name",
-        "column_break_ypwy",
-        "driver_emergency_phone",
-        "payment_tab",
-        "mpesa_details_section",
-        "mpesa_number",
-        "column_break_clzp",
-        "driver_name",
-        "tab_assignment",
-        "section_assignment",
-        "assigned_tuktuk",
-        "target_tab",
-        "section_break_targets",
-        "daily_target",
-        "column_break_nwor",
-        "fare_percentage",
-        "performance_tab",
-        "current_balance",
-        "consecutive_misses",
-        "deposit_tab",
-        "deposit_section",
-        "initial_deposit_amount",
-        "current_deposit_balance",
-        "column_break_deposit",
-        "deposit_required",
-        "allow_target_deduction_from_deposit",
-        "deposit_transactions_section",
-        "deposit_transactions",
-        "exit_refund_section",
-        "exit_date",
-        "column_break_exit",
-        "refund_amount",
-        "refund_status"
-    ],
-    "fields": [
-     {
-      "fetch_from": "driver_first_name,driver_middle_name,driver_last_name",
-      "fieldname": "driver_name",
-      "fieldtype": "Data",
-      "in_list_view": 1,
-      "in_standard_filter": 1,
-      "label": "Driver Name",
-      "read_only": 1
-     },
-     {
-      "fieldname": "mpesa_number",
-      "fieldtype": "Data",
-      "in_list_view": 1,
-      "label": "Mpesa Phone Number",
-      "reqd": 1
-     },
-     {
-      "fieldname": "assigned_tuktuk",
-      "fieldtype": "Link",
-      "label": "Assigned TukTuk",
-      "options": "TukTuk Vehicle"
-     },
-     {
-      "fieldname": "section_break_targets",
-      "fieldtype": "Section Break",
-      "label": "Individual Targets"
-     },
-     {
-      "description": "Leave empty to use global target",
-      "fieldname": "daily_target",
-      "fieldtype": "Currency",
-      "label": "Individual Daily Target"
-     },
-     {
-      "description": "Leave empty to use global percentage",
-      "fieldname": "fare_percentage",
-      "fieldtype": "Percent",
-      "label": "Individual Fare Percentage"
-     },
-     {
-      "default": "0",
-      "fieldname": "current_balance",
-      "fieldtype": "Currency",
-      "label": "Current Target Balance",
-      "read_only": 1
-     },
-     {
-      "default": "0",
-      "fieldname": "consecutive_misses",
-      "fieldtype": "Int",
-      "label": "Consecutive Target Misses",
-      "read_only": 1
-     },
-     {
-      "fieldname": "driver_information_tab",
-      "fieldtype": "Tab Break",
-      "label": "Driver Information"
-     },
-     {
-      "fieldname": "driver_first_name",
-      "fieldtype": "Data",
-      "label": "First Name"
-     },
-     {
-      "fieldname": "driver_middle_name",
-      "fieldtype": "Data",
-      "label": "Middle Name"
-     },
-     {
-      "fieldname": "driver_last_name",
-      "fieldtype": "Data",
-      "label": "Last Name"
-     },
-     {
-      "fieldname": "column_break_qtxl",
-      "fieldtype": "Column Break"
-     },
-     {
-      "fieldname": "driver_national_id",
-      "fieldtype": "Data",
-      "in_list_view": 1,
-      "label": "National ID",
-      "reqd": 1,
-      "unique": 1
-     },
-     {
-      "fieldname": "driver_license",
-      "fieldtype": "Data",
-      "label": "Driving License",
-      "reqd": 1
-     },
-     {
-      "fieldname": "driver_dob",
-      "fieldtype": "Date",
-      "label": "Date of Birth"
-     },
-     {
-      "fieldname": "column_break_hyib",
-      "fieldtype": "Column Break"
-     },
-     {
-      "fieldname": "driver_address",
-      "fieldtype": "Small Text",
-      "label": "Address"
-     },
-     {
-      "collapsible": 1,
-      "fieldname": "driver_contacts_section",
-      "fieldtype": "Section Break",
-      "label": "Driver Contacts"
-     },
-     {
-      "fieldname": "driver_primary_phone",
-      "fieldtype": "Data",
-      "label": "Primary Phone"
-     },
-     {
-      "fieldname": "column_break_odhg",
-      "fieldtype": "Column Break"
-     },
-     {
-      "fieldname": "driver_secondary_phone",
-      "fieldtype": "Data",
-      "label": "Alternative Phone"
-     },
-     {
-      "fieldname": "column_break_qmal",
-      "fieldtype": "Column Break"
-     },
-     {
-      "fieldname": "driver_email",
-      "fieldtype": "Data",
-      "label": "Email"
-     },
-     {
-        "fieldname": "user_account",
-        "fieldtype": "Link",
-        "label": "User Account",
-        "options": "User",
-        "read_only": 1,
-        "description": "Linked user account for driver portal access"
-     },
-     {
-      "collapsible": 1,
-      "fieldname": "driver_emergency_contact_section",
-      "fieldtype": "Section Break",
-      "label": "Driver Emergency Contact"
-     },
-     {
-      "fieldname": "driver_emergency_name",
-      "fieldtype": "Data",
-      "label": "Contact's Name"
-     },
-     {
-      "fieldname": "column_break_ypwy",
-      "fieldtype": "Column Break"
-     },
-     {
-      "fieldname": "driver_emergency_phone",
-      "fieldtype": "Data",
-      "label": "Contact's Phone"
-     },
-     {
-      "fieldname": "section_driver_information",
-      "fieldtype": "Section Break",
-      "label": "Driver Information"
-     },
-     {
-      "fieldname": "tab_assignment",
-      "fieldtype": "Tab Break",
-      "label": "Tuktuk Assignment"
-     },
-     {
-      "fieldname": "section_assignment",
-      "fieldtype": "Section Break",
-      "label": "Tuktuk Assignment"
-     },
-     {
-      "fieldname": "payment_tab",
-      "fieldtype": "Tab Break",
-      "label": "Payment Details"
-     },
-     {
-      "fieldname": "mpesa_details_section",
-      "fieldtype": "Section Break",
-      "label": "Mpesa Details"
-     },
-     {
-      "fieldname": "column_break_clzp",
-      "fieldtype": "Column Break"
-     },
-     {
-      "fieldname": "target_tab",
-      "fieldtype": "Tab Break",
-      "label": "Target Settings"
-     },
-     {
-      "fieldname": "column_break_nwor",
-      "fieldtype": "Column Break"
-     },
-     {
-      "fieldname": "performance_tab",
-      "fieldtype": "Tab Break",
-      "label": "Performance"
-     },
-     {
-      "fieldname": "deposit_tab",
-      "fieldtype": "Tab Break",
-      "label": "Deposit Management"
-     },
-     {
-      "fieldname": "deposit_section",
-      "fieldtype": "Section Break",
-      "label": "Deposit Information"
-     },
-     {
-      "default": "1",
-      "fieldname": "deposit_required",
-      "fieldtype": "Check",
-      "label": "Deposit Required"
-     },
-     {
-      "depends_on": "deposit_required",
-      "fieldname": "initial_deposit_amount",
-      "fieldtype": "Currency",
-      "label": "Initial Deposit Amount",
-      "precision": "2"
-     },
-     {
-      "default": "0",
-      "fieldname": "current_deposit_balance",
-      "fieldtype": "Currency",
-      "label": "Current Deposit Balance",
-      "precision": "2",
-      "read_only": 1
-     },
-     {
-      "fieldname": "column_break_deposit",
-      "fieldtype": "Column Break"
-     },
-     {
-      "default": "0",
-      "depends_on": "deposit_required",
-      "description": "Allow driver to choose if missed targets can be deducted from deposit",
-      "fieldname": "allow_target_deduction_from_deposit",
-      "fieldtype": "Check",
-      "label": "Allow Target Deduction from Deposit"
-     },
-     {
-      "fieldname": "deposit_transactions_section",
-      "fieldtype": "Section Break",
-      "label": "Deposit Transaction History"
-     },
-     {
-      "fieldname": "deposit_transactions",
-      "fieldtype": "Table",
-      "label": "Deposit Transactions",
-      "options": "Driver Deposit Transaction"
-     },
-     {
-      "collapsible": 1,
-      "fieldname": "exit_refund_section",
-      "fieldtype": "Section Break",
-      "label": "Exit and Refund Information"
-     },
-     {
-      "fieldname": "exit_date",
-      "fieldtype": "Date",
-      "label": "Exit Date"
-     },
-     {
-      "fieldname": "column_break_exit",
-      "fieldtype": "Column Break"
-     },
-     {
-      "fieldname": "refund_amount",
-      "fieldtype": "Currency",
-      "label": "Refund Amount",
-      "precision": "2",
-      "read_only": 1
-     },
-     {
-      "default": "Pending",
-      "depends_on": "exit_date",
-      "fieldname": "refund_status",
-      "fieldtype": "Select",
-      "label": "Refund Status",
-      "options": "Pending\nProcessed\nCompleted\nCancelled"
-     }
-    ],
-    "index_web_pages_for_search": 1,
-    "links": [],
-    "modified": "2024-11-29 03:24:04.477797",
-    "modified_by": "Administrator",
-    "module": "Tuktuk Management",
-    "name": "TukTuk Driver",
-    "naming_rule": "Expression",
-    "owner": "Administrator",
-    "permissions": [
-     {
-      "create": 1,
-      "delete": 1,
-      "email": 1,
-      "export": 1,
-      "print": 1,
-      "read": 1,
-      "report": 1,
-      "role": "System Manager",
-      "share": 1,
-      "write": 1
-     },
-     {
-      "read": 1,
-      "role": "Driver"
-     },
-     {
-      "create": 1,
-      "delete": 1,
-      "email": 1,
-      "export": 1,
-      "print": 1,
-      "read": 1,
-      "report": 1,
-      "role": "Tuktuk Manager",
-      "share": 1,
-      "write": 1
-     }
-    ],
-    "sort_field": "modified",
-    "sort_order": "DESC",
-    "states": [],
-    "title_field": "driver_name"
-   }
+ "actions": [],
+ "allow_import": 1,
+ "allow_rename": 1,
+ "autoname": "format:DRV-112{###}",
+ "creation": "2024-11-26 12:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "driver_information_tab",
+  "section_driver_information",
+  "driver_first_name",
+  "driver_middle_name",
+  "driver_last_name",
+  "column_break_qtxl",
+  "driver_dob",
+  "driver_national_id",
+  "driver_license",
+  "column_break_hyib",
+  "driver_address",
+  "driver_contacts_section",
+  "driver_primary_phone",
+  "column_break_odhg",
+  "driver_secondary_phone",
+  "column_break_qmal",
+  "driver_email",
+  "user_account",
+  "driver_emergency_contact_section",
+  "driver_emergency_name",
+  "column_break_ypwy",
+  "driver_emergency_phone",
+  "payment_tab",
+  "mpesa_details_section",
+  "mpesa_number",
+  "column_break_clzp",
+  "driver_name",
+  "tab_assignment",
+  "section_assignment",
+  "assigned_tuktuk",
+  "target_tab",
+  "section_break_targets",
+  "target_sharing_override",
+  "daily_target",
+  "column_break_nwor",
+  "fare_percentage",
+  "instant_payout_override",
+  "performance_tab",
+  "current_balance",
+  "column_break_performance",
+  "left_to_target",
+  "section_break_performance_history",
+  "consecutive_misses",
+  "deposit_tab",
+  "deposit_section",
+  "initial_deposit_amount",
+  "current_deposit_balance",
+  "column_break_deposit",
+  "deposit_required",
+  "allow_target_deduction_from_deposit",
+  "deposit_transactions_section",
+  "deposit_transactions",
+  "exit_refund_section",
+  "exit_date",
+  "column_break_exit",
+  "refund_amount",
+  "refund_status"
+ ],
+ "fields": [
+  {
+   "fetch_from": "driver_first_name,driver_middle_name,driver_last_name",
+   "fieldname": "driver_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Driver Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "mpesa_number",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Mpesa Phone Number",
+   "reqd": 1
+  },
+  {
+   "fieldname": "assigned_tuktuk",
+   "fieldtype": "Link",
+   "label": "Assigned TukTuk",
+   "options": "TukTuk Vehicle"
+  },
+  {
+   "fieldname": "section_break_targets",
+   "fieldtype": "Section Break",
+   "label": "Individual Targets"
+  },
+  {
+   "default": "Follow Global",
+   "description": "Override global target sharing setting for this driver. Leave empty to follow global setting.",
+   "fieldname": "target_sharing_override",
+   "fieldtype": "Select",
+   "label": "Target Sharing Override",
+   "options": "\nFollow Global\nEnable\nDisable"
+  },
+  {
+   "description": "Leave empty to use global target",
+   "fieldname": "daily_target",
+   "fieldtype": "Currency",
+   "label": "Individual Daily Target"
+  },
+  {
+   "description": "Leave empty to use global percentage",
+   "fieldname": "fare_percentage",
+   "fieldtype": "Percent",
+   "label": "Individual Fare Percentage"
+  },
+  {
+   "default": "Follow Global",
+   "description": "Override global instant payout behavior for this driver. When set, this takes precedence over the global setting.",
+   "fieldname": "instant_payout_override",
+   "fieldtype": "Select",
+   "label": "Instant Payout Preference",
+   "options": "\nFollow Global\nEnable\nDisable"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.assigned_tuktuk",
+   "fieldname": "current_balance",
+   "fieldtype": "Currency",
+   "label": "Current Target Balance",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_performance",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.assigned_tuktuk",
+   "description": "Countdown of remaining amount needed to reach daily target",
+   "fieldname": "left_to_target",
+   "fieldtype": "Currency",
+   "label": "Left to target",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_performance_history",
+   "fieldtype": "Section Break",
+   "label": "Performance History"
+  },
+  {
+   "default": "0",
+   "fieldname": "consecutive_misses",
+   "fieldtype": "Int",
+   "label": "Consecutive Target Misses",
+   "read_only": 1
+  },
+  {
+   "fieldname": "driver_information_tab",
+   "fieldtype": "Tab Break",
+   "label": "Driver Information"
+  },
+  {
+   "fieldname": "driver_first_name",
+   "fieldtype": "Data",
+   "label": "First Name"
+  },
+  {
+   "fieldname": "driver_middle_name",
+   "fieldtype": "Data",
+   "label": "Middle Name"
+  },
+  {
+   "fieldname": "driver_last_name",
+   "fieldtype": "Data",
+   "label": "Last Name"
+  },
+  {
+   "fieldname": "column_break_qtxl",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "driver_national_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "National ID",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "driver_license",
+   "fieldtype": "Data",
+   "label": "Driving License",
+   "reqd": 1
+  },
+  {
+   "fieldname": "driver_dob",
+   "fieldtype": "Date",
+   "label": "Date of Birth"
+  },
+  {
+   "fieldname": "column_break_hyib",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "driver_address",
+   "fieldtype": "Small Text",
+   "label": "Address"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "driver_contacts_section",
+   "fieldtype": "Section Break",
+   "label": "Driver Contacts"
+  },
+  {
+   "fieldname": "driver_primary_phone",
+   "fieldtype": "Data",
+   "label": "Primary Phone"
+  },
+  {
+   "fieldname": "column_break_odhg",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "driver_secondary_phone",
+   "fieldtype": "Data",
+   "label": "Alternative Phone"
+  },
+  {
+   "fieldname": "column_break_qmal",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "driver_email",
+   "fieldtype": "Data",
+   "label": "Email"
+  },
+  {
+   "description": "Linked user account for driver portal access",
+   "fieldname": "user_account",
+   "fieldtype": "Link",
+   "label": "User Account",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "driver_emergency_contact_section",
+   "fieldtype": "Section Break",
+   "label": "Driver Emergency Contact"
+  },
+  {
+   "fieldname": "driver_emergency_name",
+   "fieldtype": "Data",
+   "label": "Contact's Name"
+  },
+  {
+   "fieldname": "column_break_ypwy",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "driver_emergency_phone",
+   "fieldtype": "Data",
+   "label": "Contact's Phone"
+  },
+  {
+   "fieldname": "section_driver_information",
+   "fieldtype": "Section Break",
+   "label": "Driver Information"
+  },
+  {
+   "fieldname": "tab_assignment",
+   "fieldtype": "Tab Break",
+   "label": "Tuktuk Assignment"
+  },
+  {
+   "fieldname": "section_assignment",
+   "fieldtype": "Section Break",
+   "label": "Tuktuk Assignment"
+  },
+  {
+   "fieldname": "payment_tab",
+   "fieldtype": "Tab Break",
+   "label": "Payment Details"
+  },
+  {
+   "fieldname": "mpesa_details_section",
+   "fieldtype": "Section Break",
+   "label": "Mpesa Details"
+  },
+  {
+   "fieldname": "column_break_clzp",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "target_tab",
+   "fieldtype": "Tab Break",
+   "label": "Target Settings"
+  },
+  {
+   "fieldname": "column_break_nwor",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "performance_tab",
+   "fieldtype": "Tab Break",
+   "label": "Performance"
+  },
+  {
+   "fieldname": "deposit_tab",
+   "fieldtype": "Tab Break",
+   "label": "Deposit Management"
+  },
+  {
+   "fieldname": "deposit_section",
+   "fieldtype": "Section Break",
+   "label": "Deposit Information"
+  },
+  {
+   "default": "1",
+   "fieldname": "deposit_required",
+   "fieldtype": "Check",
+   "label": "Deposit Required"
+  },
+  {
+   "depends_on": "deposit_required",
+   "fieldname": "initial_deposit_amount",
+   "fieldtype": "Currency",
+   "label": "Initial Deposit Amount",
+   "precision": "2"
+  },
+  {
+   "default": "0",
+   "fieldname": "current_deposit_balance",
+   "fieldtype": "Currency",
+   "label": "Current Deposit Balance",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_deposit",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "depends_on": "deposit_required",
+   "description": "Allow driver to choose if missed targets can be deducted from deposit",
+   "fieldname": "allow_target_deduction_from_deposit",
+   "fieldtype": "Check",
+   "label": "Allow Target Deduction from Deposit"
+  },
+  {
+   "fieldname": "deposit_transactions_section",
+   "fieldtype": "Section Break",
+   "label": "Deposit Transaction History"
+  },
+  {
+   "fieldname": "deposit_transactions",
+   "fieldtype": "Table",
+   "label": "Deposit Transactions",
+   "options": "Driver Deposit Transaction"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "exit_refund_section",
+   "fieldtype": "Section Break",
+   "label": "Exit and Refund Information"
+  },
+  {
+   "fieldname": "exit_date",
+   "fieldtype": "Date",
+   "label": "Exit Date"
+  },
+  {
+   "fieldname": "column_break_exit",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "refund_amount",
+   "fieldtype": "Currency",
+   "label": "Refund Amount",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "default": "Pending",
+   "depends_on": "exit_date",
+   "fieldname": "refund_status",
+   "fieldtype": "Select",
+   "label": "Refund Status",
+   "options": "Pending\nProcessed\nCompleted\nCancelled"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-12-03 01:34:28.410816",
+ "modified_by": "Administrator",
+ "module": "Tuktuk Management",
+ "name": "TukTuk Driver",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Driver"
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Tuktuk Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "driver_name"
+}

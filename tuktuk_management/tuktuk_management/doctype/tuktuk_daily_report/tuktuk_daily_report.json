@@ -5,14 +5,35 @@
  "engine": "InnoDB",
  "field_order": [
   "report_date",
-  "section_break_transactions",
-  "total_transactions",
-  "column_break_1",
+  "section_break_financial",
   "total_revenue",
-  "section_break_revenue",
   "total_driver_share",
+  "column_break_1",
+  "total_target_contribution",
+  "total_transactions",
+  "section_break_driver_performance",
+  "drivers_at_target",
+  "total_drivers",
   "column_break_2",
-  "total_target_contribution"
+  "target_achievement_rate",
+  "inactive_drivers",
+  "section_break_attention",
+  "drivers_below_target",
+  "drivers_below_target_list",
+  "column_break_3",
+  "drivers_at_risk",
+  "drivers_at_risk_list",
+  "section_break_fleet",
+  "active_tuktuks",
+  "available_tuktuks",
+  "column_break_4",
+  "charging_tuktuks",
+  "section_break_report",
+  "report_text",
+  "section_break_email",
+  "email_sent",
+  "column_break_5",
+  "email_sent_at"
  ],
  "fields": [
   {
@@ -24,21 +45,9 @@
    "unique": 1
   },
   {
-   "fieldname": "section_break_transactions",
+   "fieldname": "section_break_financial",
    "fieldtype": "Section Break",
-   "label": "Transactions"
-  },
-  {
-   "default": "0",
-   "fieldname": "total_transactions",
-   "fieldtype": "Int",
-   "in_list_view": 1,
-   "label": "Total Transactions",
-   "reqd": 1
-  },
-  {
-   "fieldname": "column_break_1",
-   "fieldtype": "Column Break"
+   "label": "Financial Summary"
   },
   {
    "default": "0",
@@ -49,17 +58,46 @@
    "reqd": 1
   },
   {
-   "fieldname": "section_break_revenue",
-   "fieldtype": "Section Break",
-   "label": "Revenue Distribution"
-  },
-  {
    "default": "0",
    "fieldname": "total_driver_share",
    "fieldtype": "Currency",
-   "in_list_view": 1,
    "label": "Total Driver Share",
    "reqd": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "total_target_contribution",
+   "fieldtype": "Currency",
+   "label": "Total Target Contribution",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "total_transactions",
+   "fieldtype": "Int",
+   "label": "Total Transactions",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_driver_performance",
+   "fieldtype": "Section Break",
+   "label": "Driver Performance"
+  },
+  {
+   "default": "0",
+   "fieldname": "drivers_at_target",
+   "fieldtype": "Int",
+   "label": "Drivers at Target"
+  },
+  {
+   "default": "0",
+   "fieldname": "total_drivers",
+   "fieldtype": "Int",
+   "label": "Total Active Drivers"
   },
   {
    "fieldname": "column_break_2",
@@ -67,16 +105,108 @@
   },
   {
    "default": "0",
-   "fieldname": "total_target_contribution",
-   "fieldtype": "Currency",
-   "in_list_view": 1,
-   "label": "Total Target Contribution",
-   "reqd": 1
+   "fieldname": "target_achievement_rate",
+   "fieldtype": "Percent",
+   "label": "Target Achievement Rate"
+  },
+  {
+   "default": "0",
+   "fieldname": "inactive_drivers",
+   "fieldtype": "Int",
+   "label": "Inactive Drivers"
+  },
+  {
+   "fieldname": "section_break_attention",
+   "fieldtype": "Section Break",
+   "label": "Needs Attention"
+  },
+  {
+   "default": "0",
+   "fieldname": "drivers_below_target",
+   "fieldtype": "Int",
+   "label": "Drivers Who Did Not Meet Target"
+  },
+  {
+   "fieldname": "drivers_below_target_list",
+   "fieldtype": "Long Text",
+   "label": "Drivers Below Target List"
+  },
+  {
+   "fieldname": "column_break_3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "drivers_at_risk",
+   "fieldtype": "Int",
+   "label": "Drivers with Consecutive Misses (≥2)"
+  },
+  {
+   "fieldname": "drivers_at_risk_list",
+   "fieldtype": "Long Text",
+   "label": "Drivers At Risk List"
+  },
+  {
+   "fieldname": "section_break_fleet",
+   "fieldtype": "Section Break",
+   "label": "Fleet Status"
+  },
+  {
+   "default": "0",
+   "fieldname": "active_tuktuks",
+   "fieldtype": "Int",
+   "label": "Active TukTuks"
+  },
+  {
+   "default": "0",
+   "fieldname": "available_tuktuks",
+   "fieldtype": "Int",
+   "label": "Available TukTuks"
+  },
+  {
+   "fieldname": "column_break_4",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "charging_tuktuks",
+   "fieldtype": "Int",
+   "label": "Charging TukTuks"
+  },
+  {
+   "fieldname": "section_break_report",
+   "fieldtype": "Section Break",
+   "label": "Full Report"
+  },
+  {
+   "fieldname": "report_text",
+   "fieldtype": "Long Text",
+   "label": "Report Text"
+  },
+  {
+   "fieldname": "section_break_email",
+   "fieldtype": "Section Break",
+   "label": "Email Status"
+  },
+  {
+   "default": "0",
+   "fieldname": "email_sent",
+   "fieldtype": "Check",
+   "label": "Email Sent"
+  },
+  {
+   "fieldname": "column_break_5",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "email_sent_at",
+   "fieldtype": "Datetime",
+   "label": "Email Sent At"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2024-12-02 12:00:00.000000",
+ "modified": "2025-12-09 04:00:00.000000",
  "modified_by": "Administrator",
  "module": "Tuktuk Management",
  "name": "TukTuk Daily Report",

@@ -1,0 +1,447 @@
+{% extends "templates/web.html" %}
+
+{% block title %}{{ _("SMS Broadcast") }}{% endblock %}
+
+{% block page_content %}
+<div class="sms-broadcast-container">
+    <div class="page-header">
+        <h1 class="page-title">{{ _("SMS Broadcast to Drivers") }}</h1>
+    </div>
+
+    <!-- Configuration Status Alert -->
+    <div id="config-alert" class="alert alert-warning" style="display: none;">
+        <strong>{{ _("Warning") }}:</strong> 
+        <span id="config-message"></span>
+    </div>
+
+    <!-- Main Content -->
+    <div class="row">
+        <!-- Left Column: Driver Selection -->
+        <div class="col-md-4">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <h3 class="panel-title">
+                        {{ _("Select Drivers") }}
+                        <button id="select-all-btn" class="btn btn-xs btn-primary pull-right" style="margin-top: -5px;">
+                            {{ _("Select All") }}
+                        </button>
+                        <button id="deselect-all-btn" class="btn btn-xs btn-default pull-right" style="margin-top: -5px; margin-right: 5px;">
+                            {{ _("Deselect All") }}
+                        </button>
+                    </h3>
+                </div>
+                <div class="panel-body" style="max-height: 500px; overflow-y: auto;">
+                    <div class="form-group">
+                        <input type="text" id="driver-search" class="form-control" placeholder="{{ _('Search drivers...') }}" style="margin-bottom: 10px;">
+                    </div>
+                    <div id="drivers-list">
+                        <div class="text-center text-muted">
+                            <i class="fa fa-spinner fa-spin"></i> {{ _("Loading drivers...") }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Message and Send -->
+        <div class="col-md-8">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <h3 class="panel-title">{{ _("Compose Message") }}</h3>
+                </div>
+                <div class="panel-body">
+                    <div class="form-group">
+                        <label for="sms-message">{{ _("SMS Message") }}</label>
+                        <textarea id="sms-message" class="form-control" rows="6" placeholder="{{ _('Enter your message here...') }}"></textarea>
+                        <small class="help-block">
+                            <span id="char-count">0</span> {{ _("characters") }} 
+                            ({{ _("SMS limit: ~160 characters per message") }})
+                        </small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="include-target-info"> 
+                            {{ _("Include target reminder info") }}
+                            <small class="text-muted">({{ _("Adds: 'You have KES X to complete today's target'") }})</small>
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <button id="send-sms-btn" class="btn btn-primary btn-lg" disabled>
+                            <i class="fa fa-paper-plane"></i> {{ _("Send SMS") }}
+                            <span id="selected-count" class="badge" style="margin-left: 5px;">0</span>
+                        </button>
+                        <button id="preview-btn" class="btn btn-default">
+                            <i class="fa fa-eye"></i> {{ _("Preview") }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Panel -->
+            <div id="results-panel" class="panel panel-default" style="display: none;">
+                <div class="panel-heading">
+                    <h3 class="panel-title">{{ _("Send Results") }}</h3>
+                </div>
+                <div class="panel-body">
+                    <div id="results-content"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.sms-broadcast-container {
+    padding: 20px;
+}
+
+.driver-item {
+    padding: 8px;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+}
+
+.driver-item:hover {
+    background-color: #f5f5f5;
+}
+
+.driver-item.selected {
+    background-color: #e3f2fd;
+    border-left: 3px solid #2196F3;
+}
+
+.driver-item input[type="checkbox"] {
+    margin-right: 10px;
+}
+
+.driver-name {
+    font-weight: 500;
+}
+
+.driver-phone {
+    color: #666;
+    font-size: 12px;
+}
+
+.driver-status {
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+.status-assigned {
+    background-color: #4caf50;
+    color: white;
+}
+
+.status-unassigned {
+    background-color: #9e9e9e;
+    color: white;
+}
+
+.result-item {
+    padding: 10px;
+    margin-bottom: 5px;
+    border-radius: 4px;
+}
+
+.result-success {
+    background-color: #d4edda;
+    border-left: 4px solid #28a745;
+}
+
+.result-failed {
+    background-color: #f8d7da;
+    border-left: 4px solid #dc3545;
+}
+
+#char-count {
+    font-weight: bold;
+}
+
+#char-count.warning {
+    color: #ff9800;
+}
+
+#char-count.danger {
+    color: #f44336;
+}
+</style>
+
+<script>
+frappe.ready(function() {
+    let allDrivers = [];
+    let selectedDrivers = new Set();
+    let smsStatus = {{ sms_status|tojson }};
+
+    // Check SMS configuration
+    if (!smsStatus.success || !smsStatus.sms_enabled || !smsStatus.api_key_configured) {
+        $('#config-alert').show();
+        $('#config-message').text('SMS notifications are not properly configured. Please check TukTuk Settings.');
+    }
+
+    // Load drivers
+    loadDrivers();
+
+    // Character counter
+    $('#sms-message').on('input', function() {
+        let length = $(this).val().length;
+        $('#char-count').text(length);
+        
+        if (length > 160) {
+            $('#char-count').addClass('danger').removeClass('warning');
+        } else if (length > 140) {
+            $('#char-count').addClass('warning').removeClass('danger');
+        } else {
+            $('#char-count').removeClass('warning danger');
+        }
+        
+        updateSendButton();
+    });
+
+    // Search functionality
+    $('#driver-search').on('input', function() {
+        filterDrivers($(this).val().toLowerCase());
+    });
+
+    // Select/Deselect All
+    $('#select-all-btn').on('click', function() {
+        allDrivers.forEach(driver => {
+            selectedDrivers.add(driver.name);
+        });
+        renderDrivers();
+        updateSendButton();
+    });
+
+    $('#deselect-all-btn').on('click', function() {
+        selectedDrivers.clear();
+        renderDrivers();
+        updateSendButton();
+    });
+
+    // Include target info checkbox
+    $('#include-target-info').on('change', function() {
+        updateMessagePreview();
+    });
+
+    // Preview button
+    $('#preview-btn').on('click', function() {
+        let message = $('#sms-message').val();
+        if ($('#include-target-info').is(':checked')) {
+            message = addTargetInfoToMessage(message);
+        }
+        
+        if (!message.trim()) {
+            frappe.msgprint('Please enter a message first.');
+            return;
+        }
+        
+        frappe.msgprint({
+            title: 'Message Preview',
+            message: '<div style="padding: 20px; background: #f5f5f5; border-radius: 4px; white-space: pre-wrap;">' + 
+                     frappe.utils.escape_html(message) + 
+                     '</div><br><strong>Will be sent to:</strong> ' + selectedDrivers.size + ' driver(s)'
+        });
+    });
+
+    // Send SMS button
+    $('#send-sms-btn').on('click', function() {
+        sendBroadcastSMS();
+    });
+
+    function loadDrivers() {
+        frappe.call({
+            method: 'tuktuk_management.api.sms_notifications.get_all_drivers_for_broadcast',
+            callback: function(r) {
+                if (r.message && r.message.success) {
+                    allDrivers = r.message.drivers || [];
+                    renderDrivers();
+                } else {
+                    $('#drivers-list').html('<div class="text-danger">Error loading drivers: ' + 
+                        (r.message.message || 'Unknown error') + '</div>');
+                }
+            }
+        });
+    }
+
+    function renderDrivers() {
+        let html = '';
+        
+        if (allDrivers.length === 0) {
+            html = '<div class="text-muted">No drivers found.</div>';
+        } else {
+            allDrivers.forEach(driver => {
+                let isSelected = selectedDrivers.has(driver.name);
+                let isAssigned = driver.assigned_tuktuk ? true : false;
+                
+                html += `
+                    <div class="driver-item ${isSelected ? 'selected' : ''}" data-driver-id="${driver.name}">
+                        <label style="cursor: pointer; margin: 0; width: 100%;">
+                            <input type="checkbox" ${isSelected ? 'checked' : ''} 
+                                   onchange="toggleDriver('${driver.name}')">
+                            <span class="driver-name">${frappe.utils.escape_html(driver.driver_name || driver.name)}</span>
+                            ${driver.mpesa_number ? 
+                                '<br><span class="driver-phone">' + frappe.utils.escape_html(driver.mpesa_number) + '</span>' : 
+                                '<br><span class="text-danger">No phone number</span>'}
+                            <span class="driver-status ${isAssigned ? 'status-assigned' : 'status-unassigned'}" style="float: right;">
+                                ${isAssigned ? 'Assigned' : 'Unassigned'}
+                            </span>
+                        </label>
+                    </div>
+                `;
+            });
+        }
+        
+        $('#drivers-list').html(html);
+        updateSendButton();
+    }
+
+    function filterDrivers(searchTerm) {
+        if (!searchTerm) {
+            renderDrivers();
+            return;
+        }
+        
+        let filtered = allDrivers.filter(driver => {
+            let name = (driver.driver_name || driver.name || '').toLowerCase();
+            let phone = (driver.mpesa_number || '').toLowerCase();
+            return name.includes(searchTerm) || phone.includes(searchTerm);
+        });
+        
+        let html = '';
+        filtered.forEach(driver => {
+            let isSelected = selectedDrivers.has(driver.name);
+            let isAssigned = driver.assigned_tuktuk ? true : false;
+            
+            html += `
+                <div class="driver-item ${isSelected ? 'selected' : ''}" data-driver-id="${driver.name}">
+                    <label style="cursor: pointer; margin: 0; width: 100%;">
+                        <input type="checkbox" ${isSelected ? 'checked' : ''} 
+                               onchange="toggleDriver('${driver.name}')">
+                        <span class="driver-name">${frappe.utils.escape_html(driver.driver_name || driver.name)}</span>
+                        ${driver.mpesa_number ? 
+                            '<br><span class="driver-phone">' + frappe.utils.escape_html(driver.mpesa_number) + '</span>' : 
+                            '<br><span class="text-danger">No phone number</span>'}
+                        <span class="driver-status ${isAssigned ? 'status-assigned' : 'status-unassigned'}" style="float: right;">
+                            ${isAssigned ? 'Assigned' : 'Unassigned'}
+                        </span>
+                    </label>
+                </div>
+            `;
+        });
+        
+        $('#drivers-list').html(html);
+    }
+
+    window.toggleDriver = function(driverId) {
+        if (selectedDrivers.has(driverId)) {
+            selectedDrivers.delete(driverId);
+        } else {
+            selectedDrivers.add(driverId);
+        }
+        renderDrivers();
+        updateSendButton();
+    }
+
+    function updateSendButton() {
+        let count = selectedDrivers.size;
+        $('#selected-count').text(count);
+        $('#send-sms-btn').prop('disabled', count === 0 || !$('#sms-message').val().trim());
+    }
+
+    function addTargetInfoToMessage(baseMessage) {
+        // This would need to fetch target info for selected drivers
+        // For now, return the base message
+        return baseMessage;
+    }
+
+    function updateMessagePreview() {
+        // Could update preview if needed
+    }
+
+    function sendBroadcastSMS() {
+        let message = $('#sms-message').val().trim();
+        
+        if (!message) {
+            frappe.msgprint('Please enter a message.');
+            return;
+        }
+        
+        if (selectedDrivers.size === 0) {
+            frappe.msgprint('Please select at least one driver.');
+            return;
+        }
+        
+        // Confirm before sending
+        frappe.confirm(
+            `Send SMS to ${selectedDrivers.size} driver(s)?`,
+            function() {
+                // User confirmed
+                let driverIds = Array.from(selectedDrivers);
+                
+                frappe.call({
+                    method: 'tuktuk_management.api.sms_notifications.send_broadcast_sms',
+                    args: {
+                        driver_ids: driverIds,
+                        message: message
+                    },
+                    freeze: true,
+                    freeze_message: 'Sending SMS...',
+                    callback: function(r) {
+                        if (r.message && r.message.success) {
+                            showResults(r.message);
+                            // Clear selection
+                            selectedDrivers.clear();
+                            renderDrivers();
+                            $('#sms-message').val('');
+                            $('#char-count').text('0');
+                        } else {
+                            frappe.msgprint({
+                                title: 'Error',
+                                indicator: 'red',
+                                message: r.message.message || 'Failed to send SMS'
+                            });
+                        }
+                    }
+                });
+            }
+        );
+    }
+
+    function showResults(result) {
+        let html = `
+            <div class="alert alert-info">
+                <strong>Summary:</strong> ${result.success_count} sent successfully, 
+                ${result.failure_count} failed out of ${result.total} total.
+            </div>
+        `;
+        
+        if (result.results && result.results.length > 0) {
+            html += '<div style="max-height: 400px; overflow-y: auto;">';
+            result.results.forEach(item => {
+                let statusClass = item.status === 'success' ? 'result-success' : 'result-failed';
+                html += `
+                    <div class="result-item ${statusClass}">
+                        <strong>${frappe.utils.escape_html(item.driver_name)}</strong>
+                        ${item.phone ? '<br><small>Phone: ' + frappe.utils.escape_html(item.phone) + '</small>' : ''}
+                        <br><small>${frappe.utils.escape_html(item.message)}</small>
+                    </div>
+                `;
+            });
+            html += '</div>';
+        }
+        
+        $('#results-content').html(html);
+        $('#results-panel').show();
+        
+        // Scroll to results
+        $('html, body').animate({
+            scrollTop: $('#results-panel').offset().top
+        }, 500);
+    }
+});
+</script>
+{% endblock %}
+

@@ -1,0 +1,55 @@
+{
+    "doctype": "Report",
+    "name": "TukTuk Driver Statement",
+    "docstatus": 0,
+    "creation": "2025-01-15 10:00:00.000000",
+    "modified": "2025-01-15 10:00:00.000000",
+    "modified_by": "Administrator",
+    "owner": "Administrator",
+    "ref_doctype": "TukTuk Driver",
+    "report_name": "TukTuk Driver Statement",
+    "report_type": "Script Report",
+    "is_standard": "Yes",
+    "module": "Tuktuk Management",
+    "disabled": 0,
+    "add_total_row": 1,
+    "prepared_report": 0,
+    "filters": [
+        {
+            "fieldname": "driver",
+            "fieldtype": "Link",
+            "label": "Driver",
+            "mandatory": 1,
+            "options": "TukTuk Driver",
+            "wildcard_filter": 0
+        },
+        {
+            "fieldname": "from_date",
+            "fieldtype": "Date",
+            "label": "From Date",
+            "mandatory": 1,
+            "wildcard_filter": 0
+        },
+        {
+            "fieldname": "to_date",
+            "fieldtype": "Date",
+            "label": "To Date",
+            "mandatory": 1,
+            "wildcard_filter": 0
+        }
+    ],
+    "query": null,
+    "json": null,
+    "letter_head": null,
+    "roles": [
+        {
+            "role": "System Manager"
+        },
+        {
+            "role": "Tuktuk Manager"
+        },
+        {
+            "role": "Driver"
+        }
+    ]
+}

@@ -107,33 +107,47 @@ def check_and_send_tuktuk_manager_welcome(doc, method=None):
 def check_role_change_and_send_welcome(doc, method=None):
     """
     Hook function called when User is updated
-    Sends welcome email if Tuktuk Manager role is newly added
+    Sends welcome email if Tuktuk Manager role is newly added (only for new users without password)
     """
     try:
         # Only check if this is not a new document
         if not doc.is_new():
             # Get old document to compare roles
             old_doc = doc.get_doc_before_save()
-            
+
             if old_doc:
                 old_roles = set([role.role for role in old_doc.roles])
                 new_roles = set([role.role for role in doc.roles])
-                
+
                 # Check if Tuktuk Manager role was just added
                 if "Tuktuk Manager" in new_roles and "Tuktuk Manager" not in old_roles:
-                    # Generate new password for security
-                    password = generate_secure_password()
-                    doc.new_password = password
-                    
-                    # Send welcome email
-                    send_tuktuk_manager_welcome_email(doc.email, doc.full_name, password)
-                    
-                    frappe.msgprint(
-                        f"✅ Tuktuk Manager welcome email sent to {doc.email}",
-                        title="Welcome Email Sent",
-                        indicator="green"
-                    )
-                    
+                    # Check if user already has a password (existing user)
+                    # If they have an existing password, don't send welcome email
+                    if frappe.db.get_value("User", doc.name, "password"):
+                        frappe.msgprint(
+                            f"ℹ️ Tuktuk Manager role added to {doc.email}. No welcome email sent for existing user.",
+                            title="Role Added",
+                            indicator="blue"
+                        )
+                        frappe.log_error(
+                            "Role Change - No Welcome Email",
+                            f"Tuktuk Manager role added to existing user {doc.email}. Welcome email skipped."
+                        )
+                    else:
+                        # Only for users without password (new/inactive users)
+                        # Generate new password
+                        password = generate_secure_password()
+                        doc.new_password = password
+
+                        # Send welcome email
+                        send_tuktuk_manager_welcome_email(doc.email, doc.full_name, password)
+
+                        frappe.msgprint(
+                            f"✅ Tuktuk Manager welcome email sent to {doc.email}",
+                            title="Welcome Email Sent",
+                            indicator="green"
+                        )
+
     except Exception as e:
         frappe.log_error(f"Failed to send welcome email on role change: {str(e)}")
 

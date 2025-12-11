@@ -24,15 +24,17 @@ def boot_session(bootinfo):
     # Check user roles and set appropriate redirects
     user_roles = frappe.get_roles(frappe.session.user)
     
-    # Priority-based redirect system
+    # Priority-based redirect system - TukTuk Driver has highest priority
+    # IMPORTANT: Check TukTuk Driver FIRST, before any other role checks
     if "TukTuk Driver" in user_roles:
-        # TukTuk Drivers go to their dashboard
-        if not frappe.local.request or not frappe.local.request.path.startswith('/tuktuk-driver-dashboard'):
-            bootinfo.tuktuk_redirect = "/tuktuk-driver-dashboard"
-            bootinfo.tuktuk_redirect_role = "TukTuk Driver"
+        # TukTuk Drivers ALWAYS go to their dashboard, regardless of other roles
+        bootinfo.tuktuk_redirect = "/tuktuk-driver-dashboard"
+        bootinfo.tuktuk_redirect_role = "TukTuk Driver"
+        # Log for debugging
+        frappe.logger().info(f"TukTuk Driver redirect set for user: {frappe.session.user}")
     
     elif "Tuktuk Manager" in user_roles:
-        # TukTuk Managers go to management workspace
+        # TukTuk Managers go to management workspace (only if not a driver)
         if not frappe.local.request or not frappe.local.request.path.startswith('/app/tuktuk-management'):
             bootinfo.tuktuk_redirect = "/app/tuktuk-management"
             bootinfo.tuktuk_redirect_role = "Tuktuk Manager"
@@ -40,11 +42,13 @@ def boot_session(bootinfo):
     elif "System Manager" in user_roles:
         # System Managers can choose, but default to TukTuk management if they have that role too
         # First check if they also have TukTuk Manager role, if not, assign it
+        # BUT: Only do this if they are NOT a TukTuk Driver
         try:
             user = frappe.get_doc("User", frappe.session.user)
             user_roles_list = [role.role for role in user.roles]
             
-            if "Tuktuk Manager" not in user_roles_list:
+            # Double-check: ensure we don't redirect System Managers who are also Drivers
+            if "TukTuk Driver" not in user_roles_list and "Tuktuk Manager" not in user_roles_list:
                 user.append("roles", {"role": "Tuktuk Manager"})
                 user.save(ignore_permissions=True)
                 # After adding role, redirect to TukTuk management

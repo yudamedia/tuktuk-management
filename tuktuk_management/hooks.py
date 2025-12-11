@@ -13,7 +13,8 @@ app_include_js = [
     "/assets/tuktuk_management/js/tuktuk_management.js",
     "/assets/tuktuk_management/js/tuktuk_tracker.js",
     "/assets/tuktuk_management/js/csv_telemetry_upload.js",
-    "assets/tuktuk_management/js/tuktuk_transaction_list.js"
+    "/assets/tuktuk_management/js/tuktuk_transaction_list.js",
+    "/assets/tuktuk_management/js/tuktuk_driver_redirect.js"
 ]
 
 app_icon = "octicon octicon-file-directory"
@@ -95,11 +96,22 @@ whitelisted_methods = [
     "tuktuk_management.api.tuktuk.generate_deposit_report",
     "tuktuk_management.api.tuktuk.process_bulk_refunds",
 
+    # Balance reconciliation methods
+    "tuktuk_management.api.tuktuk.reconcile_driver_balance",
+    "tuktuk_management.api.tuktuk.fix_driver_balance",
+    "tuktuk_management.api.tuktuk.reconcile_all_drivers_balances",
+
     # User management methods
     "tuktuk_management.api.user_management.create_tuktuk_manager_user",
     "tuktuk_management.api.user_management.resend_welcome_email",
     "tuktuk_management.api.user_management.check_and_send_tuktuk_manager_welcome",
-    "tuktuk_management.api.user_management.check_role_change_and_send_welcome"
+    "tuktuk_management.api.user_management.check_role_change_and_send_welcome",
+
+    # SMS notification methods
+    "tuktuk_management.api.sms_notifications.test_sms_to_driver",
+    "tuktuk_management.api.sms_notifications.get_sms_status",
+    "tuktuk_management.api.sms_notifications.get_all_drivers_for_broadcast",
+    "tuktuk_management.api.sms_notifications.send_broadcast_sms"
 ]
 
 # Email templates
@@ -110,9 +122,8 @@ email_template_dirs = [
 
 # Document Events
 doc_events = {
-    "TukTuk Transaction": {
-        "after_insert": "tuktuk_management.api.tuktuk.handle_mpesa_payment_with_deposit"
-    },
+    # Removed after_insert hook for TukTuk Transaction to prevent double payments
+    # All payment processing is handled by mpesa_confirmation webhook with proper idempotency checks
     "TukTuk Driver": {
         "validate": "tuktuk_management.api.tuktuk.validate_driver",
         "on_update": "tuktuk_management.api.tuktuk.handle_driver_update"
@@ -131,25 +142,32 @@ doc_events = {
 # Scheduled Tasks
 scheduler_events = {
     "cron": {
-        # Reset daily targets at midnight
+        # Reset daily targets at midnight EAT 
         "0 0 * * *": [
             "tuktuk_management.api.tuktuk.reset_daily_targets_with_deposit",
             "tuktuk_management.api.tuktuk.end_operating_hours"
         ],
-        # Check for operating hours at 6 AM
-        "0 6 * * *": [
+        # Check for operating hours at 6 AM EAT
+        "0 3 * * *": [
             "tuktuk_management.api.tuktuk.start_operating_hours"
         ],
         # Update vehicle statuses every 5 minutes (now this method exists!)
-        "*/5 * * * *": [
-            "tuktuk_management.api.telematics.update_all_vehicle_statuses"
+        #"*/5 * * * *": [
+        #    "tuktuk_management.api.telematics.update_all_vehicle_statuses"
+        #],
+        # SMS reminders at specific times (East Africa Time - UTC+3)
+        "0 13 * * *": [  # 13 PM EAT (10 AM UTC)
+            "tuktuk_management.api.sms_notifications.send_driver_target_reminder"
+        ],
+        "0 18 * * *": [  # 6 PM EAT (3 PM UTC)
+            "tuktuk_management.api.sms_notifications.send_driver_target_reminder"
+        ],
+        "0 22 * * *": [  # 10 PM EAT (7 PM UTC)
+            "tuktuk_management.api.sms_notifications.send_driver_target_reminder"
         ]
     },
     "hourly": [
         "tuktuk_management.api.tuktuk.check_battery_levels"
-    ],
-    "daily": [
-        "tuktuk_management.api.tuktuk.generate_daily_reports"
     ]
 }
 
@@ -159,7 +177,8 @@ after_install = "tuktuk_management.setup.install.after_install"
 # Client Scripts
 doctype_js = {
     "TukTuk Vehicle": "public/js/tuktuk_vehicle.js",
-    "TukTuk Driver": "public/js/tuktuk_driver.js"
+    "TukTuk Driver": "public/js/tuktuk_driver.js",
+    "TukTuk Daily Report": "tuktuk_management/doctype/tuktuk_daily_report/tuktuk_daily_report.js"
 }
 
 doctype_list_js = {
@@ -223,6 +242,7 @@ reports = [
 # Website Routes - Add the new TukTuk driver dashboard route
 website_route_rules = [
     {"from_route": "/tuktuk-driver-dashboard", "to_route": "tuktuk_driver_dashboard"},
+    {"from_route": "/sms-broadcast", "to_route": "sms_broadcast"},
 ]
 
 # Portal settings for TukTuk drivers

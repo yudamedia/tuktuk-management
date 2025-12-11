@@ -176,7 +176,7 @@
         <div style="display: flex; justify-content: space-between; align-items: center;">
             <div>
                 <h1>Welcome, {{ tuktuk_driver.name }}!</h1>
-                <p style="color: #666; margin: 0;">{{ frappe.format_date(frappe.utils.today()) }}</p>
+                <p style="color: #666; margin: 0;">{{ today_date }}</p>
             </div>
             <!-- <div>
                 <a href="/app" class="btn btn-primary">Full Dashboard</a>
@@ -258,7 +258,7 @@
         {% for rental in rentals %}
         <div class="alert alert-info">
             <strong>🚗 Renting TukTuk:</strong> {{ rental.rented_tuktuk }}<br>
-            <strong>Started:</strong> {{ frappe.format_datetime(rental.start_time) }}<br>
+            <strong>Started:</strong> {{ rental.start_time_formatted }}<br>
             <strong>Rental Fee:</strong> KSH {{ "{:,.0f}".format(rental.rental_fee) }}
         </div>
         {% endfor %}
@@ -301,7 +301,7 @@
                 <tbody>
                     {% for transaction in transactions %}
                     <tr>
-                        <td>{{ frappe.format_datetime(transaction.timestamp) }}</td>
+                        <td>{{ transaction.timestamp_formatted }}</td>
                         <td class="amount">KSH {{ "{:,.0f}".format(transaction.amount) }}</td>
                         <td class="amount">KSH {{ "{:,.0f}".format(transaction.driver_share) }}</td>
                         <td>KSH {{ "{:,.0f}".format(transaction.target_contribution) }}</td>

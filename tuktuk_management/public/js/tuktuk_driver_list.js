@@ -61,6 +61,106 @@ frappe.listview_settings['TukTuk Driver'] = {
                     }
                 );
             });
+            
+            // Add balance reconciliation check (Admin only)
+            listview.page.add_menu_item(__('Reconciliation Check'), function() {
+                frappe.call({
+                    method: 'tuktuk_management.api.tuktuk.reconcile_all_drivers_balances',
+                    callback: function(r) {
+                        if (r.message) {
+                            const result = r.message;
+                            const has_issues = result.drivers_with_discrepancies > 0;
+                            
+                            // Show results dialog
+                            let message = `
+                                <div style="padding: 15px;">
+                                    <h4>Reconciliation Results</h4>
+                                    <table class="table table-bordered" style="margin-top: 10px;">
+                                        <tr>
+                                            <td><strong>Total Drivers:</strong></td>
+                                            <td>${result.total_drivers}</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Drivers Checked:</strong></td>
+                                            <td>${result.drivers_checked}</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Drivers with Discrepancies:</strong></td>
+                                            <td style="color: ${has_issues ? 'red' : 'green'}">
+                                                ${result.drivers_with_discrepancies}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Total Discrepancy Amount:</strong></td>
+                                            <td>${result.total_discrepancy_amount} KSH</td>
+                                        </tr>
+                                    </table>
+                            `;
+                            
+                            if (has_issues) {
+                                message += `
+                                    <div class="alert alert-warning" style="margin-top: 15px;">
+                                        <strong>Drivers with issues:</strong>
+                                        <ul style="margin-top: 10px;">
+                                `;
+                                result.results.forEach(driver => {
+                                    if (driver.discrepancy !== 0) {
+                                        message += `
+                                            <li>
+                                                ${driver.driver} (${driver.driver_name}): 
+                                                <strong>${Math.abs(driver.discrepancy)} KSH</strong> 
+                                                ${driver.discrepancy > 0 ? 'extra' : 'missing'}
+                                            </li>
+                                        `;
+                                    }
+                                });
+                                message += `</ul></div>`;
+                            }
+                            
+                            message += `</div>`;
+                            
+                            const d = new frappe.ui.Dialog({
+                                title: __('Balance Reconciliation Check'),
+                                fields: [
+                                    {
+                                        fieldtype: 'HTML',
+                                        fieldname: 'results',
+                                        options: message
+                                    }
+                                ],
+                                primary_action_label: has_issues ? __('Auto-Fix All Discrepancies') : __('Close'),
+                                primary_action: function() {
+                                    if (has_issues) {
+                                        frappe.confirm(
+                                            __('Fix all {0} driver balances automatically?', [result.drivers_with_discrepancies]),
+                                            function() {
+                                                frappe.call({
+                                                    method: 'tuktuk_management.api.tuktuk.reconcile_all_drivers_balances',
+                                                    args: { auto_fix: true },
+                                                    callback: function(fix_r) {
+                                                        if (fix_r.message) {
+                                                            frappe.msgprint({
+                                                                title: __('Reconciliation Complete'),
+                                                                message: __('Fixed {0} driver balances', [fix_r.message.drivers_with_discrepancies]),
+                                                                indicator: 'green'
+                                                            });
+                                                            listview.refresh();
+                                                            d.hide();
+                                                        }
+                                                    }
+                                                });
+                                            }
+                                        );
+                                    } else {
+                                        d.hide();
+                                    }
+                                }
+                            });
+                            d.show();
+                        }
+                    }
+                });
+            });
         }
     },
     

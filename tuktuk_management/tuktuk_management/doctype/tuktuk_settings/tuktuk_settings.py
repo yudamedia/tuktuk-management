@@ -12,10 +12,10 @@ class TukTukSettings(Document):
             # Additional validation can be added here
             pass
             
-        # Ensure global targets are positive
+        # Always ensure global targets are positive (target tracking continues regardless of sharing setting)
         if self.global_daily_target and self.global_daily_target <= 0:
             frappe.throw("Global daily target must be greater than 0")
-            
+
         if self.global_fare_percentage and (self.global_fare_percentage <= 0 or self.global_fare_percentage > 100):
             frappe.throw("Global fare percentage must be between 1 and 100")
             
@@ -29,6 +29,27 @@ class TukTukSettings(Document):
         # Validate bonus settings
         if self.bonus_enabled and self.bonus_amount and self.bonus_amount <= 0:
             frappe.throw("Bonus amount must be greater than 0 when bonus is enabled")
+        
+        # Validate SMS provider settings
+        if self.enable_sms_notifications:
+            sms_provider = self.sms_provider or "TextBee"
+            
+            if sms_provider == "TextBee":
+                api_key = self.get_password("textbee_api_key")
+                if not api_key:
+                    frappe.throw("TextBee API Key is required when SMS notifications are enabled and TextBee is selected as the provider")
+            
+            elif sms_provider == "TextSMS":
+                api_key = self.get_password("textsms_api_key")
+                partner_id = self.textsms_partner_id
+                sender_id = self.textsms_sender_id
+                
+                if not api_key:
+                    frappe.throw("TextSMS API Key is required when SMS notifications are enabled and TextSMS is selected as the provider")
+                if not partner_id:
+                    frappe.throw("TextSMS Partner ID is required when SMS notifications are enabled and TextSMS is selected as the provider")
+                if not sender_id:
+                    frappe.throw("TextSMS Sender ID is required when SMS notifications are enabled and TextSMS is selected as the provider")
     
     def on_update(self):
         """

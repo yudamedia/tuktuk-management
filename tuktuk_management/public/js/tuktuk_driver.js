@@ -30,6 +30,7 @@ frappe.ui.form.on('TukTuk Driver', {
             setup_custom_buttons(frm);
             setup_indicators(frm);
             setup_deposit_indicators(frm);
+            setup_account_management_buttons(frm);
         }
         
         // Handle deposit field dependencies
@@ -160,6 +161,10 @@ function setup_custom_buttons(frm) {
             assign_tuktuk(frm);
         }, __('Actions'));
     } else {
+        frm.add_custom_button(__('Reassign TukTuk'), function() {
+            reassign_tuktuk(frm);
+        }, __('Actions'));
+        
         frm.add_custom_button(__('Unassign TukTuk'), function() {
             unassign_tuktuk(frm);
         }, __('Actions'));
@@ -207,12 +212,59 @@ function setup_custom_buttons(frm) {
         frm.add_custom_button(__('Reset Consecutive Misses'), function() {
             reset_consecutive_misses(frm);
         }, __('Admin'));
+        
+        frm.add_custom_button(__('Record Overpayment Adjustment'), function() {
+            record_overpayment_adjustment(frm);
+        }, __('Admin'));
+        
+        frm.add_custom_button(__('Uncaptured Payments'), function() {
+            process_uncaptured_payment(frm);
+        }, __('Admin'));
+        
+        frm.add_custom_button(__('Transaction Verification'), function() {
+            show_transaction_verification(frm);
+        }, __('Admin'));
     }
+    
+    // SMS Driver button (visible to managers)
+    if (frappe.user.has_role(['System Manager', 'Tuktuk Manager'])) {
+        frm.add_custom_button(__('SMS Driver'), function() {
+            send_sms_to_driver(frm);
+        }, __('Communications'));
+    }
+
+    // Manual withdrawal button (visible when instant payouts are effectively disabled)
+    const driverPref = frm.doc.instant_payout_override || 'Follow Global';
+    frappe.call({
+        method: 'frappe.client.get_value',
+        args: { doctype: 'TukTuk Settings', fieldname: 'instant_payouts_enabled' },
+        callback: function(r) {
+            const globalInstant = (r && r.message && r.message.instant_payouts_enabled) ? 1 : 0;
+            let instantEnabled = false;
+            if (driverPref === 'Enable') instantEnabled = true;
+            else if (driverPref === 'Disable') instantEnabled = false;
+            else instantEnabled = !!globalInstant;
+
+            if (!instantEnabled && frappe.user.has_role(['System Manager', 'Tuktuk Manager'])) {
+                frm.add_custom_button(__('Withdraw Balance'), function() {
+                    withdraw_balance(frm);
+                }, __('Payments'));
+            }
+        }
+    });
 }
 
 function setup_indicators(frm) {
-    // Clear existing indicators
-    frm.dashboard.clear_indicators();
+    // Clear existing indicators - use safe method
+    if (frm.dashboard && typeof frm.dashboard.clear_indicators === 'function') {
+        frm.dashboard.clear_indicators();
+    } else {
+        // Fallback: manually clear indicators if method doesn't exist
+        const indicators = frm.dashboard?.wrapper?.find('.indicator');
+        if (indicators && indicators.length) {
+            indicators.remove();
+        }
+    }
     
     // Add target status indicator
     const target = frm.doc.daily_target || 3000; // Default target
@@ -335,6 +387,51 @@ function unassign_tuktuk(frm) {
             });
         }
     );
+}
+
+function reassign_tuktuk(frm) {
+    const current_tuktuk = frm.doc.assigned_tuktuk;
+    
+    frappe.prompt([
+        {
+            label: 'New TukTuk',
+            fieldname: 'tuktuk',
+            fieldtype: 'Link',
+            options: 'TukTuk Vehicle',
+            reqd: 1,
+            get_query: function() {
+                return {
+                    filters: {
+                        'status': 'Available',
+                        'name': ['!=', current_tuktuk]  // Exclude current tuktuk
+                    }
+                };
+            }
+        }
+    ], function(values) {
+        if (!values.tuktuk) {
+            frappe.msgprint(__('Please select a TukTuk'));
+            return;
+        }
+        
+        if (values.tuktuk === current_tuktuk) {
+            frappe.msgprint(__('Please select a different TukTuk'));
+            return;
+        }
+        
+        frappe.confirm(
+            __('Reassign driver to new TukTuk? Balance and target tracking will be preserved during operating hours.'),
+            function() {
+                // Directly update the assigned_tuktuk field
+                // The backend handle_tuktuk_assignment will detect this is a reassignment
+                // (old_value exists AND new_value exists) and preserve balance during operating hours
+                frm.set_value('assigned_tuktuk', values.tuktuk);
+                frm.save().then(function() {
+                    frappe.msgprint(__('TukTuk reassigned successfully. Balance and target tracking preserved.'));
+                });
+            }
+        );
+    }, __('Reassign TukTuk'), __('Reassign'));
 }
 
 function check_tuktuk_status(frm) {
@@ -549,7 +646,7 @@ function reset_target_balance(frm) {
             fieldname: 'balance',
             fieldtype: 'Currency',
             default: 0,
-            reqd: 1
+            description: 'Enter 0 to reset to zero, or any other amount'
         },
         {
             label: 'Reason',
@@ -558,21 +655,36 @@ function reset_target_balance(frm) {
             reqd: 1
         }
     ], function(values) {
-        frm.set_value('current_balance', values.balance);
-        frm.save();
+        // Validate that balance field is provided (including 0)
+        if (values.balance === null || values.balance === undefined || values.balance === '') {
+            frappe.throw(__('Please enter a balance value'));
+            return;
+        }
         
+        // Explicitly handle 0 values to ensure they're properly saved
+        const balance = parseFloat(values.balance);
+        
+        // Additional validation: ensure it's a valid number
+        if (isNaN(balance)) {
+            frappe.throw(__('Please enter a valid number'));
+            return;
+        }
+        
+        frm.set_value('current_balance', balance);
+        frm.save();
+
         // Add comment for audit trail
         frappe.call({
             method: 'frappe.desk.form.utils.add_comment',
             args: {
                 reference_doctype: frm.doctype,
                 reference_name: frm.docname,
-                content: `Target balance reset to ${values.balance} KSH. Reason: ${values.reason}`,
+                content: `Target balance reset to ${balance} KSH. Reason: ${values.reason}`,
                 comment_email: frappe.session.user,
                 comment_by: frappe.session.user_fullname
             }
         });
-        
+
         frappe.msgprint(__('Target balance reset successfully'));
     }, __('Reset Target Balance'), __('Reset'));
 }
@@ -607,28 +719,17 @@ function reset_consecutive_misses(frm) {
 // Add these functions to the existing tuktuk_driver.js file
 
 function setup_account_management_buttons(frm) {
-    // Only show for System Manager and Tuktuk Manager
-    if (frappe.user.has_role(['System Manager', 'Tuktuk Manager'])) {
-        
-        if (!frm.doc.user_account) {
-            // Driver doesn't have an account - show create button
-            frm.add_custom_button(__('Create User Account'), function() {
-                create_driver_account(frm);
-            }, __('Account Management'));
-        } else {
-            // Driver has an account - show management options
-            frm.add_custom_button(__('Reset Password'), function() {
-                reset_driver_password(frm);
-            }, __('Account Management'));
-            
-            frm.add_custom_button(__('Disable Account'), function() {
-                disable_driver_account(frm);
-            }, __('Account Management'));
-            
-            frm.add_custom_button(__('View Login Details'), function() {
-                view_login_details(frm);
-            }, __('Account Management'));
-        }
+    // Add User Account button for all users (not just managers)
+    if (!frm.doc.user_account) {
+        // Driver doesn't have an account - show create button
+        frm.add_custom_button(__('User Account'), function() {
+            create_driver_account(frm);
+        }, __('Actions'));
+    } else {
+        // Driver has an account - show button to open user document
+        frm.add_custom_button(__('User Account'), function() {
+            open_user_document(frm);
+        }, __('Actions'));
     }
 }
 
@@ -636,12 +737,11 @@ function create_driver_account(frm) {
     frappe.confirm(
         __('Create a user account for {0}? This will allow them to login and access the driver portal.', [frm.doc.driver_name]),
         function() {
+            // Yes - create account
             frappe.call({
-                method: 'tuktuk_management.api.driver_auth.create_driver_user_account',
+                method: 'tuktuk_management.api.driver_auth.create_tuktuk_driver_user_account',
                 args: {
-                    driver_name: frm.doc.name,
-                    email: frm.doc.driver_email,
-                    phone: frm.doc.driver_primary_phone
+                    tuktuk_driver_name: frm.doc.name
                 },
                 callback: function(r) {
                     if (r.message) {
@@ -650,11 +750,27 @@ function create_driver_account(frm) {
                             message: __('User account created successfully! Login credentials have been prepared for SMS.'),
                             indicator: 'green'
                         });
+                        // After reload, the button will change to open user document
                     }
+                },
+                error: function(r) {
+                    frappe.show_alert({
+                        message: __('Failed to create user account: {0}', [r.message || 'Unknown error']),
+                        indicator: 'red'
+                    });
                 }
             });
         }
     );
+}
+
+function open_user_document(frm) {
+    if (frm.doc.user_account) {
+        // Open the linked user document
+        frappe.set_route('Form', 'User', frm.doc.user_account);
+    } else {
+        frappe.msgprint(__('No user account linked to this driver.'));
+    }
 }
 
 function reset_driver_password(frm) {
@@ -764,6 +880,13 @@ frappe.listview_settings['TukTuk Driver'] = {
             label: 'Tuktuk Management',
             route: '/app/tuktuk-management'
         });
+        
+        // Add SMS Drivers button (prominently in action dropdown)
+        if (frappe.user.has_role(['System Manager', 'Tuktuk Manager'])) {
+            listview.page.add_action_item(__('SMS Drivers'), function() {
+                show_bulk_sms_dialog(listview);
+            });
+        }
         
         // Add bulk account creation button
         if (frappe.user.has_role(['System Manager', 'Tuktuk Manager'])) {
@@ -886,4 +1009,667 @@ function show_driver_accounts_dialog(accounts) {
         message: html,
         indicator: 'blue'
     });
+}
+
+function record_overpayment_adjustment(frm) {
+    frappe.prompt([
+        {
+            label: 'Adjustment Amount (KSH)',
+            fieldname: 'amount',
+            fieldtype: 'Currency',
+            reqd: 1,
+            description: 'Enter negative amount for overpayment corrections (e.g., -1250)'
+        },
+        {
+            label: 'Description/Reason',
+            fieldname: 'description',
+            fieldtype: 'Small Text',
+            reqd: 1,
+            description: 'Explain the reason for this adjustment'
+        }
+    ], function(values) {
+        if (!values.amount || values.amount == 0) {
+            frappe.msgprint(__('Please enter a valid adjustment amount'));
+            return;
+        }
+        
+        frappe.confirm(
+            __('Create adjustment transaction for {0} KSH? This will not trigger any payment to the driver.', [values.amount]),
+            function() {
+                frappe.call({
+                    method: 'tuktuk_management.api.tuktuk.create_adjustment_transaction',
+                    args: {
+                        driver: frm.doc.name,
+                        tuktuk: frm.doc.assigned_tuktuk || '',
+                        amount: values.amount,
+                        description: values.description
+                    },
+                    callback: function(r) {
+                        if (r.message && r.message.success) {
+                            frappe.msgprint({
+                                title: __('Adjustment Transaction Created'),
+                                message: r.message.message,
+                                indicator: 'green'
+                            });
+                            
+                            // Refresh the form to show updated data
+                            frm.reload_doc();
+                        } else {
+                            frappe.msgprint(__('Failed to create adjustment transaction'));
+                        }
+                    }
+                });
+            }
+        );
+    }, __('Record Overpayment Adjustment'), __('Create'));
+}
+
+function process_uncaptured_payment(frm) {
+    // Check if driver has assigned TukTuk
+    if (!frm.doc.assigned_tuktuk) {
+        frappe.msgprint(__('Driver must have an assigned TukTuk to record uncaptured payments'));
+        return;
+    }
+    
+    frappe.prompt([
+        {
+            label: 'M-Pesa Transaction Number',
+            fieldname: 'transaction_id',
+            fieldtype: 'Data',
+            reqd: 1,
+            description: 'Enter the M-Pesa transaction code (e.g., SH12ABC3XY)'
+        },
+        {
+            label: 'Customer Phone Number',
+            fieldname: 'customer_phone',
+            fieldtype: 'Data',
+            reqd: 1,
+            description: 'Enter customer phone number (e.g., 254712345678)'
+        },
+        {
+            label: 'Amount Paid (KSH)',
+            fieldname: 'amount',
+            fieldtype: 'Currency',
+            reqd: 1,
+            description: 'Enter the amount paid by the customer'
+        }
+    ], function(values) {
+        // Validate inputs
+        if (!values.transaction_id || !values.customer_phone || !values.amount || values.amount <= 0) {
+            frappe.msgprint(__('Please provide valid transaction details'));
+            return;
+        }
+        
+        // Show dialog with two action buttons
+        let d = new frappe.ui.Dialog({
+            title: __('Process Uncaptured Payment'),
+            fields: [
+                {
+                    fieldtype: 'HTML',
+                    fieldname: 'payment_details',
+                    options: `
+                        <div style="padding: 15px; background-color: #f8f9fa; border-radius: 5px; margin-bottom: 15px;">
+                            <h4 style="margin-top: 0;">Payment Details</h4>
+                            <table style="width: 100%;">
+                                <tr>
+                                    <td style="padding: 5px;"><strong>Transaction ID:</strong></td>
+                                    <td style="padding: 5px;">${values.transaction_id}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 5px;"><strong>Customer Phone:</strong></td>
+                                    <td style="padding: 5px;">${values.customer_phone}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 5px;"><strong>Amount:</strong></td>
+                                    <td style="padding: 5px;">KSH ${values.amount}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 5px;"><strong>Driver:</strong></td>
+                                    <td style="padding: 5px;">${frm.doc.driver_name}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 5px;"><strong>TukTuk:</strong></td>
+                                    <td style="padding: 5px;">${frm.doc.assigned_tuktuk}</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div style="padding: 10px; background-color: #fff3cd; border-radius: 5px; margin-bottom: 15px;">
+                            <strong>Choose Action:</strong>
+                            <ul style="margin: 10px 0;">
+                                <li><strong>Send Driver Share:</strong> Calculate driver share based on fare percentage and send via M-Pesa B2C</li>
+                                <li><strong>Deposit Driver Share:</strong> Add full amount to driver's target balance (no M-Pesa payment)</li>
+                            </ul>
+                        </div>
+                    `
+                }
+            ],
+            primary_action_label: __('Send Driver Share'),
+            primary_action: function() {
+                d.hide();
+                process_uncaptured_payment_action(frm, values, 'send_share');
+            },
+            secondary_action_label: __('Deposit Driver Share'),
+            secondary_action: function() {
+                d.hide();
+                process_uncaptured_payment_action(frm, values, 'deposit_share');
+            }
+        });
+        
+        d.show();
+    }, __('Uncaptured Payment'), __('Next'));
+}
+
+function process_uncaptured_payment_action(frm, payment_data, action_type) {
+    let action_label = action_type === 'send_share' ? 'Send Driver Share' : 'Deposit Driver Share';
+    let confirmation_msg = action_type === 'send_share' 
+        ? __('This will calculate the driver share and send payment via M-Pesa B2C. Continue?')
+        : __('This will add the full amount to the driver\'s target balance without sending M-Pesa payment. Continue?');
+    
+    frappe.confirm(
+        confirmation_msg,
+        function() {
+            frappe.call({
+                method: 'tuktuk_management.api.tuktuk.process_uncaptured_payment',
+                args: {
+                    driver: frm.doc.name,
+                    tuktuk: frm.doc.assigned_tuktuk,
+                    transaction_id: payment_data.transaction_id,
+                    customer_phone: payment_data.customer_phone,
+                    amount: payment_data.amount,
+                    action_type: action_type
+                },
+                callback: function(r) {
+                    if (r.message && r.message.success) {
+                        frappe.msgprint({
+                            title: __('Uncaptured Payment Processed'),
+                            message: r.message.message,
+                            indicator: 'green'
+                        });
+                        
+                        // Refresh the form to show updated data
+                        frm.reload_doc();
+                    } else {
+                        frappe.msgprint({
+                            title: __('Processing Failed'),
+                            message: r.message ? r.message.error : __('Failed to process uncaptured payment'),
+                            indicator: 'red'
+                        });
+                    }
+                },
+                error: function(r) {
+                    frappe.msgprint({
+                        title: __('Error'),
+                        message: __('An error occurred while processing the payment'),
+                        indicator: 'red'
+                    });
+                }
+            });
+        }
+    );
+}
+
+function show_transaction_verification(frm) {
+    frappe.call({
+        method: 'tuktuk_management.api.tuktuk.reconcile_driver_balance',
+        args: {
+            driver_name: frm.doc.name
+        },
+        callback: function(r) {
+            if (r.message) {
+                const result = r.message;
+                const has_discrepancy = result.discrepancy !== 0;
+                
+                // Fetch transactions
+                frappe.call({
+                    method: 'frappe.client.get_list',
+                    args: {
+                        doctype: 'TukTuk Transaction',
+                        filters: {
+                            driver: frm.doc.name,
+                            timestamp: ['>=', frappe.datetime.get_today() + ' 06:00:00'],
+                            payment_status: 'Completed',
+                            transaction_type: ['not in', ['Adjustment', 'Driver Repayment']]
+                        },
+                        fields: ['transaction_id', 'amount', 'target_contribution', 'timestamp'],
+                        order_by: 'timestamp asc',
+                        limit_page_length: 500
+                    },
+                    callback: function(txn_r) {
+                        let message = `
+                            <div style="padding: 15px;">
+                                <h4>Balance Verification</h4>
+                                <table class="table table-bordered" style="margin-top: 10px;">
+                                    <tr>
+                                        <td><strong>Current Balance:</strong></td>
+                                        <td>${result.old_balance} KSH</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Calculated Balance:</strong></td>
+                                        <td>${result.calculated_balance} KSH</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Discrepancy:</strong></td>
+                                        <td style="color: ${has_discrepancy ? 'red' : 'green'}; font-weight: bold;">
+                                            ${Math.abs(result.discrepancy)} KSH ${result.discrepancy !== 0 ? (result.discrepancy > 0 ? 'extra' : 'missing') : ''}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Transactions Today:</strong></td>
+                                        <td>${result.transactions_count}</td>
+                                    </tr>
+                                </table>
+                        `;
+                        
+                        if (txn_r.message && txn_r.message.length > 0) {
+                            message += `
+                                <h5 style="margin-top: 20px;">Today's Transactions</h5>
+                                <table class="table table-bordered table-sm" style="margin-top: 10px; font-size: 0.9em;">
+                                    <thead>
+                                        <tr>
+                                            <th>Time</th>
+                                            <th>Transaction ID</th>
+                                            <th>Amount</th>
+                                            <th>Target Contribution</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                            `;
+                            
+                            txn_r.message.forEach(txn => {
+                                const time = frappe.datetime.str_to_user(txn.timestamp).split(' ')[1];
+                                message += `
+                                    <tr>
+                                        <td>${time}</td>
+                                        <td>${txn.transaction_id}</td>
+                                        <td>${txn.amount} KSH</td>
+                                        <td><strong>${txn.target_contribution} KSH</strong></td>
+                                    </tr>
+                                `;
+                            });
+                            
+                            message += `
+                                    </tbody>
+                                </table>
+                            `;
+                        } else {
+                            message += `
+                                <div class="alert alert-info" style="margin-top: 15px;">
+                                    No transactions found for today.
+                                </div>
+                            `;
+                        }
+                        
+                        if (has_discrepancy) {
+                            message += `
+                                <div class="alert alert-warning" style="margin-top: 15px;">
+                                    <strong>⚠️ Discrepancy Detected:</strong><br>
+                                    ${result.message}
+                                </div>
+                            `;
+                        }
+                        
+                        message += `</div>`;
+                        
+                        const d = new frappe.ui.Dialog({
+                            title: __('Transaction Verification - {0}', [frm.doc.driver_name]),
+                            size: 'large',
+                            fields: [
+                                {
+                                    fieldtype: 'HTML',
+                                    fieldname: 'verification_results',
+                                    options: message
+                                }
+                            ],
+                            primary_action_label: has_discrepancy ? __('Fix Balance') : __('Close'),
+                            primary_action: function() {
+                                if (has_discrepancy) {
+                                    frappe.confirm(
+                                        __('Fix this driver\'s balance? This will update from {0} KSH to {1} KSH',
+                                           [result.old_balance, result.calculated_balance]),
+                                        function() {
+                                            frappe.call({
+                                                method: 'tuktuk_management.api.tuktuk.fix_driver_balance',
+                                                args: {
+                                                    driver_name: frm.doc.name,
+                                                    auto_fix: true
+                                                },
+                                                callback: function(fix_r) {
+                                                    if (fix_r.message && fix_r.message.success) {
+                                                        frappe.msgprint({
+                                                            title: __('Balance Fixed'),
+                                                            message: fix_r.message.message,
+                                                            indicator: 'green'
+                                                        });
+                                                        frm.reload_doc();
+                                                        d.hide();
+                                                    }
+                                                }
+                                            });
+                                        }
+                                    );
+                                } else {
+                                    d.hide();
+                                }
+                            }
+                        });
+                        d.show();
+                    }
+                });
+            }
+        }
+    });
+}
+
+// SMS Communication Functions
+
+function send_sms_to_driver(frm) {
+    // Check if driver has mpesa number
+    if (!frm.doc.mpesa_number) {
+        frappe.msgprint(__('Driver does not have an M-Pesa number configured'));
+        return;
+    }
+    
+    // Create dialog for SMS composition
+    let d = new frappe.ui.Dialog({
+        title: __('Send SMS to {0}', [frm.doc.driver_name]),
+        fields: [
+            {
+                fieldtype: 'HTML',
+                fieldname: 'available_fields',
+                options: `
+                    <div style="padding: 10px; background-color: #f8f9fa; border-radius: 5px; margin-bottom: 15px;">
+                        <strong>Available Fields:</strong>
+                        <p style="margin: 5px 0; font-size: 0.9em;">
+                            <code>{driver_name}</code>, 
+                            <code>{left_to_target}</code>, 
+                            <code>{current_balance}</code>, 
+                            <code>{daily_target}</code>, 
+                            <code>{assigned_tuktuk}</code>, 
+                            <code>{mpesa_number}</code>, 
+                            <code>{mpesa_paybill}</code>, 
+                            <code>{mpesa_account}</code>, 
+                            <code>{current_deposit_balance}</code>
+                        </p>
+                        <p style="margin: 5px 0; font-size: 0.85em; color: #666;">
+                            Use these placeholders in your message. They will be replaced with actual values.
+                        </p>
+                    </div>
+                `
+            },
+            {
+                label: 'Message',
+                fieldname: 'message',
+                fieldtype: 'Small Text',
+                reqd: 1,
+                description: 'Compose your SMS message. Use field placeholders like {driver_name} or {left_to_target}'
+            },
+            {
+                fieldtype: 'HTML',
+                fieldname: 'preview',
+                options: '<div id="sms-preview" style="padding: 10px; background-color: #e9ecef; border-radius: 5px; margin-top: 10px;"></div>'
+            }
+        ],
+        primary_action_label: __('Send SMS'),
+        primary_action: function(values) {
+            if (!values.message || !values.message.trim()) {
+                frappe.msgprint(__('Please enter a message'));
+                return;
+            }
+            
+            frappe.call({
+                method: 'tuktuk_management.api.sms_notifications.send_driver_sms_with_fields',
+                args: {
+                    driver_name: frm.doc.name,
+                    message_template: values.message
+                },
+                callback: function(r) {
+                    if (r.message && r.message.success) {
+                        frappe.msgprint({
+                            title: __('SMS Sent'),
+                            message: __('SMS sent successfully to {0}', [frm.doc.driver_name]),
+                            indicator: 'green'
+                        });
+                        d.hide();
+                    } else {
+                        frappe.msgprint({
+                            title: __('SMS Failed'),
+                            message: r.message ? r.message.message : __('Failed to send SMS'),
+                            indicator: 'red'
+                        });
+                    }
+                }
+            });
+        }
+    });
+    
+    // Fetch additional data for preview
+    frappe.call({
+        method: 'frappe.client.get_value',
+        args: {
+            doctype: 'TukTuk Settings',
+            fieldname: 'mpesa_paybill'
+        },
+        callback: function(r) {
+            if (r.message && r.message.mpesa_paybill) {
+                frm.doc.mpesa_paybill = r.message.mpesa_paybill;
+            }
+        }
+    });
+    
+    if (frm.doc.assigned_tuktuk) {
+        frappe.call({
+            method: 'frappe.client.get_value',
+            args: {
+                doctype: 'TukTuk Vehicle',
+                name: frm.doc.assigned_tuktuk,
+                fieldname: 'mpesa_account'
+            },
+            callback: function(r) {
+                if (r.message && r.message.mpesa_account) {
+                    frm.doc.mpesa_account = r.message.mpesa_account;
+                }
+            }
+        });
+    }
+    
+    // Add message preview functionality
+    d.fields_dict.message.$input.on('input', function() {
+        const message = $(this).val();
+        const preview = interpolate_fields(message, frm.doc);
+        $('#sms-preview').html(`<strong>Preview:</strong><br>${preview}`);
+    });
+    
+    d.show();
+}
+
+function interpolate_fields(message, doc) {
+    // Replace field placeholders with actual values
+    let result = message;
+    result = result.replace(/\{driver_name\}/g, doc.driver_name || '');
+    result = result.replace(/\{left_to_target\}/g, flt(doc.left_to_target, 0).toLocaleString());
+    result = result.replace(/\{current_balance\}/g, flt(doc.current_balance, 0).toLocaleString());
+    result = result.replace(/\{daily_target\}/g, flt(doc.daily_target || 3000, 0).toLocaleString());
+    result = result.replace(/\{assigned_tuktuk\}/g, doc.assigned_tuktuk || 'None');
+    result = result.replace(/\{mpesa_number\}/g, doc.mpesa_number || '');
+    result = result.replace(/\{mpesa_paybill\}/g, doc.mpesa_paybill || '');
+    result = result.replace(/\{mpesa_account\}/g, doc.mpesa_account || '');
+    result = result.replace(/\{current_deposit_balance\}/g, flt(doc.current_deposit_balance, 0).toLocaleString());
+    return result;
+}
+
+function show_bulk_sms_dialog(listview) {
+    // Get selected drivers or show selector
+    frappe.call({
+        method: 'frappe.client.get_list',
+        args: {
+            doctype: 'TukTuk Driver',
+            fields: ['name', 'driver_name', 'mpesa_number', 'assigned_tuktuk', 'left_to_target', 'current_balance', 'current_deposit_balance'],
+            order_by: 'driver_name asc',
+            limit_page_length: 500
+        },
+        callback: function(r) {
+            if (r.message) {
+                const drivers = r.message;
+                
+                // Create dialog
+                let d = new frappe.ui.Dialog({
+                    title: __('Send SMS to Drivers'),
+                    size: 'large',
+                    fields: [
+                        {
+                            label: 'Select Recipients',
+                            fieldname: 'recipient_type',
+                            fieldtype: 'Select',
+                            options: 'All Drivers\nAll Assigned Drivers\nAll Unassigned Drivers\nDrivers with Remaining Target\nSelect Specific Drivers',
+                            default: 'All Drivers',
+                            reqd: 1,
+                            onchange: function() {
+                                const type = d.get_value('recipient_type');
+                                d.get_field('selected_drivers').df.hidden = (type !== 'Select Specific Drivers');
+                                d.get_field('selected_drivers').refresh();
+                            }
+                        },
+                        {
+                            label: 'Select Drivers',
+                            fieldname: 'selected_drivers',
+                            fieldtype: 'MultiSelectList',
+                            hidden: 1,
+                            options: drivers.map(d => ({
+                                value: d.name,
+                                label: `${d.driver_name} (${d.mpesa_number || 'No Phone'})`
+                            })),
+                            get_data: function() {
+                                return drivers.map(d => ({
+                                    value: d.name,
+                                    label: `${d.driver_name} - ${d.assigned_tuktuk || 'Unassigned'} - Target Left: ${flt(d.left_to_target, 0)} KSH`,
+                                    description: d.mpesa_number || 'No phone number'
+                                }));
+                            }
+                        },
+                        {
+                            fieldtype: 'HTML',
+                            fieldname: 'available_fields',
+                            options: `
+                                <div style="padding: 10px; background-color: #f8f9fa; border-radius: 5px; margin: 15px 0;">
+                                    <strong>Available Fields:</strong>
+                                    <p style="margin: 5px 0; font-size: 0.9em;">
+                                        <code>{driver_name}</code>, 
+                                        <code>{left_to_target}</code>, 
+                                        <code>{current_balance}</code>, 
+                                        <code>{daily_target}</code>, 
+                                        <code>{assigned_tuktuk}</code>, 
+                                        <code>{mpesa_number}</code>, 
+                                        <code>{mpesa_paybill}</code>, 
+                                        <code>{mpesa_account}</code>, 
+                                        <code>{current_deposit_balance}</code>
+                                    </p>
+                                    <p style="margin: 5px 0; font-size: 0.85em; color: #666;">
+                                        These placeholders will be replaced with each driver's actual values.
+                                    </p>
+                                </div>
+                            `
+                        },
+                        {
+                            label: 'Message',
+                            fieldname: 'message',
+                            fieldtype: 'Small Text',
+                            reqd: 1,
+                            description: 'Compose your SMS message. Use field placeholders like {driver_name} or {left_to_target}'
+                        },
+                        {
+                            fieldtype: 'HTML',
+                            fieldname: 'recipient_count',
+                            options: '<div id="recipient-count" style="padding: 10px; background-color: #e9ecef; border-radius: 5px; margin-top: 10px;"></div>'
+                        }
+                    ],
+                    primary_action_label: __('Send SMS'),
+                    primary_action: function(values) {
+                        if (!values.message || !values.message.trim()) {
+                            frappe.msgprint(__('Please enter a message'));
+                            return;
+                        }
+                        
+                        // Determine driver IDs based on selection
+                        let driver_ids = [];
+                        const type = values.recipient_type;
+                        
+                        if (type === 'All Drivers') {
+                            driver_ids = drivers.map(d => d.name);
+                        } else if (type === 'All Assigned Drivers') {
+                            driver_ids = drivers.filter(d => d.assigned_tuktuk).map(d => d.name);
+                        } else if (type === 'All Unassigned Drivers') {
+                            driver_ids = drivers.filter(d => !d.assigned_tuktuk).map(d => d.name);
+                        } else if (type === 'Drivers with Remaining Target') {
+                            driver_ids = drivers.filter(d => flt(d.left_to_target) > 0).map(d => d.name);
+                        } else if (type === 'Select Specific Drivers') {
+                            driver_ids = values.selected_drivers || [];
+                        }
+                        
+                        if (driver_ids.length === 0) {
+                            frappe.msgprint(__('No drivers selected'));
+                            return;
+                        }
+                        
+                        frappe.confirm(
+                            __('Send SMS to {0} driver(s)?', [driver_ids.length]),
+                            function() {
+                                frappe.call({
+                                    method: 'tuktuk_management.api.sms_notifications.send_bulk_sms_with_fields',
+                                    args: {
+                                        driver_ids: driver_ids,
+                                        message_template: values.message
+                                    },
+                                    callback: function(r) {
+                                        if (r.message && r.message.success) {
+                                            frappe.msgprint({
+                                                title: __('SMS Sent'),
+                                                message: __('Successfully sent: {0}<br>Failed: {1}', 
+                                                    [r.message.success_count, r.message.failure_count]),
+                                                indicator: r.message.failure_count > 0 ? 'orange' : 'green'
+                                            });
+                                            d.hide();
+                                        } else {
+                                            frappe.msgprint({
+                                                title: __('SMS Failed'),
+                                                message: r.message ? r.message.message : __('Failed to send SMS'),
+                                                indicator: 'red'
+                                            });
+                                        }
+                                    }
+                                });
+                            }
+                        );
+                    }
+                });
+                
+                // Update recipient count when selection changes
+                d.fields_dict.recipient_type.$input.on('change', function() {
+                    update_recipient_count(d, drivers);
+                });
+                
+                d.show();
+                update_recipient_count(d, drivers);
+            }
+        }
+    });
+}
+
+function update_recipient_count(dialog, drivers) {
+    const type = dialog.get_value('recipient_type');
+    let count = 0;
+    
+    if (type === 'All Drivers') {
+        count = drivers.length;
+    } else if (type === 'All Assigned Drivers') {
+        count = drivers.filter(d => d.assigned_tuktuk).length;
+    } else if (type === 'All Unassigned Drivers') {
+        count = drivers.filter(d => !d.assigned_tuktuk).length;
+    } else if (type === 'Drivers with Remaining Target') {
+        count = drivers.filter(d => flt(d.left_to_target) > 0).length;
+    } else if (type === 'Select Specific Drivers') {
+        const selected = dialog.get_value('selected_drivers') || [];
+        count = selected.length;
+    }
+    
+    $('#recipient-count').html(`<strong>Recipients:</strong> ${count} driver(s) will receive this SMS`);
 }

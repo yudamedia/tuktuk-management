@@ -38,12 +38,15 @@
   "sim_serial",
   "column_break_cxes",
   "sim_number",
-  "rental_tab",
-  "rental_rates_section",
-  "rental_rate_initial",
-  "column_break_rental",
-  "rental_rate_hourly"
- ],
+ "rental_tab",
+ "rental_rates_section",
+ "rental_rate_initial",
+ "column_break_rental",
+ "rental_rate_hourly",
+ "maintenance_tab",
+ "maintenance_section",
+ "mileage"
+],
  "fields": [
   {
    "description": "SUNNY Call Number",
@@ -266,6 +269,24 @@
   {
    "fieldname": "column_break_cxes",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "maintenance_tab",
+   "fieldtype": "Tab Break",
+   "label": "Maintenance"
+  },
+  {
+   "fieldname": "maintenance_section",
+   "fieldtype": "Section Break",
+   "label": "Vehicle Information"
+  },
+  {
+   "description": "Total mileage/odometer reading from telemetry",
+   "fieldname": "mileage",
+   "fieldtype": "Float",
+   "label": "Mileage (km)",
+   "precision": "2",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,

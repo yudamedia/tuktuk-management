@@ -22,8 +22,15 @@ def create_roles():
             'is_custom': 1
         },
         {
-            'role_name': 'Driver',
+            'role_name': 'TukTuk Driver',
             'description': 'TukTuk driver role for accessing personal dashboard, transactions, and rentals',
+            'desk_access': 1,
+            'notifications': 1,
+            'is_custom': 1
+        },
+        {
+            'role_name': 'Driver',
+            'description': 'Legacy driver role (use TukTuk Driver instead)',
             'desk_access': 1,
             'notifications': 1,
             'is_custom': 1
@@ -106,42 +113,42 @@ def setup_permissions():
             'TukTuk Vehicle': {
                 'Tuktuk Manager': {'read': 1, 'write': 1, 'create': 1, 'delete': 1, 'report': 1, 'export': 1},
                 'Fleet Supervisor': {'read': 1, 'write': 1, 'create': 1, 'delete': 0, 'report': 1, 'export': 1},
-                'Driver': {'read': 1, 'write': 0, 'create': 0, 'delete': 0, 'report': 0, 'export': 0},
+                'TukTuk Driver': {'read': 1, 'write': 0, 'create': 0, 'delete': 0, 'report': 0, 'export': 0},
                 'Finance Officer': {'read': 1, 'write': 0, 'create': 0, 'delete': 0, 'report': 1, 'export': 1},
                 'Operations Viewer': {'read': 1, 'write': 0, 'create': 0, 'delete': 0, 'report': 1, 'export': 0}
             },
             'TukTuk Driver': {
                 'Tuktuk Manager': {'read': 1, 'write': 1, 'create': 1, 'delete': 1, 'report': 1, 'export': 1},
                 'Fleet Supervisor': {'read': 1, 'write': 1, 'create': 1, 'delete': 0, 'report': 1, 'export': 1},
-                'Driver': {'read': 1, 'write': 0, 'create': 0, 'delete': 0, 'report': 0, 'export': 0},
+                'TukTuk Driver': {'read': 1, 'write': 0, 'create': 0, 'delete': 0, 'report': 0, 'export': 0},
                 'Finance Officer': {'read': 1, 'write': 0, 'create': 0, 'delete': 0, 'report': 1, 'export': 1},
                 'Operations Viewer': {'read': 1, 'write': 0, 'create': 0, 'delete': 0, 'report': 1, 'export': 0}
             },
             'TukTuk Transaction': {
                 'Tuktuk Manager': {'read': 1, 'write': 1, 'create': 1, 'delete': 1, 'report': 1, 'export': 1},
                 'Fleet Supervisor': {'read': 1, 'write': 0, 'create': 0, 'delete': 0, 'report': 1, 'export': 1},
-                'Driver': {'read': 1, 'write': 0, 'create': 0, 'delete': 0, 'report': 0, 'export': 0},
+                'TukTuk Driver': {'read': 1, 'write': 0, 'create': 0, 'delete': 0, 'report': 0, 'export': 0},
                 'Finance Officer': {'read': 1, 'write': 1, 'create': 1, 'delete': 0, 'report': 1, 'export': 1},
                 'Operations Viewer': {'read': 1, 'write': 0, 'create': 0, 'delete': 0, 'report': 1, 'export': 0}
             },
             'TukTuk Rental': {
                 'Tuktuk Manager': {'read': 1, 'write': 1, 'create': 1, 'delete': 1, 'report': 1, 'export': 1},
                 'Fleet Supervisor': {'read': 1, 'write': 1, 'create': 1, 'delete': 0, 'report': 1, 'export': 1},
-                'Driver': {'read': 1, 'write': 0, 'create': 1, 'delete': 0, 'report': 0, 'export': 0},
+                'TukTuk Driver': {'read': 1, 'write': 0, 'create': 1, 'delete': 0, 'report': 0, 'export': 0},
                 'Finance Officer': {'read': 1, 'write': 0, 'create': 0, 'delete': 0, 'report': 1, 'export': 1},
                 'Operations Viewer': {'read': 1, 'write': 0, 'create': 0, 'delete': 0, 'report': 1, 'export': 0}
             },
             'TukTuk Settings': {
                 'Tuktuk Manager': {'read': 1, 'write': 1, 'create': 1, 'delete': 0, 'report': 0, 'export': 0},
                 'Fleet Supervisor': {'read': 1, 'write': 0, 'create': 0, 'delete': 0, 'report': 0, 'export': 0},
-                'Driver': {'read': 1, 'write': 0, 'create': 0, 'delete': 0, 'report': 0, 'export': 0},
+                'TukTuk Driver': {'read': 1, 'write': 0, 'create': 0, 'delete': 0, 'report': 0, 'export': 0},
                 'Finance Officer': {'read': 1, 'write': 0, 'create': 0, 'delete': 0, 'report': 0, 'export': 0},
                 'Operations Viewer': {'read': 1, 'write': 0, 'create': 0, 'delete': 0, 'report': 0, 'export': 0}
             },
             'TukTuk Daily Report': {
                 'Tuktuk Manager': {'read': 1, 'write': 1, 'create': 1, 'delete': 1, 'report': 1, 'export': 1},
                 'Fleet Supervisor': {'read': 1, 'write': 0, 'create': 0, 'delete': 0, 'report': 1, 'export': 1},
-                'Driver': {'read': 0, 'write': 0, 'create': 0, 'delete': 0, 'report': 0, 'export': 0},
+                'TukTuk Driver': {'read': 0, 'write': 0, 'create': 0, 'delete': 0, 'report': 0, 'export': 0},
                 'Finance Officer': {'read': 1, 'write': 0, 'create': 0, 'delete': 0, 'report': 1, 'export': 1},
                 'Operations Viewer': {'read': 1, 'write': 0, 'create': 0, 'delete': 0, 'report': 1, 'export': 0}
             }

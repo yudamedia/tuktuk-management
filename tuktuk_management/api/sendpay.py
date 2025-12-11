@@ -69,8 +69,19 @@ def get_access_token():
         frappe.log_error("Production Daraja Token Error", str(e))
         return None
 
-def send_mpesa_payment(mpesa_number, amount, payment_type="FARE"):
-    """Send payment to driver via MPesa B2C using PRODUCTION Daraja API"""
+def send_mpesa_payment(mpesa_number, amount, payment_type="FARE", petty_cash_doc=None):
+    """
+    Send payment via MPesa B2C using PRODUCTION Daraja API
+    
+    Args:
+        mpesa_number: Recipient phone number (254XXXXXXXXX format)
+        amount: Amount to send in KSH
+        payment_type: Type of payment (FARE, PETTY_CASH, RENTAL, BONUS)
+        petty_cash_doc: TukTuk Petty Cash document name (optional, for petty cash payments)
+    
+    Returns:
+        bool: True if payment initiated successfully, False otherwise
+    """
     settings = frappe.get_single("TukTuk Settings")
     access_token = get_access_token()
     
@@ -92,7 +103,7 @@ def send_mpesa_payment(mpesa_number, amount, payment_type="FARE"):
             "Content-Type": "application/json"
         }
         
-        # FIXED: Get production credentials from TukTuk Settings
+        # Get production credentials from TukTuk Settings
         initiator_name = settings.get_password("mpesa_initiator_name")
         security_credential = settings.get_password("mpesa_security_credential")
         
@@ -105,6 +116,16 @@ def send_mpesa_payment(mpesa_number, amount, payment_type="FARE"):
             frappe.log_error("B2C Config Error", "Security credential not configured in TukTuk Settings")
             return False
         
+        # Determine remarks based on payment type
+        remarks_map = {
+            "FARE": "Sunny TukTuk Fare Payment",
+            "PETTY_CASH": "Sunny TukTuk Petty Cash",
+            "RENTAL": "Sunny TukTuk Rental Payment",
+            "BONUS": "Sunny TukTuk Bonus Payment",
+            "TEST": "Sunny TukTuk Test Payment"
+        }
+        remarks = remarks_map.get(payment_type, "Sunny TukTuk Payment")
+        
         payload = {
             "InitiatorName": initiator_name,
             "SecurityCredential": security_credential,
@@ -112,177 +133,189 @@ def send_mpesa_payment(mpesa_number, amount, payment_type="FARE"):
             "Amount": amount,
             "PartyA": settings.mpesa_paybill,
             "PartyB": mpesa_number,
-            "Remarks": f"Sunny TukTuk {payment_type} payment",
-            # FIXED: Updated URLs to point to sendpay.py endpoints
+            "Remarks": remarks,
             "QueueTimeOutURL": f"{frappe.utils.get_url()}/api/method/tuktuk_management.api.sendpay.b2c_timeout",
             "ResultURL": f"{frappe.utils.get_url()}/api/method/tuktuk_management.api.sendpay.b2c_result",
-            "Occasion": "TukTuk Service Payment"
+            "Occasion": f"TukTuk {payment_type} Payment"
         }
         
         response = requests.post(api_url, json=payload, headers=headers, timeout=30)
         result = response.json()
         
         # Log the complete response for debugging
-        frappe.log_error("B2C API Response", f"Status: {response.status_code}, Response: {result}")
+        frappe.log_error("B2C API Response", f"Payment Type: {payment_type}\nResponse: {json.dumps(result, indent=2)}")
         
-        if response.status_code == 200 and result.get("ResponseCode") == "0":
-            frappe.log_error("Production B2C Success", f"B2C payment initiated: {result}")
+        if result.get("ResponseCode") == "0":
+            frappe.log_error(
+                "✅ B2C Payment Initiated",
+                f"Type: {payment_type}\nAmount: {amount}\nPhone: {mpesa_number}\nConversation ID: {result.get('ConversationID')}"
+            )
+            
+            # Update petty cash record if provided
+            if petty_cash_doc and payment_type == "PETTY_CASH":
+                try:
+                    from tuktuk_management.tuktuk_management.doctype.tuktuk_petty_cash.tuktuk_petty_cash import update_mpesa_response
+                    
+                    update_mpesa_response(
+                        docname=petty_cash_doc,
+                        conversation_id=result.get("ConversationID"),
+                        originator_conversation_id=result.get("OriginatorConversationID"),
+                        response_code=result.get("ResponseCode"),
+                        response_description=result.get("ResponseDescription")
+                    )
+                except Exception as e:
+                    frappe.log_error(f"Failed to update petty cash record: {str(e)}")
+            
             return True
         else:
-            frappe.log_error("Production B2C Failed", f"B2C payment failed: {result}")
+            frappe.log_error(
+                "❌ B2C Payment Failed",
+                f"Type: {payment_type}\nResponse Code: {result.get('ResponseCode')}\nDescription: {result.get('ResponseDescription')}"
+            )
             return False
             
     except Exception as e:
-        frappe.log_error("Production B2C Error", f"B2C payment error: {str(e)}")
+        frappe.log_error("B2C Payment Error", f"Type: {payment_type}\nError: {str(e)}")
         return False
 
+
 @frappe.whitelist(allow_guest=True)
-def b2c_result(**kwargs):
-    """Handle B2C payment results with enhanced processing"""
+def b2c_result():
+    """
+    Handle B2C payment result callback from Safaricom
+    This webhook receives the final result of B2C transactions
+    """
     try:
-        # Log the complete response
-        frappe.log_error("Production B2C Result", f"B2C result received: {json.dumps(kwargs, indent=2)}")
+        # Get the JSON payload from Safaricom
+        result_data = frappe.request.get_json()
         
-        # Extract result data
-        result_data = kwargs.get('Result', {})
-        result_type = result_data.get('ResultType')
-        result_code = result_data.get('ResultCode')
-        result_desc = result_data.get('ResultDesc', '')
-        transaction_id = result_data.get('TransactionID', '')
-        conversation_id = result_data.get('ConversationID', '')
+        if not result_data:
+            frappe.log_error("B2C Result: Empty payload received")
+            return {"ResultCode": 1, "ResultDesc": "Empty payload"}
         
-        # Check if payment was successful
-        if result_code == 0:
-            # Payment successful
-            frappe.log_error("B2C Payment Success", f"Payment successful - TransactionID: {transaction_id}")
-            
-            # Extract payment details from ResultParameters
-            result_parameters = result_data.get('ResultParameters', {}).get('ResultParameter', [])
-            payment_details = {}
-            
-            for param in result_parameters:
-                key = param.get('Key', '')
-                value = param.get('Value', '')
-                payment_details[key] = value
-            
-            # Log payment details
-            frappe.log_error("B2C Payment Details", f"Payment details: {json.dumps(payment_details)}")
-            
-            # TODO: Update transaction status in your system
-            # You can use the ConversationID to match with your original request
-            
+        # Log the complete result for debugging
+        frappe.log_error("B2C Result Received", json.dumps(result_data, indent=2))
+        
+        # Extract result parameters
+        result_body = result_data.get("Result", {})
+        conversation_id = result_body.get("ConversationID")
+        originator_conversation_id = result_body.get("OriginatorConversationID")
+        result_code = result_body.get("ResultCode")
+        result_desc = result_body.get("ResultDesc")
+        
+        # Extract transaction ID from result parameters
+        transaction_id = None
+        result_parameters = result_body.get("ResultParameters", {}).get("ResultParameter", [])
+        
+        for param in result_parameters:
+            if param.get("Key") == "TransactionID":
+                transaction_id = param.get("Value")
+                break
+        
+        # Check if this is a petty cash payment
+        petty_cash_records = frappe.get_all(
+            "TukTuk Petty Cash",
+            filters={"mpesa_conversation_id": conversation_id},
+            fields=["name"]
+        )
+        
+        if petty_cash_records:
+            # Update petty cash record
+            try:
+                from tuktuk_management.tuktuk_management.doctype.tuktuk_petty_cash.tuktuk_petty_cash import update_mpesa_result
+                
+                update_mpesa_result(
+                    conversation_id=conversation_id,
+                    result_code=result_code,
+                    transaction_id=transaction_id
+                )
+                frappe.log_error(
+                    "✅ Petty Cash B2C Result Processed",
+                    f"Doc: {petty_cash_records[0].name}\nResult: {result_desc}\nTxn ID: {transaction_id}"
+                )
+            except Exception as e:
+                frappe.log_error(f"Failed to update petty cash result: {str(e)}")
         else:
-            # Payment failed
-            frappe.log_error("B2C Payment Failed", f"Payment failed - Code: {result_code}, Desc: {result_desc}")
-            
-            # TODO: Update transaction status to failed
-            # TODO: Notify driver about payment failure
-            # TODO: Queue for retry or manual processing
+            # Handle other payment types (FARE, RENTAL, BONUS)
+            # Log for now - you can add additional logic here for other payment types
+            frappe.log_error(
+                "B2C Result (Non-Petty Cash)",
+                f"Conversation ID: {conversation_id}\nResult Code: {result_code}\nTransaction ID: {transaction_id}"
+            )
         
-        return {"ResultCode": "0", "ResultDesc": "Success"}
+        # Return success acknowledgment to Safaricom
+        return {
+            "ResultCode": 0,
+            "ResultDesc": "Accepted"
+        }
         
     except Exception as e:
-        frappe.log_error("B2C Result Error", f"Error processing B2C result: {str(e)}")
-        return {"ResultCode": "0", "ResultDesc": "Success"}
+        frappe.log_error("B2C Result Error", str(e))
+        return {
+            "ResultCode": 1,
+            "ResultDesc": f"Error: {str(e)}"
+        }
+
 
 @frappe.whitelist(allow_guest=True)
-def b2c_timeout(**kwargs):
-    """Handle B2C payment timeouts with enhanced processing"""
+def b2c_timeout():
+    """
+    Handle B2C payment timeout callback from Safaricom
+    This is called when the B2C request times out
+    """
     try:
-        # Log the timeout
-        frappe.log_error("Production B2C Timeout", f"B2C timeout received: {json.dumps(kwargs, indent=2)}")
+        timeout_data = frappe.request.get_json()
         
-        # Extract timeout data
-        result_data = kwargs.get('Result', {})
-        conversation_id = result_data.get('ConversationID', '')
-        result_desc = result_data.get('ResultDesc', 'Payment request timed out')
+        if not timeout_data:
+            frappe.log_error("B2C Timeout: Empty payload")
+            return {"ResultCode": 1, "ResultDesc": "Empty payload"}
         
-        # Log timeout details
-        frappe.log_error("B2C Timeout Details", f"ConversationID: {conversation_id}, Description: {result_desc}")
+        frappe.log_error("B2C Timeout Received", json.dumps(timeout_data, indent=2))
         
-        # TODO: Handle timeout scenario
-        # - Mark payment as timed out
-        # - Queue for retry
-        # - Notify relevant parties
+        # Extract timeout parameters
+        result_body = timeout_data.get("Result", {})
+        conversation_id = result_body.get("ConversationID")
+        result_desc = result_body.get("ResultDesc", "Payment request timed out")
         
-        return {"ResultCode": "0", "ResultDesc": "Success"}
+        # Check if this is a petty cash payment
+        petty_cash_records = frappe.get_all(
+            "TukTuk Petty Cash",
+            filters={"mpesa_conversation_id": conversation_id},
+            fields=["name"]
+        )
         
-    except Exception as e:
-        frappe.log_error("B2C Timeout Error", f"Error processing B2C timeout: {str(e)}")
-        return {"ResultCode": "0", "ResultDesc": "Success"}
-
-
-# Function to test webhook endpoints
-@frappe.whitelist()
-def test_b2c_webhooks():
-    """Test B2C webhook endpoints with sample data"""
-    
-    # Test result webhook with success scenario
-    success_data = {
-        "Result": {
-            "ResultType": 0,
+        if petty_cash_records:
+            try:
+                doc = frappe.get_doc("TukTuk Petty Cash", petty_cash_records[0].name)
+                doc.payment_status = "Failed"
+                doc.mpesa_result_code = "408"  # Timeout code
+                doc.save()
+                frappe.db.commit()
+                
+                frappe.log_error(
+                    "⏱️ Petty Cash B2C Timeout",
+                    f"Doc: {petty_cash_records[0].name}\nConversation ID: {conversation_id}"
+                )
+            except Exception as e:
+                frappe.log_error(f"Failed to update petty cash timeout: {str(e)}")
+        else:
+            # Log timeout for other payment types
+            frappe.log_error(
+                "B2C Timeout (Non-Petty Cash)",
+                f"Conversation ID: {conversation_id}\nDescription: {result_desc}"
+            )
+        
+        return {
             "ResultCode": 0,
-            "ResultDesc": "The service request is processed successfully.",
-            "OriginatorConversationID": "29115-34620561-1",
-            "ConversationID": "AG_20191219_00005797af5d7d75f652",
-            "TransactionID": "NLJ7RT61SV",
-            "ResultParameters": {
-                "ResultParameter": [
-                    {"Key": "TransactionAmount", "Value": 100},
-                    {"Key": "TransactionReceipt", "Value": "NLJ7RT61SV"},
-                    {"Key": "ReceiverPartyPublicName", "Value": "254708374149 - John Doe"}
-                ]
-            }
+            "ResultDesc": "Timeout acknowledged"
         }
-    }
-    
-    # Test timeout webhook
-    timeout_data = {
-        "Result": {
-            "ResultType": 1,
-            "ResultCode": 1,
-            "ResultDesc": "The service request has timed out.",
-            "OriginatorConversationID": "29115-34620561-1",
-            "ConversationID": "AG_20191219_00005797af5d7d75f652"
-        }
-    }
-    
-    try:
-        # Test success webhook
-        frappe.msgprint("Testing B2C result webhook...")
-        b2c_result(**success_data)
-        
-        # Test timeout webhook  
-        frappe.msgprint("Testing B2C timeout webhook...")
-        b2c_timeout(**timeout_data)
-        
-        frappe.msgprint("✅ Webhook tests completed. Check Error Log for results.")
         
     except Exception as e:
-        frappe.throw(f"Webhook test failed: {str(e)}")
-
-# Function to check webhook URL accessibility
-@frappe.whitelist()
-def verify_webhook_urls():
-    """Verify that webhook URLs are accessible from external calls"""
-    import requests
-    
-    base_url = frappe.utils.get_url()
-    result_url = f"{base_url}/api/method/tuktuk_management.api.sendpay.b2c_result"
-    timeout_url = f"{base_url}/api/method/tuktuk_management.api.sendpay.b2c_timeout"
-    
-    frappe.msgprint(f"🔗 Your B2C Webhook URLs:")
-    frappe.msgprint(f"Result URL: {result_url}")
-    frappe.msgprint(f"Timeout URL: {timeout_url}")
-    
-    # These URLs should be accessible from external systems (Safaricom)
-    # Make sure your firewall allows incoming connections to these endpoints
-    
-    return {
-        "result_url": result_url,
-        "timeout_url": timeout_url,
-        "accessible": "URLs configured - ensure firewall allows external access"
-    }
+        frappe.log_error("B2C Timeout Error", str(e))
+        return {
+            "ResultCode": 1,
+            "ResultDesc": f"Error: {str(e)}"
+        }
 
 
 # ===== B2C SETUP AND TESTING FUNCTIONS =====
@@ -318,9 +351,9 @@ def setup_b2c_credentials():
 
 @frappe.whitelist()
 def test_b2c_payment():
-    """Test B2C payment with a small amount - FIXED VERSION"""
+    """Test B2C payment with a small amount"""
     try:
-        # Find a test driver - FIXED: Remove status filter that doesn't exist
+        # Find a test driver
         test_driver = frappe.get_all(
             "TukTuk Driver",
             fields=["driver_name", "mpesa_number"],
@@ -390,8 +423,6 @@ def get_b2c_requirements():
     frappe.msgprint(requirements)
     return requirements
 
-
-# Alternative direct test function
 @frappe.whitelist()
 def direct_b2c_test(phone_number=None, amount=1.0):
     """Direct B2C test with specific phone number"""
@@ -430,7 +461,6 @@ def direct_b2c_test(phone_number=None, amount=1.0):
     except Exception as e:
         frappe.throw(f"Direct B2C test failed: {str(e)}")
 
-# Simplified B2C test without database queries
 @frappe.whitelist() 
 def simple_b2c_test():
     """Simple B2C test without querying drivers"""
@@ -440,7 +470,7 @@ def simple_b2c_test():
         test_amount = 1.0
         
         frappe.msgprint(f"🧪 Testing B2C with {test_amount} KSH to {test_phone}")
-        frappe.msgprint("📝 Note: Replace test_phone in the function with your actual number")
+        frappe.msgprint("🔍 Note: Replace test_phone in the function with your actual number")
         
         # Test the B2C payment
         success = send_mpesa_payment(test_phone, test_amount, "SIMPLE_TEST")
@@ -520,4 +550,3 @@ def verify_webhook_urls():
         "timeout_url": timeout_url,
         "status": "URLs configured"
     }
-

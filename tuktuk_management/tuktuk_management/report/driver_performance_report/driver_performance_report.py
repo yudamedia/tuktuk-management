@@ -77,8 +77,8 @@ def get_data(filters):
             COUNT(DISTINCT tt.name) as total_trips,
             SUM(tt.amount) as total_revenue,
             SUM(tt.driver_share) as driver_earnings,
-            (td.current_balance / COALESCE(td.daily_target, 
-                (SELECT global_daily_target FROM `tabTukTuk Settings` LIMIT 1))) * 100 
+            (td.current_balance / COALESCE(td.daily_target,
+                (SELECT global_daily_target FROM `tabTukTuk Settings` LIMIT 1))) * 100
                 as target_progress,
             (SELECT AVG(battery_level) 
              FROM `tabTukTuk Vehicle` 
@@ -91,7 +91,8 @@ def get_data(filters):
         FROM 
             `tabTukTuk Driver` td
         LEFT JOIN 
-            `tabTukTuk Transaction` tt ON td.name = tt.driver
+            `tabTukTuk Transaction` tt ON td.name = tt.driver 
+            AND tt.transaction_type NOT IN ('Adjustment', 'Driver Repayment')  -- Exclude adjustment and repayment transactions
         WHERE 
             {conditions}
         GROUP BY 
