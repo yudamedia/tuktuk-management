@@ -1,12 +1,18 @@
 # -*- coding: utf-8 -*-
 """
-Enhanced M-Pesa Confirmation Webhook Handler for Sunny ID Payments
+Enhanced M-Pesa Confirmation Webhook Handler for Sunny ID Payments - CORRECTED VERSION
+
+CRITICAL FIX:
+- Now uses left_to_target (actual outstanding debt) instead of current_balance
+- left_to_target = daily_target - current_balance (live calculation of what's owed)
+- current_balance = running total of payments toward target
+- left_to_target = exact amount needed to clear daily target
 
 This module adds support for driver repayment via sunny_id as Bill Reference Number.
 When a payment comes in with sunny_id, it:
-1. Reduces driver's current_balance by the amount (up to current_balance)
-2. Any excess goes to deposit balance as "Top Up"
-3. Creates TukTuk Transaction as "Target Reduction/Deposit" type
+1. Reduces driver's left_to_target (outstanding debt) by payment amount
+2. Adds payment to current_balance (running total toward target)
+3. Any excess after clearing left_to_target goes to deposit
 4. No B2C payment is sent
 """
 
@@ -31,12 +37,12 @@ def handle_sunny_id_payment(transaction_id, amount, sunny_id, customer_phone, tr
     try:
         frappe.flags.ignore_permissions = True
         
-        # Find driver by sunny_id
+        # Find driver by sunny_id - CORRECTED: Now fetches left_to_target
         driver_data = frappe.db.get_value(
             "TukTuk Driver",
             {"sunny_id": sunny_id},
-            ["name", "driver_name", "current_balance", "current_deposit_balance", 
-             "assigned_tuktuk", "user"],
+            ["name", "driver_name", "current_balance", "left_to_target", 
+             "current_deposit_balance", "assigned_tuktuk", "user"],
             as_dict=True
         )
         
@@ -67,14 +73,14 @@ def handle_sunny_id_payment(transaction_id, amount, sunny_id, customer_phone, tr
             )
             return {"ResultCode": "0", "ResultDesc": "Success"}
         
-        # Calculate target reduction and deposit amount
-        current_balance = flt(driver_data.current_balance or 0)
+        # CORRECTED: Calculate target reduction based on left_to_target (actual debt)
+        left_to_target = flt(driver_data.left_to_target or 0)
         payment_amount = flt(amount)
         
-        # Target reduction is min of current_balance and payment amount
-        target_reduction = min(current_balance, payment_amount)
+        # Target reduction is min of left_to_target (debt) and payment amount
+        target_reduction = min(left_to_target, payment_amount)
         
-        # Deposited amount is any excess after target reduction
+        # Deposited amount is any excess after clearing debt
         deposited_amount = payment_amount - target_reduction
         
         # Use database savepoint for transaction integrity
@@ -116,16 +122,17 @@ def handle_sunny_id_payment(transaction_id, amount, sunny_id, customer_phone, tr
             
             transaction.insert(ignore_permissions=True)
             
-            # Update driver's current_balance (reduce by target_reduction)
+            # CORRECTED: Update driver's current_balance (ADD payment to running total)
+            # and recalculate left_to_target
             # Use atomic SQL UPDATE to prevent race conditions
             if target_reduction > 0:
                 frappe.db.sql("""
                     UPDATE `tabTukTuk Driver`
-                    SET current_balance = GREATEST(0, current_balance - %s)
+                    SET current_balance = current_balance + %s
                     WHERE name = %s
                 """, (target_reduction, driver_data.name))
                 
-                # Also update left_to_target
+                # Recalculate left_to_target based on new current_balance
                 settings = frappe.get_single("TukTuk Settings")
                 global_target = settings.global_daily_target or 0
                 
@@ -139,7 +146,7 @@ def handle_sunny_id_payment(transaction_id, amount, sunny_id, customer_phone, tr
             
             # Add deposit transaction if there's deposited amount
             if deposited_amount > 0:
-                # Get or create driver document
+                # Get driver document
                 driver_doc = frappe.get_doc("TukTuk Driver", driver_data.name)
                 
                 # Update deposit balance
@@ -147,7 +154,6 @@ def handle_sunny_id_payment(transaction_id, amount, sunny_id, customer_phone, tr
                 driver_doc.current_deposit_balance = new_deposit_balance
                 
                 # Add deposit transaction to child table
-                # This bypasses deposit_required validation as requested
                 driver_doc.append("deposit_transactions", {
                     "transaction_date": getdate(),
                     "transaction_type": "Top Up",
@@ -173,10 +179,19 @@ def handle_sunny_id_payment(transaction_id, amount, sunny_id, customer_phone, tr
                 Driver: {driver_data.driver_name} ({sunny_id})
                 Transaction ID: {transaction_id}
                 Total Amount: {payment_amount} KSH
-                Target Reduction: {target_reduction} KSH
-                Deposited Amount: {deposited_amount} KSH
-                New Current Balance: {current_balance - target_reduction} KSH
-                New Deposit Balance: {flt(driver_data.current_deposit_balance or 0) + deposited_amount} KSH
+                
+                BEFORE:
+                - left_to_target (debt): {left_to_target} KSH
+                - current_balance (total earned): {driver_data.current_balance} KSH
+                
+                APPLIED:
+                - Target Reduction: {target_reduction} KSH
+                - Deposited Amount: {deposited_amount} KSH
+                
+                AFTER:
+                - left_to_target (debt): {left_to_target - target_reduction} KSH
+                - current_balance (total earned): {driver_data.current_balance + target_reduction} KSH
+                - deposit_balance: {flt(driver_data.current_deposit_balance or 0) + deposited_amount} KSH
                 """
             )
             
@@ -252,36 +267,3 @@ def is_sunny_id_format(account_number):
     # Pattern: D followed by 6 digits
     pattern = r'^D\d{6}$'
     return bool(re.match(pattern, account_number.strip().upper()))
-
-
-# Integration function to add to existing mpesa_confirmation webhook
-def integrate_sunny_id_check(transaction_id, amount, account_number, customer_phone, trans_time):
-    """
-    Integration point for existing mpesa_confirmation webhook
-    
-    This should be called BEFORE checking for tuktuk account numbers
-    If account_number is a sunny_id, process it and return immediately
-    
-    Args:
-        transaction_id: M-Pesa transaction ID
-        amount: Payment amount
-        account_number: Bill Reference Number (could be tuktuk or sunny_id)
-        customer_phone: Customer phone
-        trans_time: Transaction time
-        
-    Returns:
-        dict or None: Response if handled, None if not a sunny_id payment
-    """
-    
-    # Check if this is a sunny_id payment
-    if is_sunny_id_format(account_number):
-        return handle_sunny_id_payment(
-            transaction_id=transaction_id,
-            amount=amount,
-            sunny_id=account_number.strip().upper(),
-            customer_phone=customer_phone,
-            trans_time=trans_time
-        )
-    
-    # Not a sunny_id, let regular flow continue
-    return None
