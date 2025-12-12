@@ -1505,7 +1505,7 @@ function show_bulk_sms_dialog(listview) {
         method: 'frappe.client.get_list',
         args: {
             doctype: 'TukTuk Driver',
-            fields: ['name', 'driver_name', 'mpesa_number', 'assigned_tuktuk', 'left_to_target', 'current_balance', 'current_deposit_balance'],
+            fields: ['name', 'driver_name', 'sunny_id', 'mpesa_number', 'assigned_tuktuk', 'left_to_target', 'current_balance', 'current_deposit_balance'],
             order_by: 'driver_name asc',
             limit_page_length: 500
         },
