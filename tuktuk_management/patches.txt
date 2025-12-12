@@ -16,6 +16,7 @@
 
 # tuktuk_management.patches.add_location_fields
 
-tuktuk_management.patches.add_b2c_fields
-tuktuk_management.patches.create_tuktuk_driver_role
-tuktuk_management.patches.fix_tuktuk_driver_permissions
+# tuktuk_management.patches.add_b2c_fields
+# tuktuk_management.patches.create_tuktuk_driver_role
+# tuktuk_management.patches.fix_tuktuk_driver_permissions
+tuktuk_management.patches.add_sunny_id_field

@@ -1673,3 +1673,34 @@ function update_recipient_count(dialog, drivers) {
     
     $('#recipient-count').html(`<strong>Recipients:</strong> ${count} driver(s) will receive this SMS`);
 }
+
+// Sunny ID 
+frappe.ui.form.on("TukTuk Driver", {
+    refresh(frm) {
+        // Auto-generate Sunny ID on form load if document is saved but field is empty
+        if (frm.doc.name && !frm.doc.sunny_id && frm.doc.name.startsWith('DRV-')) {
+            const sunny_id = generate_sunny_id(frm.doc.name);
+            frm.set_value('sunny_id', sunny_id);
+        }
+    },
+    
+    onload(frm) {
+        // Set Sunny ID on initial load
+        if (frm.doc.name && !frm.doc.sunny_id && frm.doc.name.startsWith('DRV-')) {
+            const sunny_id = generate_sunny_id(frm.doc.name);
+            frm.set_value('sunny_id', sunny_id);
+        }
+    }
+});
+
+function generate_sunny_id(driver_name) {
+    /**
+     * Transform DRV-112### to D112###
+     * @param {string} driver_name - The driver document name (e.g., "DRV-112001")
+     * @returns {string} - The Sunny ID (e.g., "D112001")
+     */
+    if (driver_name && driver_name.startsWith('DRV-')) {
+        return 'D' + driver_name.replace('DRV-', '');
+    }
+    return '';
+}

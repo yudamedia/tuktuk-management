@@ -2,6 +2,11 @@
 
 frappe.listview_settings['TukTuk Driver'] = {
     onload: function(listview) {
+        // Hide the ID (name) column
+        $(document).ready(function() {
+            $('th:contains("ID"), td:contains("ID")').hide();  // Adjust this selector as needed
+        });
+        
         // Add breadcrumb
         frappe.breadcrumbs.add({
             type: 'Custom',

@@ -17,12 +17,22 @@ class TukTukDriver(Document):
         
     def before_save(self):
         self.set_full_name()
+        self.generate_sunny_id()
         self.handle_deposit_changes()
         self.update_left_to_target()
         
     def set_full_name(self):
         parts = [self.driver_first_name, self.driver_middle_name, self.driver_last_name]
         self.driver_name = ' '.join(filter(None, parts))
+
+    def generate_sunny_id(self):
+        """
+        Generate Sunny ID from document name
+        Transforms DRV-112### to D112###
+        """
+        if self.name and self.name.startswith("DRV-"):
+            # Strip "DRV-" and add "D" prefix
+            self.sunny_id = "D" + self.name.replace("DRV-", "")    
         
     def update_left_to_target(self):
         """Calculate and update the countdown to daily target"""
