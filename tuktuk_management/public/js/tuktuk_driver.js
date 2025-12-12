@@ -1381,6 +1381,7 @@ function send_sms_to_driver(frm) {
                         <strong>Available Fields:</strong>
                         <p style="margin: 5px 0; font-size: 0.9em;">
                             <code>{driver_name}</code>, 
+                            <code>{sunny_id}</code>,
                             <code>{left_to_target}</code>, 
                             <code>{current_balance}</code>, 
                             <code>{daily_target}</code>, 
@@ -1486,6 +1487,7 @@ function interpolate_fields(message, doc) {
     // Replace field placeholders with actual values
     let result = message;
     result = result.replace(/\{driver_name\}/g, doc.driver_name || '');
+    result = result.replace(/\{sunny_id\}/g, doc.sunny_id || '');
     result = result.replace(/\{left_to_target\}/g, flt(doc.left_to_target, 0).toLocaleString());
     result = result.replace(/\{current_balance\}/g, flt(doc.current_balance, 0).toLocaleString());
     result = result.replace(/\{daily_target\}/g, flt(doc.daily_target || 3000, 0).toLocaleString());
@@ -1554,6 +1556,7 @@ function show_bulk_sms_dialog(listview) {
                                     <strong>Available Fields:</strong>
                                     <p style="margin: 5px 0; font-size: 0.9em;">
                                         <code>{driver_name}</code>, 
+                                        <code>{sunny_id}</code>,
                                         <code>{left_to_target}</code>, 
                                         <code>{current_balance}</code>, 
                                         <code>{daily_target}</code>, 

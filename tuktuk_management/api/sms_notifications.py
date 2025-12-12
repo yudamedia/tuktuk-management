@@ -576,6 +576,7 @@ def send_driver_sms_with_fields(driver_name, message_template):
         # Interpolate fields in the message
         message = message_template
         message = message.replace("{driver_name}", driver.driver_name or "")
+        message = message.replace("{sunny_id}", driver.sunny_id or "")
         message = message.replace("{left_to_target}", f"{flt(driver.left_to_target, 0):,.0f}")
         message = message.replace("{current_balance}", f"{flt(driver.current_balance, 0):,.0f}")
         message = message.replace("{daily_target}", f"{daily_target:,.0f}")
@@ -644,7 +645,7 @@ def send_bulk_sms_with_fields(driver_ids, message_template):
         drivers = frappe.get_all(
             "TukTuk Driver",
             filters={"name": ["in", driver_ids]},
-            fields=["name", "driver_name", "mpesa_number", "left_to_target", "current_balance", "daily_target", "assigned_tuktuk", "current_deposit_balance"]
+            fields=["name", "driver_name", "sunny_id", "mpesa_number", "left_to_target", "current_balance", "daily_target", "assigned_tuktuk", "current_deposit_balance"]
         )
         
         if not drivers:
@@ -688,6 +689,7 @@ def send_bulk_sms_with_fields(driver_ids, message_template):
             daily_target = flt(driver.get("daily_target") or global_target)
             message = message_template
             message = message.replace("{driver_name}", driver_name_str)
+            message = message.replace("{sunny_id}", driver.get("sunny_id") or "")
             message = message.replace("{left_to_target}", f"{flt(driver.get('left_to_target'), 0):,.0f}")
             message = message.replace("{current_balance}", f"{flt(driver.get('current_balance'), 0):,.0f}")
             message = message.replace("{daily_target}", f"{daily_target:,.0f}")

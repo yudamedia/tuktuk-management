@@ -50,6 +50,7 @@ You can use these placeholders in your messages. They will be automatically repl
 | Placeholder | Description | Example Output |
 |------------|-------------|----------------|
 | `{driver_name}` | Full name of the driver | "John Doe" |
+| `{sunny_id}` | Driver's Sunny ID | "D112001" |
 | `{left_to_target}` | Amount remaining to reach daily target | "1,250" |
 | `{current_balance}` | Current target balance | "1,750" |
 | `{daily_target}` | Driver's daily target amount | "3,000" |
