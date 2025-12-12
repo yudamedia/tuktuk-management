@@ -8,6 +8,12 @@ import requests
 import base64
 import json
 
+from tuktuk_management.api.sunny_id_payment_handler import (
+    handle_sunny_id_payment,
+    is_sunny_id_format,
+    parse_mpesa_trans_time
+)
+
 # Import B2C payment function from sendpay module
 from tuktuk_management.api.sendpay import send_mpesa_payment
 
@@ -50,22 +56,22 @@ def validate_mpesa_number_string(mpesa_number):
         
     return True
 
-def parse_mpesa_trans_time(trans_time_str):
-    """Parse M-Pesa TransTime format (YYYYMMDDHHmmss) to datetime object"""
-    if not trans_time_str:
-        return now_datetime()
+# def parse_mpesa_trans_time(trans_time_str):
+#     """Parse M-Pesa TransTime format (YYYYMMDDHHmmss) to datetime object"""
+#     if not trans_time_str:
+#         return now_datetime()
     
-    try:
-        # M-Pesa format: YYYYMMDDHHmmss (e.g., "20250101153053")
-        if len(trans_time_str) == 14:
-            dt = datetime.strptime(trans_time_str, '%Y%m%d%H%M%S')
-            return get_datetime(dt)
-        else:
-            # If format is unexpected, return current time
-            return now_datetime()
-    except (ValueError, TypeError):
-        # If parsing fails, return current time
-        return now_datetime()
+#     try:
+#         # M-Pesa format: YYYYMMDDHHmmss (e.g., "20250101153053")
+#         if len(trans_time_str) == 14:
+#             dt = datetime.strptime(trans_time_str, '%Y%m%d%H%M%S')
+#             return get_datetime(dt)
+#         else:
+#             # If format is unexpected, return current time
+#             return now_datetime()
+#     except (ValueError, TypeError):
+#         # If parsing fails, return current time
+#         return now_datetime()
 
 def is_within_operating_hours():
     """Check if current time is within operating hours"""
@@ -240,6 +246,43 @@ def mpesa_validation(**kwargs):
         
         if not account_number:
             return {"ResultCode": "C2B00012", "ResultDesc": "Account number required"}
+
+        # === NEW: Validate sunny_id format ===
+        if is_sunny_id_format(account_number):
+            # Check if driver exists with this sunny_id
+            driver_exists = frappe.db.exists("TukTuk Driver", {"sunny_id": account_number.strip().upper()})
+            if not driver_exists:
+                # Log failed transaction
+                try:
+                    frappe.flags.ignore_permissions = True
+                    transaction_id = kwargs.get('TransID', f"VAL-{frappe.utils.now_datetime().strftime('%Y%m%d%H%M%S')}-{account_number}")
+                    trans_time = kwargs.get('TransTime', '')
+                    
+                    failed_log = frappe.get_doc({
+                        "doctype": "Failed Transaction Log",
+                        "transaction_id": transaction_id,
+                        "customer_phone": phone,
+                        "amount": amount,
+                        "transaction_time": parse_mpesa_trans_time(trans_time),
+                        "account_number": account_number,
+                        "failure_stage": "Validation",
+                        "status": "Failed"
+                    })
+                    failed_log.insert(ignore_permissions=True)
+                    frappe.db.commit()
+                except Exception as log_error:
+                    frappe.log_error(f"Failed to log failed transaction: {str(log_error)}")
+                
+                return {"ResultCode": "C2B00012", "ResultDesc": f"Invalid sunny ID: {account_number}"}
+            
+            # Check if driver has assigned tuktuk
+            driver = frappe.db.get_value("TukTuk Driver", {"sunny_id": account_number.strip().upper()}, "assigned_tuktuk")
+            if not driver:
+                return {"ResultCode": "C2B00012", "ResultDesc": "Driver has no assigned tuktuk"}
+            
+            # Sunny ID is valid, return success
+            return {"ResultCode": "0", "ResultDesc": "Success"}
+        # === END NEW CODE ===            
         
         # Check if tuktuk exists
         tuktuk_exists = frappe.db.exists("TukTuk Vehicle", {"mpesa_account": account_number})
@@ -305,6 +348,17 @@ def mpesa_confirmation(**kwargs):
             frappe.log_error("Duplicate Transaction Prevented", 
                             f"Transaction {transaction_id} already processed. Skipping duplicate.")
             return {"ResultCode": "0", "ResultDesc": "Success"}
+
+        # === NEW: Check if this is a sunny_id payment ===
+        if is_sunny_id_format(account_number):
+            return handle_sunny_id_payment(
+                transaction_id=transaction_id,
+                amount=amount,
+                sunny_id=account_number.strip().upper(),
+                customer_phone=customer_phone,
+                trans_time=trans_time
+            )
+        # === END NEW CODE ===            
         
         # Find the tuktuk
         tuktuk = frappe.db.get_value("TukTuk Vehicle", {"mpesa_account": account_number}, "name")

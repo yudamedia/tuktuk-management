@@ -32,7 +32,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Transaction Type",
-   "options": "Payment\nAdjustment\nDriver Repayment"
+   "options": "Payment\nAdjustment\nDriver Repayment\nTarget Reduction/Deposit"
   },
   {
    "fieldname": "tuktuk",
@@ -105,12 +105,21 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2024-12-03 17:19:05.118748",
+ "modified": "2025-12-12 06:42:42.069612",
  "modified_by": "Administrator",
  "module": "Tuktuk Management",
  "name": "TukTuk Transaction",
  "owner": "Administrator",
  "permissions": [
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "TukTuk Driver",
+   "share": 1
+  },
   {
    "create": 1,
    "email": 1,
@@ -127,6 +136,7 @@
    "role": "Driver"
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],
