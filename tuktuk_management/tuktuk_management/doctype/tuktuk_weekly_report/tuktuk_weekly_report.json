@@ -244,6 +244,11 @@
       "label": "Days Included"
      },
      {
+      "fieldname": "daily_target_contributions_breakdown",
+      "fieldtype": "Long Text",
+      "label": "Daily Target Contributions Breakdown"
+     },
+     {
       "fieldname": "section_break_report",
       "fieldtype": "Section Break",
       "label": "Full Report"

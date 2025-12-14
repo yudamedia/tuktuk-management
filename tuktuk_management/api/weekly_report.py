@@ -144,6 +144,17 @@ def generate_weekly_report(week_start_date=None, week_end_date=None, save_to_db=
         # Days included
         days_included = ", ".join([str(dr.report_date) for dr in daily_reports])
         
+        # Create daily target contributions breakdown
+        daily_breakdown_lines = []
+        for dr in sorted(daily_reports, key=lambda x: x.report_date, reverse=True):
+            # Format date as DD-MM-YYYY
+            date_str = dr.report_date.strftime("%d-%m-%Y") if hasattr(dr.report_date, 'strftime') else str(dr.report_date)
+            total_drivers = int(dr.total_drivers or 0)
+            target_contrib = flt(dr.total_target_contribution or 0)
+            daily_breakdown_lines.append(f"{date_str} : {total_drivers} : Sh {target_contrib:,.0f}")
+        
+        daily_target_contributions_breakdown = "\n".join(daily_breakdown_lines)
+        
         # Generate report text
         report_text = f"""
 📊 SUNNY TUKTUK WEEKLY REPORT - {week_start_date} to {week_end_date}
@@ -207,6 +218,7 @@ def generate_weekly_report(week_start_date=None, week_end_date=None, save_to_db=
             "worst_day_revenue": worst_day_revenue,
             "days_included": days_included,
             "days_count": days_count,
+            "daily_target_contributions_breakdown": daily_target_contributions_breakdown,
             "report_text": report_text
         }
         
@@ -254,6 +266,7 @@ def generate_weekly_report(week_start_date=None, week_end_date=None, save_to_db=
                 weekly_report.worst_day_revenue = worst_day_revenue
                 weekly_report.days_included = days_included
                 weekly_report.days_count = days_count
+                weekly_report.daily_target_contributions_breakdown = daily_target_contributions_breakdown
                 weekly_report.report_text = report_text
                 weekly_report.generated_at = frappe.utils.now()
                 
