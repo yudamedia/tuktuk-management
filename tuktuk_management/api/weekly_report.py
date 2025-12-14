@@ -25,13 +25,29 @@ def generate_weekly_report(week_start_date=None, week_end_date=None, save_to_db=
             days_since_sunday = (today.weekday() + 1) % 7  # Monday=0, Sunday=6
             week_start_date = add_days(today, -days_since_sunday - 7)  # Last Sunday
         else:
-            week_start_date = getdate(week_start_date)
+            # Convert string to date if needed
+            if isinstance(week_start_date, str):
+                week_start_date = getdate(week_start_date)
+            else:
+                week_start_date = getdate(week_start_date)
         
         if not week_end_date:
             # End date is Saturday (6 days after Sunday)
             week_end_date = add_days(week_start_date, 6)
         else:
-            week_end_date = getdate(week_end_date)
+            # Convert string to date if needed
+            if isinstance(week_end_date, str):
+                week_end_date = getdate(week_end_date)
+            else:
+                week_end_date = getdate(week_end_date)
+        
+        # Validate date range
+        if week_end_date < week_start_date:
+            frappe.throw(f"week_end_date ({week_end_date}) cannot be before week_start_date ({week_start_date})")
+        
+        # Ensure we have date objects, not datetime
+        week_start_date = getdate(week_start_date)
+        week_end_date = getdate(week_end_date)
         
         # Get all daily reports for the week
         daily_reports = frappe.get_all(
