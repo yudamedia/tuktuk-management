@@ -1,0 +1,307 @@
+{
+    "actions": [],
+    "creation": "2025-12-09 12:00:00.000000",
+    "doctype": "DocType",
+    "engine": "InnoDB",
+    "field_order": [
+     "week_start_date",
+     "week_end_date",
+     "section_break_financial",
+     "total_revenue",
+     "total_driver_share",
+     "column_break_1",
+     "total_target_contribution",
+     "total_transactions",
+     "avg_daily_revenue",
+     "avg_daily_transactions",
+     "section_break_driver_performance",
+     "avg_drivers_at_target",
+     "avg_total_drivers",
+     "column_break_2",
+     "avg_target_achievement_rate",
+     "avg_inactive_drivers",
+     "unique_active_drivers",
+     "section_break_attention",
+     "drivers_below_target_this_week",
+     "drivers_below_target_list",
+     "column_break_3",
+     "drivers_at_risk_this_week",
+     "drivers_at_risk_list",
+     "section_break_fleet",
+     "avg_active_tuktuks",
+     "avg_available_tuktuks",
+     "column_break_4",
+     "avg_charging_tuktuks",
+     "section_break_insights",
+     "best_performing_day",
+     "best_day_revenue",
+     "column_break_5",
+     "worst_performing_day",
+     "worst_day_revenue",
+     "days_included",
+     "section_break_report",
+     "report_text",
+     "section_break_metadata",
+     "generated_at",
+     "days_count"
+    ],
+    "fields": [
+     {
+      "fieldname": "week_start_date",
+      "fieldtype": "Date",
+      "in_list_view": 1,
+      "label": "Week Start Date",
+      "reqd": 1
+     },
+     {
+      "fieldname": "week_end_date",
+      "fieldtype": "Date",
+      "in_list_view": 1,
+      "label": "Week End Date",
+      "reqd": 1
+     },
+     {
+      "fieldname": "section_break_financial",
+      "fieldtype": "Section Break",
+      "label": "Financial Summary"
+     },
+     {
+      "default": "0",
+      "fieldname": "total_revenue",
+      "fieldtype": "Currency",
+      "in_list_view": 1,
+      "label": "Total Weekly Revenue",
+      "reqd": 1
+     },
+     {
+      "default": "0",
+      "fieldname": "total_driver_share",
+      "fieldtype": "Currency",
+      "label": "Total Weekly Driver Share",
+      "reqd": 1
+     },
+     {
+      "fieldname": "column_break_1",
+      "fieldtype": "Column Break"
+     },
+     {
+      "default": "0",
+      "fieldname": "total_target_contribution",
+      "fieldtype": "Currency",
+      "label": "Total Weekly Target Contribution",
+      "reqd": 1
+     },
+     {
+      "default": "0",
+      "fieldname": "total_transactions",
+      "fieldtype": "Int",
+      "label": "Total Weekly Transactions",
+      "reqd": 1
+     },
+     {
+      "default": "0",
+      "fieldname": "avg_daily_revenue",
+      "fieldtype": "Currency",
+      "label": "Average Daily Revenue"
+     },
+     {
+      "default": "0",
+      "fieldname": "avg_daily_transactions",
+      "fieldtype": "Float",
+      "label": "Average Daily Transactions"
+     },
+     {
+      "fieldname": "section_break_driver_performance",
+      "fieldtype": "Section Break",
+      "label": "Driver Performance"
+     },
+     {
+      "default": "0",
+      "fieldname": "avg_drivers_at_target",
+      "fieldtype": "Float",
+      "label": "Average Drivers at Target"
+     },
+     {
+      "default": "0",
+      "fieldname": "avg_total_drivers",
+      "fieldtype": "Float",
+      "label": "Average Total Drivers"
+     },
+     {
+      "fieldname": "column_break_2",
+      "fieldtype": "Column Break"
+     },
+     {
+      "default": "0",
+      "fieldname": "avg_target_achievement_rate",
+      "fieldtype": "Percent",
+      "label": "Average Target Achievement Rate"
+     },
+     {
+      "default": "0",
+      "fieldname": "avg_inactive_drivers",
+      "fieldtype": "Float",
+      "label": "Average Inactive Drivers"
+     },
+     {
+      "default": "0",
+      "fieldname": "unique_active_drivers",
+      "fieldtype": "Int",
+      "label": "Unique Active Drivers (Week)"
+     },
+     {
+      "fieldname": "section_break_attention",
+      "fieldtype": "Section Break",
+      "label": "Needs Attention"
+     },
+     {
+      "default": "0",
+      "fieldname": "drivers_below_target_this_week",
+      "fieldtype": "Int",
+      "label": "Drivers Below Target This Week"
+     },
+     {
+      "fieldname": "drivers_below_target_list",
+      "fieldtype": "Long Text",
+      "label": "Drivers Below Target List"
+     },
+     {
+      "fieldname": "column_break_3",
+      "fieldtype": "Column Break"
+     },
+     {
+      "default": "0",
+      "fieldname": "drivers_at_risk_this_week",
+      "fieldtype": "Int",
+      "label": "Drivers At Risk This Week"
+     },
+     {
+      "fieldname": "drivers_at_risk_list",
+      "fieldtype": "Long Text",
+      "label": "Drivers At Risk List"
+     },
+     {
+      "fieldname": "section_break_fleet",
+      "fieldtype": "Section Break",
+      "label": "Fleet Status"
+     },
+     {
+      "default": "0",
+      "fieldname": "avg_active_tuktuks",
+      "fieldtype": "Float",
+      "label": "Average Active TukTuks"
+     },
+     {
+      "default": "0",
+      "fieldname": "avg_available_tuktuks",
+      "fieldtype": "Float",
+      "label": "Average Available TukTuks"
+     },
+     {
+      "fieldname": "column_break_4",
+      "fieldtype": "Column Break"
+     },
+     {
+      "default": "0",
+      "fieldname": "avg_charging_tuktuks",
+      "fieldtype": "Float",
+      "label": "Average Charging TukTuks"
+     },
+     {
+      "fieldname": "section_break_insights",
+      "fieldtype": "Section Break",
+      "label": "Weekly Insights"
+     },
+     {
+      "fieldname": "best_performing_day",
+      "fieldtype": "Date",
+      "label": "Best Performing Day"
+     },
+     {
+      "default": "0",
+      "fieldname": "best_day_revenue",
+      "fieldtype": "Currency",
+      "label": "Best Day Revenue"
+     },
+     {
+      "fieldname": "column_break_5",
+      "fieldtype": "Column Break"
+     },
+     {
+      "fieldname": "worst_performing_day",
+      "fieldtype": "Date",
+      "label": "Worst Performing Day"
+     },
+     {
+      "default": "0",
+      "fieldname": "worst_day_revenue",
+      "fieldtype": "Currency",
+      "label": "Worst Day Revenue"
+     },
+     {
+      "fieldname": "days_included",
+      "fieldtype": "Long Text",
+      "label": "Days Included"
+     },
+     {
+      "fieldname": "section_break_report",
+      "fieldtype": "Section Break",
+      "label": "Full Report"
+     },
+     {
+      "fieldname": "report_text",
+      "fieldtype": "Long Text",
+      "label": "Report Text"
+     },
+     {
+      "fieldname": "section_break_metadata",
+      "fieldtype": "Section Break",
+      "label": "Metadata"
+     },
+     {
+      "fieldname": "generated_at",
+      "fieldtype": "Datetime",
+      "label": "Generated At"
+     },
+     {
+      "default": "0",
+      "fieldname": "days_count",
+      "fieldtype": "Int",
+      "label": "Days Count"
+     }
+    ],
+    "index_web_pages_for_search": 1,
+    "links": [],
+    "modified": "2025-12-09 12:00:00.000000",
+    "modified_by": "Administrator",
+    "module": "Tuktuk Management",
+    "name": "TukTuk Weekly Report",
+    "owner": "Administrator",
+    "permissions": [
+     {
+      "create": 1,
+      "delete": 1,
+      "email": 1,
+      "export": 1,
+      "print": 1,
+      "read": 1,
+      "report": 1,
+      "role": "System Manager",
+      "share": 1,
+      "write": 1
+     },
+     {
+      "email": 1,
+      "export": 1,
+      "print": 1,
+      "read": 1,
+      "report": 1,
+      "role": "Tuktuk Manager",
+      "share": 1
+     }
+    ],
+    "sort_field": "modified",
+    "sort_order": "DESC",
+    "states": [],
+    "track_changes": 1
+   }

@@ -111,7 +111,10 @@ whitelisted_methods = [
     "tuktuk_management.api.sms_notifications.test_sms_to_driver",
     "tuktuk_management.api.sms_notifications.get_sms_status",
     "tuktuk_management.api.sms_notifications.get_all_drivers_for_broadcast",
-    "tuktuk_management.api.sms_notifications.send_broadcast_sms"
+    "tuktuk_management.api.sms_notifications.send_broadcast_sms",
+
+    # From weekly_report.py
+    "tuktuk_management.api.weekly_report.generate_weekly_report"
 ]
 
 # Email templates
