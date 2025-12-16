@@ -166,6 +166,11 @@ frappe.listview_settings['TukTuk Driver'] = {
                     }
                 });
             });
+            
+            // Add bulk SMS with fields menu item
+            listview.page.add_menu_item(__('Send Bulk SMS with Fields'), function() {
+                show_bulk_sms_dialog(listview);
+            });            
         }
     },
     
@@ -222,3 +227,201 @@ frappe.listview_settings['TukTuk Driver'] = {
         }
     }
 };
+
+// Helper function to show bulk SMS dialog with field interpolation
+function show_bulk_sms_dialog(listview) {
+    // Get selected drivers - use get_checked_items() which returns array of names
+    const selected_drivers = listview.get_checked_items() || [];
+    
+    frappe.call({
+        method: 'frappe.client.get_list',
+        args: {
+            doctype: 'TukTuk Driver',
+            fields: ['name', 'driver_name', 'sunny_id', 'mpesa_number', 'assigned_tuktuk', 'left_to_target', 'current_balance', 'current_deposit_balance'],
+            order_by: 'driver_name asc',
+            limit_page_length: 500
+        },
+        callback: function(r) {
+            if (r.message) {
+                const drivers = r.message;
+                
+                // Create dialog
+                let d = new frappe.ui.Dialog({
+                    title: __('Send SMS to Drivers with Field Interpolation'),
+                    size: 'large',
+                    fields: [
+                        {
+                            label: 'Select Recipients',
+                            fieldname: 'recipient_type',
+                            fieldtype: 'Select',
+                            options: 'Selected Drivers\nAll Drivers\nAll Assigned Drivers\nAll Unassigned Drivers\nDrivers with Remaining Target\nSelect Specific Drivers',
+                            default: selected_drivers.length > 0 ? 'Selected Drivers' : 'All Drivers',
+                            reqd: 1,
+                            onchange: function() {
+                                const type = d.get_value('recipient_type');
+                                d.get_field('selected_drivers').df.hidden = (type !== 'Select Specific Drivers');
+                                d.get_field('selected_drivers').refresh();
+                                update_recipient_count(d, drivers, selected_drivers);
+                            }
+                        },
+                        {
+                            label: 'Select Drivers',
+                            fieldname: 'selected_drivers',
+                            fieldtype: 'MultiSelectList',
+                            hidden: 1,
+                            options: drivers.map(d => ({
+                                value: d.name,
+                                label: `${d.driver_name} (${d.mpesa_number || 'No Phone'})`
+                            })),
+                            get_data: function() {
+                                return drivers.map(d => ({
+                                    value: d.name,
+                                    label: `${d.driver_name} - ${d.assigned_tuktuk || 'Unassigned'} - Target Left: ${flt(d.left_to_target, 0)} KSH`,
+                                    description: d.mpesa_number || 'No phone number'
+                                }));
+                            },
+                            onchange: function() {
+                                update_recipient_count(d, drivers, selected_drivers);
+                            }
+                        },
+                        {
+                            fieldtype: 'HTML',
+                            fieldname: 'available_fields',
+                            options: `
+                                <div style="padding: 10px; background-color: #f8f9fa; border-radius: 5px; margin: 15px 0;">
+                                    <strong>Available Fields:</strong>
+                                    <p style="margin: 5px 0; font-size: 0.9em;">
+                                        <code>{driver_name}</code>, 
+                                        <code>{sunny_id}</code>,
+                                        <code>{left_to_target}</code>, 
+                                        <code>{current_balance}</code>, 
+                                        <code>{daily_target}</code>, 
+                                        <code>{assigned_tuktuk}</code>, 
+                                        <code>{mpesa_number}</code>, 
+                                        <code>{mpesa_paybill}</code>, 
+                                        <code>{mpesa_account}</code>, 
+                                        <code>{current_deposit_balance}</code>
+                                    </p>
+                                    <p style="margin: 5px 0; font-size: 0.85em; color: #666;">
+                                        These placeholders will be replaced with each driver's actual values.
+                                    </p>
+                                </div>
+                            `
+                        },
+                        {
+                            label: 'Message Template',
+                            fieldname: 'message',
+                            fieldtype: 'Small Text',
+                            reqd: 1,
+                            description: 'Compose your SMS message. Use field placeholders like {driver_name} or {left_to_target}'
+                        },
+                        {
+                            fieldtype: 'HTML',
+                            fieldname: 'recipient_count',
+                            options: '<div id="recipient-count" style="padding: 10px; background-color: #e9ecef; border-radius: 5px; margin-top: 10px;"></div>'
+                        }
+                    ],
+                    primary_action_label: __('Send SMS'),
+                    primary_action: function(values) {
+                        if (!values.message || !values.message.trim()) {
+                            frappe.msgprint(__('Please enter a message'));
+                            return;
+                        }
+                        
+                        // Determine driver IDs based on selection
+                        let driver_ids = [];
+                        const type = values.recipient_type;
+                        
+                        if (type === 'Selected Drivers') {
+                            // selected_drivers is already an array of driver names (strings)
+                            driver_ids = selected_drivers;
+                        } else if (type === 'All Drivers') {
+                            driver_ids = drivers.map(d => d.name);
+                        } else if (type === 'All Assigned Drivers') {
+                            driver_ids = drivers.filter(d => d.assigned_tuktuk).map(d => d.name);
+                        } else if (type === 'All Unassigned Drivers') {
+                            driver_ids = drivers.filter(d => !d.assigned_tuktuk).map(d => d.name);
+                        } else if (type === 'Drivers with Remaining Target') {
+                            driver_ids = drivers.filter(d => flt(d.left_to_target) > 0).map(d => d.name);
+                        } else if (type === 'Select Specific Drivers') {
+                            driver_ids = values.selected_drivers || [];
+                        }
+                        
+                        if (driver_ids.length === 0) {
+                            frappe.msgprint(__('No drivers selected'));
+                            return;
+                        }
+                        
+                        frappe.confirm(
+                            __('Send SMS to {0} driver(s)?', [driver_ids.length]),
+                            function() {
+                                frappe.call({
+                                    method: 'tuktuk_management.api.sms_notifications.send_bulk_sms_with_fields',
+                                    args: {
+                                        driver_ids: driver_ids,
+                                        message_template: values.message
+                                    },
+                                    freeze: true,
+                                    freeze_message: __('Sending SMS...'),
+                                    callback: function(r) {
+                                        if (r.message && r.message.success) {
+                                            frappe.msgprint({
+                                                title: __('SMS Sent'),
+                                                message: __('Successfully sent: {0}<br>Failed: {1}', 
+                                                    [r.message.success_count, r.message.failure_count]),
+                                                indicator: r.message.failure_count > 0 ? 'orange' : 'green'
+                                            });
+                                            d.hide();
+                                            listview.refresh();
+                                        } else {
+                                            frappe.msgprint({
+                                                title: __('SMS Failed'),
+                                                message: r.message ? r.message.message : __('Failed to send SMS'),
+                                                indicator: 'red'
+                                            });
+                                        }
+                                    }
+                                });
+                            }
+                        );
+                    }
+                });
+                
+                // Update recipient count when selection changes
+                d.fields_dict.recipient_type.$input.on('change', function() {
+                    update_recipient_count(d, drivers, selected_drivers);
+                });
+                
+                // Also update when MultiSelectList changes
+                d.on('selected_drivers', function() {
+                    update_recipient_count(d, drivers, selected_drivers);
+                });
+                
+                d.show();
+                update_recipient_count(d, drivers, selected_drivers);
+            }
+        }
+    });
+}
+
+function update_recipient_count(dialog, drivers, selected_drivers) {
+    const type = dialog.get_value('recipient_type');
+    let count = 0;
+    
+    if (type === 'Selected Drivers') {
+        count = selected_drivers.length;
+    } else if (type === 'All Drivers') {
+        count = drivers.length;
+    } else if (type === 'All Assigned Drivers') {
+        count = drivers.filter(d => d.assigned_tuktuk).length;
+    } else if (type === 'All Unassigned Drivers') {
+        count = drivers.filter(d => !d.assigned_tuktuk).length;
+    } else if (type === 'Drivers with Remaining Target') {
+        count = drivers.filter(d => flt(d.left_to_target) > 0).length;
+    } else if (type === 'Select Specific Drivers') {
+        const selected = dialog.get_value('selected_drivers') || [];
+        count = selected.length;
+    }
+    
+    $('#recipient-count').html(`<strong>Recipients:</strong> ${count} driver(s) will receive this SMS`);
+}
