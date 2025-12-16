@@ -2646,7 +2646,7 @@ def reconcile_driver_balance(driver_name, date=None):
         
         # Get operating hours start time
         settings = frappe.get_single("TukTuk Settings")
-        operating_hours_start = settings.operating_hours_start or "06:00:00"
+        operating_hours_start = settings.operating_hours_start or "00:05:00"
         
         # Calculate date to reconcile from
         if date:
