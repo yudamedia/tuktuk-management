@@ -1,5 +1,5 @@
 // ~/frappe-bench/apps/tuktuk_management/tuktuk_management/public/js/tuktuk_vehicle.js
-// Enhanced TukTuk Vehicle client script with device mapping integration
+// Complete TukTuk Vehicle client script with device mapping integration AND substitute driver management
 
 // Ensure Frappe utility functions are available for type safety
 if (typeof flt === 'undefined') {
@@ -25,6 +25,9 @@ frappe.ui.form.on('TukTuk Vehicle', {
         setup_indicators(frm);
         setup_device_mapping_buttons(frm);
         
+        // Add substitute driver management buttons
+        setup_substitute_driver_buttons(frm);
+        
         // Add real-time location and battery display
         if (frm.doc.latitude && frm.doc.longitude) {
             add_location_display(frm);
@@ -32,6 +35,11 @@ frappe.ui.form.on('TukTuk Vehicle', {
         
         // Show device mapping status
         show_device_mapping_status(frm);
+        
+        // Show substitute assignment info if applicable
+        if (frm.doc.current_substitute_driver) {
+            show_substitute_info(frm);
+        }
     },
     
     device_id: function(frm) {
@@ -54,13 +62,205 @@ frappe.ui.form.on('TukTuk Vehicle', {
     },
     
     status: function(frm) {
+        // Handle status changes
+        if (frm.doc.status === 'Subbed' && !frm.doc.current_substitute_driver) {
+            frappe.msgprint(__('Please assign a substitute driver'));
+            frm.set_value('status', frm.doc.__oldstatus || 'Available');
+        }
+        
         // Refresh form actions when status changes
         setup_form_actions(frm);
         setup_indicators(frm);
+    },
+    
+    current_substitute_driver: function(frm) {
+        if (frm.doc.current_substitute_driver && frm.doc.status !== 'Subbed') {
+            frm.set_value('status', 'Subbed');
+        } else if (!frm.doc.current_substitute_driver && frm.doc.status === 'Subbed') {
+            // Reset to appropriate status
+            if (frm.doc.assigned_driver) {
+                frm.set_value('status', 'Assigned');
+            } else {
+                frm.set_value('status', 'Available');
+            }
+        }
     }
 });
 
-// Device Mapping Functions
+// ===== SUBSTITUTE DRIVER MANAGEMENT FUNCTIONS =====
+
+function setup_substitute_driver_buttons(frm) {
+    if (!frm.is_new()) {
+        // Add button to suggest substitute driver
+        if (frm.doc.assigned_driver && !frm.doc.current_substitute_driver) {
+            frm.add_custom_button(__('Assign Substitute Driver'), function() {
+                suggest_and_assign_substitute(frm);
+            }, __('Actions'));
+        }
+        
+        // Add button to remove substitute
+        if (frm.doc.current_substitute_driver) {
+            frm.add_custom_button(__('Remove Substitute Driver'), function() {
+                remove_substitute_driver(frm);
+            }, __('Actions'));
+        }
+        
+        // Add button to view transactions
+        frm.add_custom_button(__('View Transactions'), function() {
+            frappe.set_route('List', 'TukTuk Transaction', {
+                'tuktuk': frm.doc.name
+            });
+        }, __('Reports'));
+    }
+}
+
+function show_substitute_info(frm) {
+    frappe.call({
+        method: 'frappe.client.get',
+        args: {
+            doctype: 'TukTuk Substitute Driver',
+            name: frm.doc.current_substitute_driver
+        },
+        callback: function(r) {
+            if (r.message) {
+                const sub_driver = r.message;
+                const info_html = `
+                    <div class="alert alert-info">
+                        <strong>Substitute Driver Active:</strong> ${sub_driver.first_name} ${sub_driver.last_name}
+                        <br><strong>Phone:</strong> ${sub_driver.phone_number}
+                        <br><strong>Assigned Since:</strong> ${frappe.datetime.str_to_user(frm.doc.substitute_assignment_date)}
+                    </div>
+                `;
+                frm.set_df_property('current_substitute_driver', 'description', info_html);
+            }
+        }
+    });
+}
+
+function suggest_and_assign_substitute(frm) {
+    frappe.call({
+        method: 'tuktuk_management.tuktuk_management.doctype.tuktuk_substitute_driver.tuktuk_substitute_driver.suggest_substitute_for_vehicle',
+        args: {
+            vehicle_name: frm.doc.name
+        },
+        callback: function(r) {
+            if (r.message && r.message.success) {
+                const suggested = r.message.suggested_driver;
+                const all_available = r.message.all_available;
+                
+                // Create dialog to show suggestions
+                let options_html = '<div class="row">';
+                
+                all_available.forEach(driver => {
+                    const is_suggested = driver.name === suggested.name;
+                    options_html += `
+                        <div class="col-md-6">
+                            <div class="card ${is_suggested ? 'border-primary' : ''}" style="margin-bottom: 10px;">
+                                <div class="card-body">
+                                    ${is_suggested ? '<span class="badge badge-primary">Suggested</span>' : ''}
+                                    <h5>${driver.first_name} ${driver.last_name}</h5>
+                                    <p class="mb-1"><strong>Phone:</strong> ${driver.phone_number}</p>
+                                    <p class="mb-1"><strong>Days Worked:</strong> ${driver.total_days_worked || 0}</p>
+                                    <p class="mb-1"><strong>Avg Earnings:</strong> ${driver.average_daily_earnings ? driver.average_daily_earnings.toFixed(2) : '0.00'} KSH</p>
+                                    <button class="btn btn-sm btn-primary assign-sub-btn" data-driver="${driver.name}">
+                                        Assign
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                options_html += '</div>';
+                
+                let d = new frappe.ui.Dialog({
+                    title: 'Select Substitute Driver',
+                    fields: [{
+                        fieldtype: 'HTML',
+                        fieldname: 'driver_options',
+                        options: options_html
+                    }],
+                    primary_action_label: 'Close'
+                });
+                
+                d.show();
+                
+                // Add click handlers
+                d.$wrapper.find('.assign-sub-btn').on('click', function() {
+                    const driver_name = $(this).data('driver');
+                    assign_substitute_driver(frm, driver_name);
+                    d.hide();
+                });
+                
+            } else {
+                frappe.msgprint({
+                    title: __('No Substitutes Available'),
+                    message: r.message ? r.message.message : 'No substitute drivers available at this time',
+                    indicator: 'orange'
+                });
+            }
+        }
+    });
+}
+
+function assign_substitute_driver(frm, substitute_driver_name) {
+    frappe.call({
+        method: 'tuktuk_management.tuktuk_management.doctype.tuktuk_substitute_driver.tuktuk_substitute_driver.assign_substitute_to_vehicle',
+        args: {
+            substitute_driver: substitute_driver_name,
+            vehicle_name: frm.doc.name
+        },
+        callback: function(r) {
+            if (r.message && r.message.success) {
+                frappe.msgprint({
+                    title: __('Success'),
+                    message: r.message.message,
+                    indicator: 'green'
+                });
+                frm.reload_doc();
+            } else {
+                frappe.msgprint({
+                    title: __('Error'),
+                    message: r.message ? r.message.message : 'Failed to assign substitute driver',
+                    indicator: 'red'
+                });
+            }
+        }
+    });
+}
+
+function remove_substitute_driver(frm) {
+    frappe.confirm(
+        __('Are you sure you want to remove the substitute driver from this vehicle?'),
+        function() {
+            frappe.call({
+                method: 'tuktuk_management.tuktuk_management.doctype.tuktuk_substitute_driver.tuktuk_substitute_driver.unassign_substitute_from_vehicle',
+                args: {
+                    substitute_driver: frm.doc.current_substitute_driver
+                },
+                callback: function(r) {
+                    if (r.message && r.message.success) {
+                        frappe.msgprint({
+                            title: __('Success'),
+                            message: r.message.message,
+                            indicator: 'green'
+                        });
+                        frm.reload_doc();
+                    } else {
+                        frappe.msgprint({
+                            title: __('Error'),
+                            message: r.message ? r.message.message : 'Failed to remove substitute driver',
+                            indicator: 'red'
+                        });
+                    }
+                }
+            });
+        }
+    );
+}
+
+// ===== DEVICE MAPPING FUNCTIONS =====
+
 function setup_device_mapping_buttons(frm) {
     if (!frm.doc.__islocal) {
         // Add Device Mapping section
@@ -73,26 +273,14 @@ function setup_device_mapping_buttons(frm) {
             frm.add_custom_button(__('Manual Map Device'), function() {
                 manual_map_device_dialog(frm);
             }, __('Device Mapping'));
-            
-            frm.add_custom_button(__('View Available Devices'), function() {
-                view_available_devices(frm);
-            }, __('Device Mapping'));
         } else {
-            // Device already mapped - show management options
-            frm.add_custom_button(__('Update from Device'), function() {
-                update_from_telematics(frm);
+            // Device already mapped - show update and unmap options
+            frm.add_custom_button(__('Update Device Data'), function() {
+                fetch_initial_device_data(frm);
             }, __('Device Mapping'));
             
-            frm.add_custom_button(__('Reset Device Mapping'), function() {
-                reset_device_mapping(frm);
-            }, __('Device Mapping'));
-            
-            frm.add_custom_button(__('Validate Mapping'), function() {
-                validate_device_mapping(frm);
-            }, __('Device Mapping'));
-            
-            frm.add_custom_button(__('View Location History'), function() {
-                view_location_history(frm);
+            frm.add_custom_button(__('Unmap Device'), function() {
+                unmap_device(frm);
             }, __('Device Mapping'));
         }
     }
@@ -100,234 +288,102 @@ function setup_device_mapping_buttons(frm) {
 
 function auto_map_device(frm) {
     frappe.call({
-        method: 'tuktuk_management.api.device_mapping.get_unmapped_devices',
+        method: 'tuktuk_management.api.telematics.auto_map_device_to_vehicle',
+        args: {
+            tuktuk_id: frm.doc.tuktuk_id
+        },
+        freeze: true,
+        freeze_message: __('Searching for device...'),
         callback: function(r) {
-            if (r.message && r.message.mapping_suggestions.length > 0) {
-                // Find suggestion for this tuktuk
-                const suggestion = r.message.mapping_suggestions.find(s => s.tuktuk_name === frm.docname);
-                
-                if (suggestion) {
-                    frappe.confirm(
-                        __('Auto-map device {0} (IMEI: {1}) to this TukTuk?<br><br>Device Status: {2}<br>Confidence: {3}', 
-                           [suggestion.suggested_device_id, suggestion.suggested_imei, 
-                            suggestion.device_status, suggestion.confidence]),
-                        function() {
-                            apply_device_mapping(frm, suggestion.suggested_device_id, suggestion.suggested_imei);
-                        }
-                    );
-                } else {
-                    frappe.msgprint(__('No available devices found for auto-mapping'));
-                }
+            if (r.message && r.message.success) {
+                frappe.show_alert({
+                    message: __('Device mapped successfully'),
+                    indicator: 'green'
+                });
+                frm.reload_doc();
             } else {
-                frappe.msgprint(__('No unmapped devices available'));
+                frappe.msgprint({
+                    title: __('Auto-Mapping Failed'),
+                    message: r.message ? r.message.message : 'No matching device found',
+                    indicator: 'orange'
+                });
             }
         }
     });
 }
 
 function manual_map_device_dialog(frm) {
-    // Get available devices first
-    frappe.call({
-        method: 'tuktuk_management.api.device_mapping.get_unmapped_devices',
-        callback: function(r) {
-            if (r.message && r.message.available_devices.length > 0) {
-                show_device_selection_dialog(frm, r.message.available_devices);
-            } else {
-                frappe.msgprint(__('No available devices to map'));
-            }
-        }
-    });
-}
-
-function show_device_selection_dialog(frm, devices) {
-    const device_options = devices.map(d => ({
-        label: `Device ${d.device_id} (${d.imei}) - ${d.status}`,
-        value: JSON.stringify({device_id: d.device_id, imei: d.imei})
-    }));
-    
-    const dialog = new frappe.ui.Dialog({
-        title: __('Select Device to Map'),
+    let d = new frappe.ui.Dialog({
+        title: __('Manual Device Mapping'),
         fields: [
             {
-                fieldtype: 'Select',
-                fieldname: 'selected_device',
-                label: __('Available Devices'),
-                options: device_options,
+                fieldtype: 'Data',
+                fieldname: 'device_id',
+                label: __('Device ID'),
                 reqd: 1
             },
             {
-                fieldtype: 'HTML',
-                fieldname: 'device_info',
-                options: '<div id="device-info-display"></div>'
+                fieldtype: 'Data',
+                fieldname: 'device_imei',
+                label: __('Device IMEI'),
+                reqd: 1,
+                description: __('15-digit IMEI number')
+            },
+            {
+                fieldtype: 'Data',
+                fieldname: 'device_model',
+                label: __('Device Model'),
+                default: 'Teltonika'
             }
         ],
         primary_action: function(values) {
-            const device_data = JSON.parse(values.selected_device);
-            apply_device_mapping(frm, device_data.device_id, device_data.imei);
-            dialog.hide();
+            // Validate IMEI format
+            if (!/^\d{15}$/.test(values.device_imei)) {
+                frappe.msgprint(__('IMEI must be exactly 15 digits'));
+                return;
+            }
+            
+            frm.set_value('device_id', values.device_id);
+            frm.set_value('device_imei', values.device_imei);
+            frm.set_value('telematics_device_model', values.device_model);
+            
+            frm.save().then(() => {
+                frappe.show_alert({
+                    message: __('Device mapped successfully'),
+                    indicator: 'green'
+                });
+                d.hide();
+                fetch_initial_device_data(frm);
+            });
         },
         primary_action_label: __('Map Device')
     });
     
-    dialog.show();
-    
-    // Add device info display when selection changes
-    dialog.fields_dict.selected_device.$input.on('change', function() {
-        const selected = JSON.parse(this.value);
-        const device = devices.find(d => d.device_id === selected.device_id);
-        if (device) {
-            $('#device-info-display').html(`
-                <div class="alert alert-info">
-                    <strong>Device Details:</strong><br>
-                    Device ID: ${device.device_id}<br>
-                    IMEI: ${device.imei}<br>
-                    Status: ${device.status}<br>
-                    Last Location: ${device.lat || 'N/A'}, ${device.lng || 'N/A'}
-                </div>
-            `);
-        }
-    });
+    d.show();
 }
 
-function apply_device_mapping(frm, device_id, device_imei) {
-    frappe.call({
-        method: 'tuktuk_management.api.device_mapping.manual_device_mapping',
-        args: {
-            tuktuk_vehicle: frm.docname,
-            device_id: device_id,
-            device_imei: device_imei
-        },
-        callback: function(r) {
-            if (r.message && r.message.success) {
-                frappe.show_alert({
-                    message: r.message.message,
-                    indicator: 'green'
-                });
-                
-                // Refresh the form to show new mapping
-                frm.reload_doc();
-            } else {
-                frappe.msgprint(__('Device mapping failed: {0}', [r.message.message || 'Unknown error']));
-            }
-        }
-    });
-}
-
-function reset_device_mapping(frm) {
+function unmap_device(frm) {
     frappe.confirm(
-        __('Reset device mapping for this TukTuk? This will remove the device ID and IMEI.'),
+        __('Are you sure you want to unmap this device? Telemetry data will no longer be received.'),
         function() {
-            frappe.call({
-                method: 'tuktuk_management.api.device_mapping.reset_device_mapping',
-                args: {
-                    tuktuk_vehicle: frm.docname
-                },
-                callback: function(r) {
-                    if (r.message && r.message.success) {
-                        frappe.show_alert({
-                            message: r.message.message,
-                            indicator: 'orange'
-                        });
-                        frm.reload_doc();
-                    }
-                }
+            frm.set_value('device_id', '');
+            frm.set_value('device_imei', '');
+            frm.save().then(() => {
+                frappe.show_alert({
+                    message: __('Device unmapped'),
+                    indicator: 'orange'
+                });
             });
         }
     );
 }
 
-function validate_device_mapping(frm) {
-    frappe.call({
-        method: 'tuktuk_management.api.device_mapping.validate_device_mappings',
-        callback: function(r) {
-            if (r.message) {
-                const results = r.message;
-                let message = `
-                    <strong>Device Mapping Validation Results:</strong><br><br>
-                    Total Vehicles: ${results.total_vehicles}<br>
-                    Mapped: ${results.mapped_vehicles}<br>
-                    Unmapped: ${results.unmapped_vehicles}<br>
-                    Recent Updates: ${results.recent_updates}<br>
-                `;
-                
-                if (results.duplicate_mappings.length > 0) {
-                    message += '<br><strong>⚠️ Duplicate Mappings Found:</strong><br>';
-                    results.duplicate_mappings.forEach(dup => {
-                        message += `Device ${dup.device_id || dup.imei}: ${dup.vehicles.join(', ')}<br>`;
-                    });
-                }
-                
-                if (results.inactive_devices.length > 0) {
-                    message += '<br><strong>🔴 Inactive Devices:</strong><br>';
-                    results.inactive_devices.forEach(inactive => {
-                        message += `${inactive.tuktuk_id}: Last seen ${inactive.hours_ago}h ago<br>`;
-                    });
-                }
-                
-                frappe.msgprint({
-                    title: __('Validation Results'),
-                    message: message,
-                    indicator: results.duplicate_mappings.length > 0 ? 'red' : 'blue'
-                });
-            }
-        }
-    });
-}
-
-function view_available_devices(frm) {
-    frappe.call({
-        method: 'tuktuk_management.api.device_mapping.get_unmapped_devices',
-        callback: function(r) {
-            if (r.message) {
-                const data = r.message;
-                let message = '<strong>Device Mapping Overview:</strong><br><br>';
-                
-                message += `<strong>Unmapped Vehicles (${data.unmapped_vehicles.length}):</strong><br>`;
-                data.unmapped_vehicles.forEach(v => {
-                    message += `• ${v.tuktuk_id} (${v.status})<br>`;
-                });
-                
-                message += `<br><strong>Available Devices (${data.available_devices.length}):</strong><br>`;
-                data.available_devices.forEach(d => {
-                    message += `• Device ${d.device_id} - ${d.imei} (${d.status})<br>`;
-                });
-                
-                if (data.mapping_suggestions.length > 0) {
-                    message += '<br><strong>Suggested Mappings:</strong><br>';
-                    data.mapping_suggestions.forEach(s => {
-                        message += `• ${s.tuktuk_id} → Device ${s.suggested_device_id}<br>`;
-                    });
-                }
-                
-                frappe.msgprint({
-                    title: __('Available Devices'),
-                    message: message
-                });
-            }
-        }
-    });
-}
-
-// Enhanced Status and Display Functions
 function show_device_mapping_status(frm) {
-    if (frm.doc.device_id && frm.doc.device_imei) {
-        // Device is mapped - show status
-        const status_html = `
-            <div class="device-mapping-status" style="background: #e8f5e8; padding: 10px; border-radius: 4px; margin: 10px 0;">
-                <strong>📱 Device Mapped:</strong><br>
-                Device ID: ${frm.doc.device_id}<br>
-                IMEI: ${frm.doc.device_imei}<br>
-                ${frm.doc.last_reported ? `Last Update: ${frappe.datetime.str_to_user(frm.doc.last_reported)}` : 'No recent updates'}
-            </div>
-        `;
-        
-        frm.dashboard.add_comment(status_html);
-    } else {
-        // No device mapped - show warning
+    if (!frm.doc.device_id) {
         const warning_html = `
-            <div class="device-mapping-warning" style="background: #fff3cd; padding: 10px; border-radius: 4px; margin: 10px 0;">
-                <strong>⚠️ No Device Mapped</strong><br>
-                This TukTuk is not connected to a telematics device. 
+            <div class="alert alert-warning">
+                <strong>No Telemetry Device Mapped</strong><br>
+                This vehicle is not receiving real-time location and battery updates.<br>
                 Use the Device Mapping buttons to connect a device for real-time tracking.
             </div>
         `;
@@ -371,10 +427,11 @@ function validate_imei_format(frm) {
     }
 }
 
-// Existing Functions (Enhanced)
+// ===== EXISTING FORM FUNCTIONS =====
+
 function setup_form_actions(frm) {
-    // Clear existing custom buttons
-    frm.clear_custom_buttons();
+    // Clear existing custom buttons (except those added by substitute driver and device mapping functions)
+    // Note: We don't clear all custom buttons to preserve the ones added above
     
     // Add custom buttons based on status
     if (frm.doc.status === 'Available') {
@@ -416,143 +473,154 @@ function setup_indicators(frm) {
         add_battery_indicator(frm);
     }
     
-    // Add status indicator
+    // Add status indicator with color coding
     let status_color = get_status_color(frm.doc.status);
     frm.dashboard.add_indicator(__('Status: {0}', [frm.doc.status]), status_color);
     
     // Add device connectivity indicator
     if (frm.doc.device_id) {
         const connectivity_color = frm.doc.last_reported ? 
-            (flt(frappe.datetime.get_diff(frappe.datetime.now_datetime(), frm.doc.last_reported)) < 1 ? 'green' : 'orange') : 
-            'red';
-        frm.dashboard.add_indicator(__('Device: Connected'), connectivity_color);
-    } else {
-        frm.dashboard.add_indicator(__('Device: Not Mapped'), 'red');
+            (flt(frappe.datetime.get_diff(frappe.datetime.now_datetime(), frm.doc.last_reported)) < 1 ? 'green' : 'orange') : 'red';
+        frm.dashboard.add_indicator(__('Device Connected'), connectivity_color);
     }
     
-    // Add last reported indicator if available
-    if (frm.doc.last_reported) {
-        let time_diff = flt(frappe.datetime.get_diff(frappe.datetime.now_datetime(), frm.doc.last_reported));
-        let hours_ago = cint(Math.floor(time_diff / 3600));
-        let indicator_color = hours_ago > 24 ? 'red' : (hours_ago > 6 ? 'orange' : 'green');
-        frm.dashboard.add_indicator(__('Last Update: {0}h ago', [hours_ago]), indicator_color);
+    // Add substitute driver indicator if applicable
+    if (frm.doc.current_substitute_driver) {
+        frm.dashboard.add_indicator(__('Substitute Driver Active'), 'orange');
     }
 }
 
 function add_battery_indicator(frm) {
-    const battery_level = flt(frm.doc.battery_level);
+    const battery = flt(frm.doc.battery_level);
     let color = 'green';
     let icon = '🔋';
     
-    if (battery_level <= 10) {
+    if (battery < 20) {
         color = 'red';
         icon = '🪫';
-    } else if (battery_level <= 25) {
+    } else if (battery < 50) {
         color = 'orange';
-        icon = '🔋';
-    } else if (battery_level <= 50) {
-        color = 'yellow';
         icon = '🔋';
     }
     
-    frm.dashboard.add_indicator(__('Battery: {0}% {1}', [battery_level, icon]), color);
+    frm.dashboard.add_indicator(__(`${icon} Battery: {0}%`, [battery]), color);
 }
 
-function add_location_display(frm) {
-    if (frm.doc.latitude && frm.doc.longitude) {
-        const location_html = `
-            <div class="location-display" style="background: #f8f9fa; padding: 10px; border-radius: 4px; margin: 10px 0;">
-                <strong>📍 Current Location:</strong><br>
-                Latitude: ${frm.doc.latitude}<br>
-                Longitude: ${frm.doc.longitude}<br>
-                ${frm.doc.current_location ? `Address: ${frm.doc.current_location}` : ''}
-                <br><br>
-                <button class="btn btn-xs btn-primary" onclick="view_on_map_inline('${frm.doc.latitude}', '${frm.doc.longitude}')">
-                    View on Map
-                </button>
-            </div>
-        `;
-        
-        frm.dashboard.add_comment(location_html);
-    }
-}
-
-// Utility Functions
 function get_status_color(status) {
     const status_colors = {
         'Available': 'green',
         'Assigned': 'blue',
-        'Charging': 'orange',
+        'Subbed': 'orange',
+        'Charging': 'yellow',
         'Maintenance': 'red',
-        'Out of Service': 'red'
+        'Offline': 'gray'
     };
     return status_colors[status] || 'gray';
 }
 
-function view_on_map(frm) {
+function add_location_display(frm) {
     if (frm.doc.latitude && frm.doc.longitude) {
-        const url = `https://www.google.com/maps?q=${frm.doc.latitude},${frm.doc.longitude}&z=15`;
-        window.open(url, '_blank');
-    } else {
-        frappe.msgprint(__('No location data available'));
+        const map_link = `https://www.google.com/maps?q=${frm.doc.latitude},${frm.doc.longitude}`;
+        const location_html = `
+            <div class="alert alert-info">
+                <strong>Last Known Location:</strong><br>
+                Lat: ${frm.doc.latitude.toFixed(6)}, Long: ${frm.doc.longitude.toFixed(6)}<br>
+                <a href="${map_link}" target="_blank" class="btn btn-xs btn-primary">
+                    View on Google Maps
+                </a>
+            </div>
+        `;
+        frm.set_df_property('current_location', 'description', location_html);
     }
 }
 
-// Global function for inline map viewing
-window.view_on_map_inline = function(lat, lng) {
-    const url = `https://www.google.com/maps?q=${lat},${lng}&z=15`;
-    window.open(url, '_blank');
-};
+// ===== VEHICLE STATUS ACTIONS =====
 
-// Status change functions
 function assign_to_driver(frm) {
-    frappe.route_options = {
-        "assigned_tuktuk": ""
-    };
-    frappe.new_doc("TukTuk Driver");
-}
-
-function set_charging(frm) {
-    frm.set_value('status', 'Charging');
-    frm.save();
-}
-
-function set_maintenance(frm) {
-    frm.set_value('status', 'Maintenance');
-    frm.save();
-}
-
-function complete_charging(frm) {
-    frm.set_value('status', 'Assigned');
-    frm.set_value('battery_level', 100);
-    frm.save();
-}
-
-function update_from_telematics(frm) {
-    if (frm.doc.device_id) {
+    frappe.prompt([
+        {
+            label: 'Select Driver',
+            fieldname: 'driver',
+            fieldtype: 'Link',
+            options: 'TukTuk Driver',
+            reqd: 1,
+            get_query: function() {
+                return {
+                    filters: {
+                        'assigned_tuktuk': ['is', 'not set']
+                    }
+                };
+            }
+        }
+    ], function(values) {
         frappe.call({
-            method: 'tuktuk_management.api.telematics.update_vehicle_status',
+            method: 'frappe.client.set_value',
             args: {
-                device_id: frm.doc.device_id
+                doctype: 'TukTuk Driver',
+                name: values.driver,
+                fieldname: 'assigned_tuktuk',
+                value: frm.doc.name
             },
             callback: function(r) {
-                if (r.message && r.message.success) {
-                    frappe.show_alert({
-                        message: __('Telematics data updated'),
-                        indicator: 'green'
-                    });
-                    frm.reload_doc();
-                } else {
-                    frappe.msgprint(__('Failed to update from telematics device'));
+                if (!r.exc) {
+                    frm.set_value('status', 'Assigned');
+                    frm.set_value('assigned_driver', values.driver);
+                    frm.save();
+                    frappe.msgprint(__('Driver assigned successfully'));
                 }
             }
         });
-    }
+    }, __('Assign Driver'), __('Assign'));
 }
 
-function view_location_history(frm) {
-    frappe.route_options = {
-        "tuktuk_vehicle": frm.docname
-    };
-    frappe.set_route("query-report", "TukTuk Location History");
+function set_charging(frm) {
+    frappe.confirm(
+        __('Set this vehicle to charging status?'),
+        function() {
+            frm.set_value('status', 'Charging');
+            frm.save();
+        }
+    );
+}
+
+function set_maintenance(frm) {
+    frappe.prompt([
+        {
+            label: 'Maintenance Notes',
+            fieldname: 'notes',
+            fieldtype: 'Small Text',
+            reqd: 1
+        }
+    ], function(values) {
+        frm.set_value('status', 'Maintenance');
+        frm.save().then(() => {
+            // Add comment with maintenance notes
+            frm.add_comment('Comment', `Maintenance: ${values.notes}`);
+            frappe.msgprint(__('Vehicle set to maintenance'));
+        });
+    }, __('Maintenance Details'), __('Confirm'));
+}
+
+function complete_charging(frm) {
+    frappe.confirm(
+        __('Mark charging as complete?'),
+        function() {
+            // Reset to appropriate status
+            if (frm.doc.assigned_driver) {
+                frm.set_value('status', 'Assigned');
+            } else {
+                frm.set_value('status', 'Available');
+            }
+            frm.save();
+        }
+    );
+}
+
+function view_on_map(frm) {
+    if (frm.doc.latitude && frm.doc.longitude) {
+        const map_url = `https://www.google.com/maps?q=${frm.doc.latitude},${frm.doc.longitude}`;
+        window.open(map_url, '_blank');
+    } else {
+        frappe.msgprint(__('No location data available'));
+    }
 }

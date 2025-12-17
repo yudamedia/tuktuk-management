@@ -169,6 +169,25 @@ def suggest_substitute_for_vehicle(vehicle_name):
         "all_available": sorted_subs
     }
 
+@frappe.whitelist()
+def get_available_vehicles_for_substitute():
+    """Get list of vehicles available for substitute assignment"""
+    return frappe.get_all(
+        "TukTuk Vehicle",
+        filters={
+            "assigned_driver": ["is", "set"],  # Must have regular driver
+            "current_substitute_driver": ["is", "not set"],  # No substitute assigned
+            "status": ["not in", ["Maintenance", "Offline"]]  # Not in maintenance
+        },
+        fields=[
+            "name",
+            "tuktuk_id",  # CORRECT field name
+            "assigned_driver",
+            "assigned_driver_name",
+            "status",
+            "battery_level"
+        ]
+    )
 
 @frappe.whitelist()
 def assign_substitute_to_vehicle(substitute_driver, vehicle_name):

@@ -1,16 +1,18 @@
-// Copyright (c) 2024, Yuda and contributors
-// For license information, please see license.txt
+// ~/frappe-bench/apps/tuktuk_management/tuktuk_management/tuktuk_management/doctype/tuktuk_substitute_driver/tuktuk_substitute_driver.js
+// Complete TukTuk Substitute Driver client script
 
 frappe.ui.form.on('TukTuk Substitute Driver', {
     refresh: function(frm) {
         // Add custom buttons
         if (!frm.is_new()) {
-            // Button to show available vehicles
-            frm.add_custom_button(__('Show Available Vehicles'), function() {
-                show_available_vehicles(frm);
-            }, __('Actions'));
+            // Button to show available vehicles (only if not assigned)
+            if (frm.doc.status === 'Active' && !frm.doc.assigned_tuktuk) {
+                frm.add_custom_button(__('Show Available Vehicles'), function() {
+                    show_available_vehicles(frm);
+                }, __('Actions'));
+            }
             
-            // Button to unassign from vehicle
+            // Button to unassign from vehicle (only if assigned)
             if (frm.doc.assigned_tuktuk) {
                 frm.add_custom_button(__('Unassign from Vehicle'), function() {
                     unassign_from_vehicle(frm);
@@ -97,25 +99,19 @@ function show_target_progress(frm) {
 
 function show_available_vehicles(frm) {
     frappe.call({
-        method: 'frappe.client.get_list',
-        args: {
-            doctype: 'TukTuk Vehicle',
-            filters: {
-                'status': ['in', ['Available', 'Assigned']],
-                'current_substitute_driver': ['is', 'not set']
-            },
-            fields: ['name', 'tuktuk_number', 'status', 'assigned_driver', 'battery_level']
-        },
+        method: 'tuktuk_management.tuktuk_management.doctype.tuktuk_substitute_driver.tuktuk_substitute_driver.get_available_vehicles_for_substitute',
         callback: function(r) {
             if (r.message && r.message.length > 0) {
-                let vehicles_html = '<table class="table table-bordered"><thead><tr><th>Vehicle</th><th>Status</th><th>Regular Driver</th><th>Battery</th><th>Action</th></tr></thead><tbody>';
+                let vehicles_html = '<table class="table table-bordered"><thead><tr><th>Vehicle</th><th>Vehicle ID</th><th>Status</th><th>Regular Driver</th><th>Battery</th><th>Action</th></tr></thead><tbody>';
                 
                 r.message.forEach(vehicle => {
-                    vehicles_html += `<tr>
+                    vehicles_html += `
+                    <tr>
                         <td>${vehicle.name}</td>
-                        <td>${vehicle.status}</td>
-                        <td>${vehicle.assigned_driver || 'None'}</td>
-                        <td>${vehicle.battery_level || 0}%</td>
+                        <td>${vehicle.tuktuk_id || 'N/A'}</td>
+                        <td><span class="indicator blue">${vehicle.status}</span></td>
+                        <td>${vehicle.assigned_driver_name || 'N/A'}</td>
+                        <td>${vehicle.battery_level || 'N/A'}%</td>
                         <td><button class="btn btn-xs btn-primary assign-vehicle" data-vehicle="${vehicle.name}">Assign</button></td>
                     </tr>`;
                 });
@@ -128,7 +124,8 @@ function show_available_vehicles(frm) {
                         fieldtype: 'HTML',
                         fieldname: 'vehicles_list',
                         options: vehicles_html
-                    }]
+                    }],
+                    size: 'large'
                 });
                 
                 d.show();
@@ -155,10 +152,18 @@ function assign_vehicle(frm, vehicle_name) {
         },
         callback: function(r) {
             if (r.message && r.message.success) {
-                frappe.msgprint(r.message.message);
+                frappe.msgprint({
+                    title: __('Success'),
+                    message: r.message.message,
+                    indicator: 'green'
+                });
                 frm.reload_doc();
             } else {
-                frappe.msgprint(__('Error: ') + (r.message ? r.message.message : 'Unknown error'));
+                frappe.msgprint({
+                    title: __('Error'),
+                    message: r.message ? r.message.message : 'Unknown error',
+                    indicator: 'red'
+                });
             }
         }
     });
@@ -175,10 +180,18 @@ function unassign_from_vehicle(frm) {
                 },
                 callback: function(r) {
                     if (r.message && r.message.success) {
-                        frappe.msgprint(r.message.message);
+                        frappe.msgprint({
+                            title: __('Success'),
+                            message: r.message.message,
+                            indicator: 'green'
+                        });
                         frm.reload_doc();
                     } else {
-                        frappe.msgprint(__('Error: ') + (r.message ? r.message.message : 'Unknown error'));
+                        frappe.msgprint({
+                            title: __('Error'),
+                            message: r.message ? r.message.message : 'Unknown error',
+                            indicator: 'red'
+                        });
                     }
                 }
             });
