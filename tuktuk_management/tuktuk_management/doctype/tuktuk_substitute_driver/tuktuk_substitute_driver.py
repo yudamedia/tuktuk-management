@@ -94,7 +94,7 @@ class TukTukSubstituteDriver(Document):
         
         # Get global setting
         settings = frappe.get_single("TukTuk Settings")
-        return flt(settings.global_fare_percentage_to_driver) if settings.global_fare_percentage_to_driver else 50.0
+        return flt(settings.global_fare_percentage) if settings.global_fare_percentage else 50.0
     
     def process_transaction(self, transaction_amount, transaction_doc):
         """

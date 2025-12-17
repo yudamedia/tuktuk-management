@@ -45,7 +45,7 @@ def get_active_driver_for_vehicle(tuktuk_name):
                 'driver_name': sub_driver.name,
                 'driver_type': 'Substitute',
                 'doctype': 'TukTuk Substitute Driver',
-                'phone_number': sub_driver.phone_number
+                'phone_number': sub_driver.mpesa_number or sub_driver.phone_number
             }
         
         elif vehicle.assigned_driver:

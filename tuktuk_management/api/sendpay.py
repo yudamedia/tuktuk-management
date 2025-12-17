@@ -239,7 +239,7 @@ def b2c_result():
             # Handle other payment types (FARE, RENTAL, BONUS)
             # Log for now - you can add additional logic here for other payment types
             frappe.log_error(
-                "B2C Result (Non-Petty Cash)",
+                "B2C Result (Driver Pay)",
                 f"Conversation ID: {conversation_id}\nResult Code: {result_code}\nTransaction ID: {transaction_id}"
             )
         
