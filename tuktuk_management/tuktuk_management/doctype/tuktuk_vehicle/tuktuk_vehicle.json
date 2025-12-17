@@ -1,335 +1,364 @@
 {
- "actions": [],
- "allow_rename": 1,
- "autoname": "format:TUK-885-{tuktuk_id}",
- "creation": "2024-11-26 12:00:00",
- "doctype": "DocType",
- "engine": "InnoDB",
- "field_order": [
-  "tuktuk_id",
-  "tuktuk_chasis",
-  "tuktuk_make",
-  "column_break_general",
-  "status",
-  "assigned_driver_name",
-  "mpesa_account",
-  "battery_section",
-  "battery_level",
-  "battery_voltage",
-  "column_break_battery",
-  "last_battery_reading",
-  "last_reported",
-  "location_tab",
-  "current_location_section",
-  "current_location",
-  "coordinates_section",
-  "latitude",
-  "column_break_coords",
-  "longitude",
-  "telematics_tab",
-  "device_section",
-  "device_id",
-  "device_imei",
-  "column_break_device",
-  "telematics_device_model",
-  "sim_card_section",
-  "sim_provider",
-  "column_break_oulk",
-  "sim_serial",
-  "column_break_cxes",
-  "sim_number",
- "rental_tab",
- "rental_rates_section",
- "rental_rate_initial",
- "column_break_rental",
- "rental_rate_hourly",
- "maintenance_tab",
- "maintenance_section",
- "mileage"
-],
- "fields": [
-  {
-   "description": "SUNNY Call Number",
-   "fieldname": "tuktuk_id",
-   "fieldtype": "Data",
-   "in_list_view": 1,
-   "label": "TukTuk ID",
-   "reqd": 1,
-   "unique": 1
-  },
-  {
-   "fieldname": "tuktuk_chasis",
-   "fieldtype": "Data",
-   "label": "Chasis Number"
-  },
-  {
-   "default": "TRi",
-   "fieldname": "tuktuk_make",
-   "fieldtype": "Select",
-   "label": "Make",
-   "options": "TRi\nBajaj\nPiaggio\nTVS\nMahindra\nOther"
-  },
-  {
-   "fieldname": "column_break_general",
-   "fieldtype": "Column Break"
-  },
-  {
-   "default": "Available",
-   "fieldname": "status",
-   "fieldtype": "Select",
-   "in_list_view": 1,
-   "label": "Status",
-   "options": "Available\nAssigned\nCharging\nMaintenance\nOffline"
-  },
-  {
-   "fieldname": "assigned_driver_name",
-   "fieldtype": "Data",
-   "in_list_view": 1,
-   "label": "Assigned Driver",
-   "read_only": 1
-  },
-  {
-   "description": "3-digit Mpesa account number",
-   "fieldname": "mpesa_account",
-   "fieldtype": "Data",
-   "in_list_view": 1,
-   "label": "Mpesa Account",
-   "length": 3
-  },
-  {
-   "collapsible": 1,
-   "fieldname": "battery_section",
-   "fieldtype": "Section Break",
-   "label": "Battery Information"
-  },
-  {
-   "default": "100",
-   "description": "Current battery percentage",
-   "fieldname": "battery_level",
-   "fieldtype": "Percent",
-   "in_list_view": 1,
-   "label": "Battery Level (%)"
-  },
-  {
-   "description": "Raw voltage reading from telemetry",
-   "fieldname": "battery_voltage",
-   "fieldtype": "Float",
-   "label": "Battery Voltage (V)",
-   "precision": "3",
-   "read_only": 1
-  },
-  {
-   "fieldname": "column_break_battery",
-   "fieldtype": "Column Break"
-  },
-  {
-   "description": "Previous battery percentage reading",
-   "fieldname": "last_battery_reading",
-   "fieldtype": "Percent",
-   "label": "Last Battery Reading",
-   "read_only": 1
-  },
-  {
-   "description": "Last telemetry update time",
-   "fieldname": "last_reported",
-   "fieldtype": "Datetime",
-   "label": "Last Updated",
-   "read_only": 1
-  },
-  {
-   "fieldname": "location_tab",
-   "fieldtype": "Tab Break",
-   "label": "Location"
-  },
-  {
-   "fieldname": "current_location_section",
-   "fieldtype": "Section Break",
-   "label": "Current Location"
-  },
-  {
-   "description": "GPS location from telemetry",
-   "fieldname": "current_location",
-   "fieldtype": "Geolocation",
-   "label": "Map Location"
-  },
-  {
-   "collapsible": 1,
-   "fieldname": "coordinates_section",
-   "fieldtype": "Section Break",
-   "label": "Coordinates"
-  },
-  {
-   "description": "Latitude (-90 to 90)",
-   "fieldname": "latitude",
-   "fieldtype": "Float",
-   "label": "Latitude",
-   "precision": "6",
-   "read_only": 1
-  },
-  {
-   "fieldname": "column_break_coords",
-   "fieldtype": "Column Break"
-  },
-  {
-   "description": "Longitude (-180 to 180)",
-   "fieldname": "longitude",
-   "fieldtype": "Float",
-   "label": "Longitude",
-   "precision": "6",
-   "read_only": 1
-  },
-  {
-   "fieldname": "telematics_tab",
-   "fieldtype": "Tab Break",
-   "label": "Telematics"
-  },
-  {
-   "fieldname": "device_section",
-   "fieldtype": "Section Break",
-   "label": "Telematics Device"
-  },
-  {
-   "description": "Device ID from telemetry platform",
-   "fieldname": "device_id",
-   "fieldtype": "Data",
-   "label": "Device ID",
-   "unique": 1
-  },
-  {
-   "description": "15-digit IMEI number",
-   "fieldname": "device_imei",
-   "fieldtype": "Data",
-   "label": "Device IMEI",
-   "length": 15,
-   "unique": 1
-  },
-  {
-   "fieldname": "column_break_device",
-   "fieldtype": "Column Break"
-  },
-  {
-   "default": "F902-EUR",
-   "fieldname": "telematics_device_model",
-   "fieldtype": "Data",
-   "label": "Device Model",
-   "read_only": 1
-  },
-  {
-   "default": "Safaricom",
-   "fieldname": "sim_provider",
-   "fieldtype": "Data",
-   "label": "SIM Provider"
-  },
-  {
-   "fieldname": "sim_number",
-   "fieldtype": "Data",
-   "label": "SIM Card Number"
-  },
-  {
-   "fieldname": "sim_serial",
-   "fieldtype": "Data",
-   "label": "SIM Serial Number"
-  },
-  {
-   "fieldname": "rental_tab",
-   "fieldtype": "Tab Break",
-   "label": "Rental Rates"
-  },
-  {
-   "fieldname": "rental_rates_section",
-   "fieldtype": "Section Break",
-   "label": "Rental Pricing"
-  },
-  {
-   "description": "Leave empty to use global rate",
-   "fieldname": "rental_rate_initial",
-   "fieldtype": "Currency",
-   "label": "Rate (First 2 Hours)"
-  },
-  {
-   "fieldname": "column_break_rental",
-   "fieldtype": "Column Break"
-  },
-  {
-   "description": "Leave empty to use global rate",
-   "fieldname": "rental_rate_hourly",
-   "fieldtype": "Currency",
-   "label": "Rate (Per Hour After)"
-  },
-  {
-   "collapsible": 1,
-   "fieldname": "sim_card_section",
-   "fieldtype": "Section Break",
-   "label": "Sim Card Details"
-  },
-  {
-   "fieldname": "column_break_oulk",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "column_break_cxes",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "maintenance_tab",
-   "fieldtype": "Tab Break",
-   "label": "Maintenance"
-  },
-  {
-   "fieldname": "maintenance_section",
-   "fieldtype": "Section Break",
-   "label": "Vehicle Information"
-  },
-  {
-   "description": "Total mileage/odometer reading from telemetry",
-   "fieldname": "mileage",
-   "fieldtype": "Float",
-   "label": "Mileage (km)",
-   "precision": "2",
-   "read_only": 1
-  }
- ],
- "index_web_pages_for_search": 1,
- "links": [],
- "modified": "2025-06-23 23:54:16.703376",
- "modified_by": "Administrator",
- "module": "Tuktuk Management",
- "name": "TukTuk Vehicle",
- "naming_rule": "Expression",
- "owner": "Administrator",
- "permissions": [
-  {
-   "create": 1,
-   "delete": 1,
-   "email": 1,
-   "export": 1,
-   "import": 1,
-   "print": 1,
-   "read": 1,
-   "report": 1,
-   "role": "System Manager",
-   "share": 1,
-   "write": 1
-  },
-  {
-   "create": 1,
-   "delete": 1,
-   "email": 1,
-   "export": 1,
-   "print": 1,
-   "read": 1,
-   "report": 1,
-   "role": "Tuktuk Manager",
-   "share": 1,
-   "write": 1
-  },
-  {
-   "read": 1,
-   "role": "Driver"
-  }
- ],
- "sort_field": "modified",
- "sort_order": "DESC",
- "states": [],
- "title_field": "tuktuk_id"
-}
+    "actions": [],
+    "allow_rename": 1,
+    "autoname": "format:TUK-885-{tuktuk_id}",
+    "creation": "2024-11-26 12:00:00",
+    "doctype": "DocType",
+    "engine": "InnoDB",
+    "field_order": [
+     "tuktuk_id",
+     "tuktuk_chasis",
+     "tuktuk_make",
+     "column_break_general",
+     "status",
+     "assigned_driver",
+     "assigned_driver_name",
+     "mpesa_account",
+     "substitute_section",
+     "current_substitute_driver",
+     "column_break_substitute",
+     "substitute_assignment_date",
+     "battery_section",
+     "battery_level",
+     "battery_voltage",
+     "column_break_battery",
+     "last_battery_reading",
+     "last_reported",
+     "location_tab",
+     "current_location_section",
+     "current_location",
+     "coordinates_section",
+     "latitude",
+     "column_break_coords",
+     "longitude",
+     "telematics_tab",
+     "device_section",
+     "device_id",
+     "device_imei",
+     "column_break_device",
+     "telematics_device_model",
+     "sim_card_section",
+     "sim_provider",
+     "column_break_oulk",
+     "sim_serial",
+     "column_break_cxes",
+     "sim_number",
+     "rental_tab",
+     "rental_rates_section",
+     "rental_rate_initial",
+     "column_break_rental",
+     "rental_rate_hourly",
+     "maintenance_tab",
+     "maintenance_section",
+     "mileage"
+    ],
+    "fields": [
+     {
+      "description": "SUNNY Call Number",
+      "fieldname": "tuktuk_id",
+      "fieldtype": "Data",
+      "in_list_view": 1,
+      "label": "TukTuk ID",
+      "reqd": 1,
+      "unique": 1
+     },
+     {
+      "fieldname": "tuktuk_chasis",
+      "fieldtype": "Data",
+      "label": "Chasis Number"
+     },
+     {
+      "default": "TRi",
+      "fieldname": "tuktuk_make",
+      "fieldtype": "Select",
+      "label": "Make",
+      "options": "TRi\nBajaj\nPiaggio\nTVS\nMahindra\nOther"
+     },
+     {
+      "fieldname": "column_break_general",
+      "fieldtype": "Column Break"
+     },
+     {
+      "default": "Available",
+      "fieldname": "status",
+      "fieldtype": "Select",
+      "in_list_view": 1,
+      "label": "Status",
+      "options": "Available\nAssigned\nSubbed\nCharging\nMaintenance\nOffline"
+     },
+     {
+      "fieldname": "assigned_driver",
+      "fieldtype": "Link",
+      "label": "Assigned Driver",
+      "options": "TukTuk Driver"
+     },
+     {
+      "fieldname": "assigned_driver_name",
+      "fieldtype": "Data",
+      "in_list_view": 1,
+      "label": "Driver Name",
+      "read_only": 1
+     },
+     {
+      "description": "3-digit Mpesa account number",
+      "fieldname": "mpesa_account",
+      "fieldtype": "Data",
+      "in_list_view": 1,
+      "label": "Mpesa Account",
+      "length": 3
+     },
+     {
+      "collapsible": 1,
+      "fieldname": "substitute_section",
+      "fieldtype": "Section Break",
+      "label": "Substitute Driver Assignment"
+     },
+     {
+      "fieldname": "current_substitute_driver",
+      "fieldtype": "Link",
+      "label": "Current Substitute Driver",
+      "options": "TukTuk Substitute Driver",
+      "description": "Temporary substitute driver assignment"
+     },
+     {
+      "fieldname": "column_break_substitute",
+      "fieldtype": "Column Break"
+     },
+     {
+      "fieldname": "substitute_assignment_date",
+      "fieldtype": "Datetime",
+      "label": "Substitute Assignment Date",
+      "read_only": 1
+     },
+     {
+      "collapsible": 1,
+      "fieldname": "battery_section",
+      "fieldtype": "Section Break",
+      "label": "Battery Information"
+     },
+     {
+      "default": "100",
+      "description": "Current battery percentage",
+      "fieldname": "battery_level",
+      "fieldtype": "Percent",
+      "in_list_view": 1,
+      "label": "Battery Level (%)"
+     },
+     {
+      "description": "Raw voltage reading from telemetry",
+      "fieldname": "battery_voltage",
+      "fieldtype": "Float",
+      "label": "Battery Voltage (V)",
+      "precision": "3",
+      "read_only": 1
+     },
+     {
+      "fieldname": "column_break_battery",
+      "fieldtype": "Column Break"
+     },
+     {
+      "description": "Previous battery percentage reading",
+      "fieldname": "last_battery_reading",
+      "fieldtype": "Percent",
+      "label": "Last Battery Reading",
+      "read_only": 1
+     },
+     {
+      "description": "Last telemetry update time",
+      "fieldname": "last_reported",
+      "fieldtype": "Datetime",
+      "label": "Last Updated",
+      "read_only": 1
+     },
+     {
+      "fieldname": "location_tab",
+      "fieldtype": "Tab Break",
+      "label": "Location"
+     },
+     {
+      "fieldname": "current_location_section",
+      "fieldtype": "Section Break",
+      "label": "Current Location"
+     },
+     {
+      "description": "GPS location from telemetry",
+      "fieldname": "current_location",
+      "fieldtype": "Geolocation",
+      "label": "Map Location"
+     },
+     {
+      "collapsible": 1,
+      "fieldname": "coordinates_section",
+      "fieldtype": "Section Break",
+      "label": "Coordinates"
+     },
+     {
+      "description": "GPS Latitude",
+      "fieldname": "latitude",
+      "fieldtype": "Float",
+      "label": "Latitude",
+      "precision": "8",
+      "read_only": 1
+     },
+     {
+      "fieldname": "column_break_coords",
+      "fieldtype": "Column Break"
+     },
+     {
+      "description": "GPS Longitude",
+      "fieldname": "longitude",
+      "fieldtype": "Float",
+      "label": "Longitude",
+      "precision": "8",
+      "read_only": 1
+     },
+     {
+      "fieldname": "telematics_tab",
+      "fieldtype": "Tab Break",
+      "label": "Telematics"
+     },
+     {
+      "fieldname": "device_section",
+      "fieldtype": "Section Break",
+      "label": "Telematics Device"
+     },
+     {
+      "fieldname": "device_id",
+      "fieldtype": "Data",
+      "label": "Device ID",
+      "unique": 1
+     },
+     {
+      "fieldname": "device_imei",
+      "fieldtype": "Data",
+      "label": "Device IMEI",
+      "unique": 1
+     },
+     {
+      "fieldname": "column_break_device",
+      "fieldtype": "Column Break"
+     },
+     {
+      "fieldname": "telematics_device_model",
+      "fieldtype": "Data",
+      "label": "Device Model"
+     },
+     {
+      "collapsible": 1,
+      "fieldname": "sim_card_section",
+      "fieldtype": "Section Break",
+      "label": "Sim Card Details"
+     },
+     {
+      "fieldname": "sim_provider",
+      "fieldtype": "Data",
+      "label": "SIM Provider"
+     },
+     {
+      "fieldname": "column_break_oulk",
+      "fieldtype": "Column Break"
+     },
+     {
+      "fieldname": "sim_serial",
+      "fieldtype": "Data",
+      "label": "SIM Serial"
+     },
+     {
+      "fieldname": "column_break_cxes",
+      "fieldtype": "Column Break"
+     },
+     {
+      "fieldname": "sim_number",
+      "fieldtype": "Data",
+      "label": "SIM Number"
+     },
+     {
+      "fieldname": "rental_tab",
+      "fieldtype": "Tab Break",
+      "label": "Rental"
+     },
+     {
+      "fieldname": "rental_rates_section",
+      "fieldtype": "Section Break",
+      "label": "Rental Rates"
+     },
+     {
+      "description": "Leave empty to use global rate",
+      "fieldname": "rental_rate_initial",
+      "fieldtype": "Currency",
+      "label": "Rate (First 2 Hours)"
+     },
+     {
+      "fieldname": "column_break_rental",
+      "fieldtype": "Column Break"
+     },
+     {
+      "description": "Leave empty to use global rate",
+      "fieldname": "rental_rate_hourly",
+      "fieldtype": "Currency",
+      "label": "Rate (Per Hour After)"
+     },
+     {
+      "fieldname": "maintenance_tab",
+      "fieldtype": "Tab Break",
+      "label": "Maintenance"
+     },
+     {
+      "fieldname": "maintenance_section",
+      "fieldtype": "Section Break",
+      "label": "Vehicle Information"
+     },
+     {
+      "description": "Total mileage/odometer reading from telemetry",
+      "fieldname": "mileage",
+      "fieldtype": "Float",
+      "label": "Mileage (km)",
+      "precision": "2",
+      "read_only": 1
+     }
+    ],
+    "index_web_pages_for_search": 1,
+    "links": [],
+    "modified": "2025-01-15 10:00:00.000000",
+    "modified_by": "Administrator",
+    "module": "TukTuk Management",
+    "name": "TukTuk Vehicle",
+    "naming_rule": "Expression",
+    "owner": "Administrator",
+    "permissions": [
+     {
+      "create": 1,
+      "delete": 1,
+      "email": 1,
+      "export": 1,
+      "import": 1,
+      "print": 1,
+      "read": 1,
+      "report": 1,
+      "role": "System Manager",
+      "share": 1,
+      "write": 1
+     },
+     {
+      "create": 1,
+      "delete": 1,
+      "email": 1,
+      "export": 1,
+      "print": 1,
+      "read": 1,
+      "report": 1,
+      "role": "Tuktuk Manager",
+      "share": 1,
+      "write": 1
+     },
+     {
+      "read": 1,
+      "role": "Driver"
+     }
+    ],
+    "sort_field": "modified",
+    "sort_order": "DESC",
+    "states": [],
+    "title_field": "tuktuk_id"
+   }
+   

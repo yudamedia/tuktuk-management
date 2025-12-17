@@ -21,6 +21,166 @@ from tuktuk_management.api.sendpay import send_mpesa_payment
 PRODUCTION_BASE_URL = "https://api.safaricom.co.ke"
 SANDBOX_BASE_URL = "https://sandbox.safaricom.co.ke"
 
+
+def get_active_driver_for_vehicle(tuktuk_name):
+    """
+    Determine which driver (regular or substitute) is currently active for a vehicle
+    
+    Returns:
+        dict: {
+            'driver_name': str,
+            'driver_type': 'Regular' or 'Substitute',
+            'doctype': 'TukTuk Driver' or 'TukTuk Substitute Driver',
+            'phone_number': str
+        } or None if no active driver
+    """
+    try:
+        # First check if there's a substitute driver assigned
+        vehicle = frappe.get_doc("TukTuk Vehicle", tuktuk_name)
+        
+        if vehicle.current_substitute_driver:
+            # Substitute driver is active
+            sub_driver = frappe.get_doc("TukTuk Substitute Driver", vehicle.current_substitute_driver)
+            return {
+                'driver_name': sub_driver.name,
+                'driver_type': 'Substitute',
+                'doctype': 'TukTuk Substitute Driver',
+                'phone_number': sub_driver.phone_number
+            }
+        
+        elif vehicle.assigned_driver:
+            # Regular driver is active
+            driver = frappe.get_doc("TukTuk Driver", vehicle.assigned_driver)
+            return {
+                'driver_name': driver.name,
+                'driver_type': 'Regular',
+                'doctype': 'TukTuk Driver',
+                'phone_number': driver.mpesa_number
+            }
+        
+        return None
+        
+    except Exception as e:
+        frappe.log_error(f"Error determining active driver: {str(e)}")
+        return None
+
+
+def process_regular_driver_payment(driver_doc, tuktuk, transaction_id, amount, customer_phone, trans_time):
+    """
+    Process payment for regular driver with standard target logic
+    Returns: dict with transaction details
+    """
+    # Get daily target and fare percentage
+    daily_target = driver_doc.get_daily_target() if hasattr(driver_doc, 'get_daily_target') else driver_doc.daily_target or 3000
+    fare_percentage = driver_doc.get_fare_percentage() if hasattr(driver_doc, 'get_fare_percentage') else driver_doc.fare_percentage or 50
+    
+    # Calculate shares based on target status
+    target_met = (driver_doc.todays_target_contribution or 0) >= daily_target
+    
+    if target_met:
+        # Target already met - driver gets 100%
+        driver_share = amount
+        target_contribution = 0
+    else:
+        # Target not met - apply percentage split
+        driver_share = amount * (fare_percentage / 100)
+        target_contribution = amount - driver_share
+    
+    # Create transaction record
+    transaction = frappe.get_doc({
+        "doctype": "TukTuk Transaction",
+        "transaction_id": transaction_id,
+        "transaction_type": "Payment",
+        "tuktuk": tuktuk,
+        "driver": driver_doc.name,
+        "substitute_driver": None,
+        "driver_type": "Regular",
+        "amount": amount,
+        "driver_share": driver_share,
+        "target_contribution": target_contribution,
+        "customer_phone": customer_phone,
+        "timestamp": parse_mpesa_trans_time(trans_time),
+        "payment_status": "Completed"
+    })
+    transaction.insert(ignore_permissions=True)
+    
+    # Update driver stats atomically
+    frappe.db.sql("""
+        UPDATE `tabTukTuk Driver`
+        SET todays_earnings = todays_earnings + %s,
+            todays_target_contribution = todays_target_contribution + %s,
+            target_balance = target_balance - %s,
+            total_earnings = total_earnings + %s,
+            total_rides = total_rides + 1
+        WHERE name = %s
+    """, (driver_share, target_contribution, target_contribution, driver_share, driver_doc.name))
+    
+    return {
+        'transaction_name': transaction.name,
+        'driver_share': driver_share,
+        'target_contribution': target_contribution,
+        'send_b2c': True  # Regular drivers always get B2C
+    }
+
+def process_substitute_driver_payment(driver_doc, tuktuk, transaction_id, amount, customer_phone, trans_time):
+    """
+    Process payment for substitute driver - ALWAYS uses percentage split
+    Returns: dict with transaction details
+    """
+    from frappe.utils import today
+    
+    # Get fare percentage
+    fare_percentage = driver_doc.get_fare_percentage() if hasattr(driver_doc, 'get_fare_percentage') else driver_doc.fare_percentage_to_driver or 50
+    
+    # Substitute drivers ALWAYS get the percentage split
+    driver_share = amount * (fare_percentage / 100)
+    target_contribution = amount - driver_share
+    
+    # Create transaction record
+    transaction = frappe.get_doc({
+        "doctype": "TukTuk Transaction",
+        "transaction_id": transaction_id,
+        "transaction_type": "Payment",
+        "tuktuk": tuktuk,
+        "driver": None,
+        "substitute_driver": driver_doc.name,
+        "driver_type": "Substitute",
+        "amount": amount,
+        "driver_share": driver_share,
+        "target_contribution": target_contribution,
+        "customer_phone": customer_phone,
+        "timestamp": parse_mpesa_trans_time(trans_time),
+        "payment_status": "Completed"
+    })
+    transaction.insert(ignore_permissions=True)
+    
+    # Update substitute driver stats atomically
+    frappe.db.sql("""
+        UPDATE `tabTukTuk Substitute Driver`
+        SET todays_earnings = todays_earnings + %s,
+            todays_target_contribution = todays_target_contribution + %s,
+            target_balance = target_balance - %s,
+            total_earnings = total_earnings + %s,
+            total_rides = total_rides + 1
+        WHERE name = %s
+    """, (driver_share, target_contribution, target_contribution, driver_share, driver_doc.name))
+    
+    # Update last worked date if needed
+    if driver_doc.last_worked_date != today():
+        frappe.db.sql("""
+            UPDATE `tabTukTuk Substitute Driver`
+            SET last_worked_date = %s,
+                total_days_worked = total_days_worked + 1
+            WHERE name = %s
+        """, (today(), driver_doc.name))
+    
+    return {
+        'transaction_name': transaction.name,
+        'driver_share': driver_share,
+        'target_contribution': target_contribution,
+        'send_b2c': True  # Substitutes also get B2C
+    }            
+
 # ===== CORE VALIDATION FUNCTIONS =====
 
 def validate_mpesa_number(doc):
@@ -385,197 +545,271 @@ def mpesa_confirmation(**kwargs):
             
             return {"ResultCode": "0", "ResultDesc": "Success"}
         
-        # Find assigned driver
-        driver_name = frappe.db.get_value("TukTuk Driver", {"assigned_tuktuk": tuktuk}, "name")
-        if not driver_name:
+        # Determine active driver (regular or substitute)
+        active_driver_info = get_active_driver_for_vehicle(tuktuk)
+        if not active_driver_info:
             frappe.log_error(f"M-Pesa Confirmation: No driver assigned to tuktuk: {tuktuk}")
             return {"ResultCode": "0", "ResultDesc": "Success"}
-        
-        # Get settings for calculations (outside savepoint)
-        settings = frappe.get_single("TukTuk Settings")
-        transaction_type = kwargs.get('transaction_type', 'Payment')
-        
-        # RACE CONDITION FIX: Use savepoint and lock driver row FIRST
+
+        driver_name = active_driver_info['driver_name']
+        driver_type = active_driver_info['driver_type']
+        driver_doctype = active_driver_info['doctype']
+        driver_phone = active_driver_info['phone_number']
+
+        # Start database transaction with savepoint
         savepoint = 'mpesa_confirmation_savepoint'
         try:
             frappe.db.savepoint(savepoint)
-
+            
             # Double-check for duplicate within transaction
             if frappe.db.exists("TukTuk Transaction", {"transaction_id": transaction_id}):
                 frappe.log_error("Duplicate Transaction in Transaction Block",
                                 f"Transaction {transaction_id} already exists. Aborting.")
+                frappe.db.rollback(save_point=savepoint)
                 return {"ResultCode": "0", "ResultDesc": "Success"}
-
-            # CRITICAL FIX: Load driver with row lock to prevent concurrent updates
-            driver = frappe.get_doc("TukTuk Driver", driver_name, for_update=True)
             
-            # Calculate shares INSIDE the locked transaction
-            percentage = driver.fare_percentage or settings.global_fare_percentage
-            target = driver.daily_target or settings.global_daily_target
-
-            # Check if target sharing is enabled (driver override takes precedence)
-            driver_target_override = getattr(driver, 'target_sharing_override', 'Follow Global')
-            if driver_target_override == 'Enable':
-                target_sharing_enabled = True
-            elif driver_target_override == 'Disable':
-                target_sharing_enabled = False
-            else:
-                target_sharing_enabled = getattr(settings, 'enable_target_sharing', 1)
-
-            # Detect driver repayment: Check if amount matches pending adjustment
-            is_driver_repayment = False
-            if transaction_type == 'Payment':
-                # Look for pending adjustment transactions for this driver
-                pending_adjustments = frappe.get_all("TukTuk Transaction",
-                                                   filters={
-                                                       "driver": driver_name,
-                                                       "transaction_type": "Adjustment",
-                                                       "amount": amount,
-                                                       "payment_status": "Completed"
-                                                   },
-                                                   fields=["name", "amount"],
-                                                   limit=1)
-
-                if pending_adjustments:
-                    is_driver_repayment = True
-                    transaction_type = 'Driver Repayment'
-
-            if transaction_type == 'Adjustment' or is_driver_repayment:
-                driver_share = 0  # No payment to driver
-                target_contribution = 0  # No target credit
-            elif target_sharing_enabled and driver.current_balance >= target:
-                driver_share = amount  # 100% to driver when target met AND target sharing enabled
-                target_contribution = 0
-            else:
-                # Always use percentage sharing when target not met OR target sharing disabled
-                driver_share = amount * (percentage / 100)
-                target_contribution = amount - driver_share  # Target contribution always calculated
-
-            # Create transaction with calculated fields
-            transaction = frappe.get_doc({
-                "doctype": "TukTuk Transaction",
-                "transaction_id": transaction_id,
-                "transaction_type": transaction_type,
-                "tuktuk": tuktuk,
-                "driver": driver_name,
-                "amount": amount,
-                "driver_share": driver_share,
-                "target_contribution": target_contribution,
-                "customer_phone": customer_phone,
-                "timestamp": now_datetime(),
-                "payment_status": "Pending"  # Start as pending
-            })
-
-            transaction.insert(ignore_permissions=True)
-
-            # ATOMIC UPDATE FIX: Use SQL UPDATE to prevent race conditions
-            # Skip balance updates for adjustment and driver repayment transactions
-            if target_contribution > 0 and transaction_type not in ['Adjustment', 'Driver Repayment']:
-                # Get global target for left_to_target calculation
-                global_target = settings.global_daily_target or 0
-                
-                # Use atomic SQL update instead of read-modify-save
-                frappe.db.sql("""
-                    UPDATE `tabTukTuk Driver`
-                    SET current_balance = current_balance + %s
-                    WHERE name = %s
-                """, (target_contribution, driver_name))
-                
-                # Also update left_to_target atomically
-                frappe.db.sql("""
-                    UPDATE `tabTukTuk Driver`
-                    SET left_to_target = GREATEST(0, 
-                        COALESCE(NULLIF(daily_target, 0), %s) - current_balance
-                    )
-                    WHERE name = %s
-                """, (global_target, driver_name))
-                
-                # Reload driver to get updated balance
-                driver.reload()
-
-            # Mark transaction as completed after successful driver update
-            transaction.payment_status = "Completed"
-            transaction.save(ignore_permissions=True)
+            # Lock driver row to prevent race conditions
+            driver_doc = frappe.get_doc(driver_doctype, driver_name, for_update=True)
             
-            # EXPLICIT COMMIT: Commit the transaction and balance update immediately
+            # Process transaction based on driver type
+            if driver_type == "Regular":
+                result = process_regular_driver_payment(
+                    driver_doc=driver_doc,
+                    tuktuk=tuktuk,
+                    transaction_id=transaction_id,
+                    amount=amount,
+                    customer_phone=customer_phone,
+                    trans_time=trans_time
+                )
+            else:  # Substitute
+                result = process_substitute_driver_payment(
+                    driver_doc=driver_doc,
+                    tuktuk=tuktuk,
+                    transaction_id=transaction_id,
+                    amount=amount,
+                    customer_phone=customer_phone,
+                    trans_time=trans_time
+                )
+            
+            # Commit the transaction
             frappe.db.commit()
-
-        except Exception as inner_error:
-            frappe.db.rollback(save_point=savepoint)
-            raise inner_error
-
-        # CRITICAL FIX: Send payment to driver ONLY ONCE after successful database operations
-        # Skip B2C payment for adjustment and driver repayment transactions
-        payment_success = False
-        if transaction_type not in ['Adjustment', 'Driver Repayment']:
-            # Determine if instant payout is enabled (driver override takes precedence over global)
-            instant_global = frappe.get_single("TukTuk Settings").get("instant_payouts_enabled") or 0
-            driver_pref = (driver.get("instant_payout_override")
-                           if hasattr(driver, "get") else getattr(driver, "instant_payout_override", None))
-            # Normalize preference
-            # Values: None/"Follow Global", "Enable", "Disable"
-            should_instant_payout = False
-            if driver_pref == "Enable":
-                should_instant_payout = True
-            elif driver_pref == "Disable":
-                should_instant_payout = False
-            else:
-                should_instant_payout = bool(instant_global)
-
-            if not should_instant_payout:
-                # No instant payout: record only; mark as not sent
-                frappe.db.set_value("TukTuk Transaction", transaction.name,
-                                    "b2c_payment_sent", 0, update_modified=False)
-                frappe.log_error("Instant Payout Disabled",
-                                 f"Skipping B2C for {transaction_id}; driver_pref={driver_pref}, global={instant_global}")
-                frappe.db.commit()
-                return {"ResultCode": "0", "ResultDesc": "Success"}
-
-            # Check if B2C payment was already attempted for this transaction
-            b2c_already_sent = frappe.db.get_value("TukTuk Transaction",
-                                                    transaction.name,
-                                                    "b2c_payment_sent")
-
-            if not b2c_already_sent:
+            
+            # Send B2C payment if applicable (outside transaction)
+            if result['send_b2c'] and result['driver_share'] > 0:
                 try:
-                    # Mark B2C as sent BEFORE making the API call to prevent race conditions
-                    frappe.db.set_value("TukTuk Transaction", transaction.name,
-                                       "b2c_payment_sent", 1, update_modified=False)
-                    frappe.db.commit()
-
-                    if send_mpesa_payment(driver.mpesa_number, driver_share, "FARE"):
-                        payment_success = True
+                    payment_success = send_mpesa_payment(
+                        mpesa_number=driver_phone,
+                        amount=result['driver_share'],
+                        payment_type="DRIVER_REVENUE"
+                    )
+                    
+                    if payment_success:
+                        frappe.db.set_value("TukTuk Transaction", result['transaction_name'],
+                                        "b2c_payment_sent", 1, update_modified=False)
+                        frappe.db.commit()
                         frappe.log_error("M-Pesa Payment Success",
-                                       f"Sent {driver_share} KSH to driver {driver.driver_name}")
+                                    f"Sent {result['driver_share']} KSH to {driver_type} driver {driver_name}")
                     else:
                         frappe.log_error("M-Pesa Payment Failed",
-                                       f"Failed to send {driver_share} KSH to driver {driver.driver_name}")
+                                    f"Failed to send {result['driver_share']} KSH to {driver_type} driver {driver_name}")
                 except Exception as payment_error:
                     frappe.log_error("M-Pesa B2C Error", f"B2C payment failed: {str(payment_error)}")
-
-                # Update transaction with payment result
-                if not payment_success:
-                    transaction.add_comment('Comment', 'Driver payment failed but transaction recorded')
-                    transaction.save(ignore_permissions=True)
-            else:
-                frappe.log_error("Duplicate B2C Prevention",
-                               f"B2C payment already sent for transaction {transaction_id}. Skipping duplicate.")
-        else:
-            # For adjustment and driver repayment transactions, mark as completed without B2C payment
-            frappe.db.set_value("TukTuk Transaction", transaction.name,
-                               "b2c_payment_sent", 1, update_modified=False)
-            payment_success = True
             
-            # Add special comment for driver repayments
-            if is_driver_repayment:
-                transaction.add_comment('Comment', f'Driver repayment received: {amount} KSH - No B2C payment sent')
-                transaction.save(ignore_permissions=True)
+            frappe.log_error("M-Pesa Transaction Success", 
+                        f"Transaction {transaction_id} processed for {driver_type} driver {driver_name}")
+            
+            return {"ResultCode": "0", "ResultDesc": "Success"}
+            
+        except Exception as e:
+            frappe.db.rollback(save_point=savepoint)
+            frappe.log_error(f"Transaction Processing Error: {str(e)}")
+            return {"ResultCode": "0", "ResultDesc": "Success"}
         
-        frappe.db.commit()
-        frappe.log_error("M-Pesa Transaction Success", 
-                        f"Transaction {transaction_id} processed successfully")
+        # # Get settings for calculations (outside savepoint)
+        # settings = frappe.get_single("TukTuk Settings")
+        # transaction_type = kwargs.get('transaction_type', 'Payment')
         
-        return {"ResultCode": "0", "ResultDesc": "Success"}
+        # # RACE CONDITION FIX: Use savepoint and lock driver row FIRST
+        # savepoint = 'mpesa_confirmation_savepoint'
+        # try:
+        #     frappe.db.savepoint(savepoint)
+
+        #     # Double-check for duplicate within transaction
+        #     if frappe.db.exists("TukTuk Transaction", {"transaction_id": transaction_id}):
+        #         frappe.log_error("Duplicate Transaction in Transaction Block",
+        #                         f"Transaction {transaction_id} already exists. Aborting.")
+        #         return {"ResultCode": "0", "ResultDesc": "Success"}
+
+        #     # CRITICAL FIX: Load driver with row lock to prevent concurrent updates
+        #     driver = frappe.get_doc("TukTuk Driver", driver_name, for_update=True)
+            
+        #     # Calculate shares INSIDE the locked transaction
+        #     percentage = driver.fare_percentage or settings.global_fare_percentage
+        #     target = driver.daily_target or settings.global_daily_target
+
+        #     # Check if target sharing is enabled (driver override takes precedence)
+        #     driver_target_override = getattr(driver, 'target_sharing_override', 'Follow Global')
+        #     if driver_target_override == 'Enable':
+        #         target_sharing_enabled = True
+        #     elif driver_target_override == 'Disable':
+        #         target_sharing_enabled = False
+        #     else:
+        #         target_sharing_enabled = getattr(settings, 'enable_target_sharing', 1)
+
+        #     # Detect driver repayment: Check if amount matches pending adjustment
+        #     is_driver_repayment = False
+        #     if transaction_type == 'Payment':
+        #         # Look for pending adjustment transactions for this driver
+        #         pending_adjustments = frappe.get_all("TukTuk Transaction",
+        #                                            filters={
+        #                                                "driver": driver_name,
+        #                                                "transaction_type": "Adjustment",
+        #                                                "amount": amount,
+        #                                                "payment_status": "Completed"
+        #                                            },
+        #                                            fields=["name", "amount"],
+        #                                            limit=1)
+
+        #         if pending_adjustments:
+        #             is_driver_repayment = True
+        #             transaction_type = 'Driver Repayment'
+
+        #     if transaction_type == 'Adjustment' or is_driver_repayment:
+        #         driver_share = 0  # No payment to driver
+        #         target_contribution = 0  # No target credit
+        #     elif target_sharing_enabled and driver.current_balance >= target:
+        #         driver_share = amount  # 100% to driver when target met AND target sharing enabled
+        #         target_contribution = 0
+        #     else:
+        #         # Always use percentage sharing when target not met OR target sharing disabled
+        #         driver_share = amount * (percentage / 100)
+        #         target_contribution = amount - driver_share  # Target contribution always calculated
+
+        #     # Create transaction with calculated fields
+        #     transaction = frappe.get_doc({
+        #         "doctype": "TukTuk Transaction",
+        #         "transaction_id": transaction_id,
+        #         "transaction_type": transaction_type,
+        #         "tuktuk": tuktuk,
+        #         "driver": driver_name,
+        #         "amount": amount,
+        #         "driver_share": driver_share,
+        #         "target_contribution": target_contribution,
+        #         "customer_phone": customer_phone,
+        #         "timestamp": now_datetime(),
+        #         "payment_status": "Pending"  # Start as pending
+        #     })
+
+        #     transaction.insert(ignore_permissions=True)
+
+        #     # ATOMIC UPDATE FIX: Use SQL UPDATE to prevent race conditions
+        #     # Skip balance updates for adjustment and driver repayment transactions
+        #     if target_contribution > 0 and transaction_type not in ['Adjustment', 'Driver Repayment']:
+        #         # Get global target for left_to_target calculation
+        #         global_target = settings.global_daily_target or 0
+                
+        #         # Use atomic SQL update instead of read-modify-save
+        #         frappe.db.sql("""
+        #             UPDATE `tabTukTuk Driver`
+        #             SET current_balance = current_balance + %s
+        #             WHERE name = %s
+        #         """, (target_contribution, driver_name))
+                
+        #         # Also update left_to_target atomically
+        #         frappe.db.sql("""
+        #             UPDATE `tabTukTuk Driver`
+        #             SET left_to_target = GREATEST(0, 
+        #                 COALESCE(NULLIF(daily_target, 0), %s) - current_balance
+        #             )
+        #             WHERE name = %s
+        #         """, (global_target, driver_name))
+                
+        #         # Reload driver to get updated balance
+        #         driver.reload()
+
+        #     # Mark transaction as completed after successful driver update
+        #     transaction.payment_status = "Completed"
+        #     transaction.save(ignore_permissions=True)
+            
+        #     # EXPLICIT COMMIT: Commit the transaction and balance update immediately
+        #     frappe.db.commit()
+
+        # except Exception as inner_error:
+        #     frappe.db.rollback(save_point=savepoint)
+        #     raise inner_error
+
+        # # CRITICAL FIX: Send payment to driver ONLY ONCE after successful database operations
+        # # Skip B2C payment for adjustment and driver repayment transactions
+        # payment_success = False
+        # if transaction_type not in ['Adjustment', 'Driver Repayment']:
+        #     # Determine if instant payout is enabled (driver override takes precedence over global)
+        #     instant_global = frappe.get_single("TukTuk Settings").get("instant_payouts_enabled") or 0
+        #     driver_pref = (driver.get("instant_payout_override")
+        #                    if hasattr(driver, "get") else getattr(driver, "instant_payout_override", None))
+        #     # Normalize preference
+        #     # Values: None/"Follow Global", "Enable", "Disable"
+        #     should_instant_payout = False
+        #     if driver_pref == "Enable":
+        #         should_instant_payout = True
+        #     elif driver_pref == "Disable":
+        #         should_instant_payout = False
+        #     else:
+        #         should_instant_payout = bool(instant_global)
+
+        #     if not should_instant_payout:
+        #         # No instant payout: record only; mark as not sent
+        #         frappe.db.set_value("TukTuk Transaction", transaction.name,
+        #                             "b2c_payment_sent", 0, update_modified=False)
+        #         frappe.log_error("Instant Payout Disabled",
+        #                          f"Skipping B2C for {transaction_id}; driver_pref={driver_pref}, global={instant_global}")
+        #         frappe.db.commit()
+        #         return {"ResultCode": "0", "ResultDesc": "Success"}
+
+        #     # Check if B2C payment was already attempted for this transaction
+        #     b2c_already_sent = frappe.db.get_value("TukTuk Transaction",
+        #                                             transaction.name,
+        #                                             "b2c_payment_sent")
+
+        #     if not b2c_already_sent:
+        #         try:
+        #             # Mark B2C as sent BEFORE making the API call to prevent race conditions
+        #             frappe.db.set_value("TukTuk Transaction", transaction.name,
+        #                                "b2c_payment_sent", 1, update_modified=False)
+        #             frappe.db.commit()
+
+        #             if send_mpesa_payment(driver.mpesa_number, driver_share, "FARE"):
+        #                 payment_success = True
+        #                 frappe.log_error("M-Pesa Payment Success",
+        #                                f"Sent {driver_share} KSH to driver {driver.driver_name}")
+        #             else:
+        #                 frappe.log_error("M-Pesa Payment Failed",
+        #                                f"Failed to send {driver_share} KSH to driver {driver.driver_name}")
+        #         except Exception as payment_error:
+        #             frappe.log_error("M-Pesa B2C Error", f"B2C payment failed: {str(payment_error)}")
+
+        #         # Update transaction with payment result
+        #         if not payment_success:
+        #             transaction.add_comment('Comment', 'Driver payment failed but transaction recorded')
+        #             transaction.save(ignore_permissions=True)
+        #     else:
+        #         frappe.log_error("Duplicate B2C Prevention",
+        #                        f"B2C payment already sent for transaction {transaction_id}. Skipping duplicate.")
+        # else:
+        #     # For adjustment and driver repayment transactions, mark as completed without B2C payment
+        #     frappe.db.set_value("TukTuk Transaction", transaction.name,
+        #                        "b2c_payment_sent", 1, update_modified=False)
+        #     payment_success = True
+            
+        #     # Add special comment for driver repayments
+        #     if is_driver_repayment:
+        #         transaction.add_comment('Comment', f'Driver repayment received: {amount} KSH - No B2C payment sent')
+        #         transaction.save(ignore_permissions=True)
+        
+        # frappe.db.commit()
+        # frappe.log_error("M-Pesa Transaction Success", 
+        #                 f"Transaction {transaction_id} processed successfully")
+        
+        # return {"ResultCode": "0", "ResultDesc": "Success"}
         
     except Exception as e:
         frappe.log_error(f"M-Pesa Confirmation Error: {str(e)}")

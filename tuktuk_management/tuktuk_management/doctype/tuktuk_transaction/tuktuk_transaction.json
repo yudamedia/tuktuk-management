@@ -1,144 +1,158 @@
 {
- "actions": [],
- "creation": "2024-11-26 12:00:00",
- "doctype": "DocType",
- "engine": "InnoDB",
- "field_order": [
-  "transaction_id",
-  "transaction_type",
-  "tuktuk",
-  "driver",
-  "column_break_1",
-  "amount",
-  "driver_share",
-  "target_contribution",
-  "section_break_1",
-  "customer_phone",
-  "timestamp",
-  "payment_status",
-  "b2c_payment_sent"
- ],
- "fields": [
-  {
-   "fieldname": "transaction_id",
-   "fieldtype": "Data",
-   "label": "Mpesa Transaction ID",
-   "reqd": 1,
-   "unique": 1
-  },
-  {
-   "default": "Payment",
-   "fieldname": "transaction_type",
-   "fieldtype": "Select",
-   "in_list_view": 1,
-   "label": "Transaction Type",
-   "options": "Payment\nAdjustment\nDriver Repayment\nTarget Reduction/Deposit"
-  },
-  {
-   "fieldname": "tuktuk",
-   "fieldtype": "Link",
-   "label": "TukTuk",
-   "options": "TukTuk Vehicle",
-   "reqd": 1
-  },
-  {
-   "fieldname": "driver",
-   "fieldtype": "Link",
-   "label": "Driver",
-   "options": "TukTuk Driver",
-   "reqd": 1
-  },
-  {
-   "fieldname": "column_break_1",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "amount",
-   "fieldtype": "Currency",
-   "in_list_view": 1,
-   "label": "Amount",
-   "reqd": 1
-  },
-  {
-   "fieldname": "driver_share",
-   "fieldtype": "Currency",
-   "label": "Driver Share",
-   "reqd": 1
-  },
-  {
-   "fieldname": "target_contribution",
-   "fieldtype": "Currency",
-   "label": "Target Contribution",
-   "reqd": 1
-  },
-  {
-   "fieldname": "section_break_1",
-   "fieldtype": "Section Break"
-  },
-  {
-   "fieldname": "customer_phone",
-   "fieldtype": "Data",
-   "label": "Customer Phone",
-   "reqd": 1
-  },
-  {
-   "fieldname": "timestamp",
-   "fieldtype": "Datetime",
-   "label": "Transaction Time",
-   "reqd": 1
-  },
-  {
-   "default": "Pending",
-   "fieldname": "payment_status",
-   "fieldtype": "Select",
-   "in_list_view": 1,
-   "label": "Payment Status",
-   "options": "Pending\nCompleted\nFailed"
-  },
-  {
-   "default": "0",
-   "fieldname": "b2c_payment_sent",
-   "fieldtype": "Check",
-   "label": "B2C Payment Sent",
-   "read_only": 1
-  }
- ],
- "index_web_pages_for_search": 1,
- "links": [],
- "modified": "2025-12-12 06:42:42.069612",
- "modified_by": "Administrator",
- "module": "Tuktuk Management",
- "name": "TukTuk Transaction",
- "owner": "Administrator",
- "permissions": [
-  {
-   "email": 1,
-   "export": 1,
-   "print": 1,
-   "read": 1,
-   "report": 1,
-   "role": "TukTuk Driver",
-   "share": 1
-  },
-  {
-   "create": 1,
-   "email": 1,
-   "export": 1,
-   "print": 1,
-   "read": 1,
-   "report": 1,
-   "role": "System Manager",
-   "share": 1,
-   "write": 1
-  },
-  {
-   "read": 1,
-   "role": "Driver"
-  }
- ],
- "row_format": "Dynamic",
- "sort_field": "modified",
- "sort_order": "DESC",
- "states": [],
- "track_changes": 1
-}
+    "actions": [],
+    "creation": "2024-11-26 12:00:00",
+    "doctype": "DocType",
+    "engine": "InnoDB",
+    "field_order": [
+     "transaction_id",
+     "transaction_type",
+     "tuktuk",
+     "driver",
+     "substitute_driver",
+     "driver_type",
+     "column_break_1",
+     "amount",
+     "driver_share",
+     "target_contribution",
+     "section_break_1",
+     "customer_phone",
+     "timestamp",
+     "payment_status",
+     "b2c_payment_sent"
+    ],
+    "fields": [
+     {
+      "fieldname": "transaction_id",
+      "fieldtype": "Data",
+      "label": "Mpesa Transaction ID",
+      "reqd": 1,
+      "unique": 1
+     },
+     {
+      "default": "Payment",
+      "fieldname": "transaction_type",
+      "fieldtype": "Select",
+      "in_list_view": 1,
+      "label": "Transaction Type",
+      "options": "Payment\nAdjustment\nDriver Repayment\nTarget Reduction/Deposit"
+     },
+     {
+      "fieldname": "tuktuk",
+      "fieldtype": "Link",
+      "label": "TukTuk",
+      "options": "TukTuk Vehicle",
+      "reqd": 1
+     },
+     {
+      "fieldname": "driver",
+      "fieldtype": "Link",
+      "label": "Regular Driver",
+      "options": "TukTuk Driver"
+     },
+     {
+      "fieldname": "substitute_driver",
+      "fieldtype": "Link",
+      "label": "Substitute Driver",
+      "options": "TukTuk Substitute Driver"
+     },
+     {
+      "fieldname": "driver_type",
+      "fieldtype": "Select",
+      "label": "Driver Type",
+      "options": "Regular\nSubstitute",
+      "read_only": 1,
+      "in_list_view": 1
+     },
+     {
+      "fieldname": "column_break_1",
+      "fieldtype": "Column Break"
+     },
+     {
+      "fieldname": "amount",
+      "fieldtype": "Currency",
+      "in_list_view": 1,
+      "label": "Amount",
+      "reqd": 1
+     },
+     {
+      "fieldname": "driver_share",
+      "fieldtype": "Currency",
+      "label": "Driver Share",
+      "reqd": 1
+     },
+     {
+      "fieldname": "target_contribution",
+      "fieldtype": "Currency",
+      "label": "Target Contribution",
+      "reqd": 1
+     },
+     {
+      "fieldname": "section_break_1",
+      "fieldtype": "Section Break"
+     },
+     {
+      "fieldname": "customer_phone",
+      "fieldtype": "Data",
+      "label": "Customer Phone",
+      "reqd": 1
+     },
+     {
+      "fieldname": "timestamp",
+      "fieldtype": "Datetime",
+      "label": "Transaction Time",
+      "reqd": 1
+     },
+     {
+      "default": "Pending",
+      "fieldname": "payment_status",
+      "fieldtype": "Select",
+      "in_list_view": 1,
+      "label": "Payment Status",
+      "options": "Pending\nCompleted\nFailed"
+     },
+     {
+      "default": "0",
+      "fieldname": "b2c_payment_sent",
+      "fieldtype": "Check",
+      "label": "B2C Payment Sent",
+      "read_only": 1
+     }
+    ],
+    "index_web_pages_for_search": 1,
+    "links": [],
+    "modified": "2025-01-15 10:00:00.000000",
+    "modified_by": "Administrator",
+    "module": "TukTuk Management",
+    "name": "TukTuk Transaction",
+    "owner": "Administrator",
+    "permissions": [
+     {
+      "email": 1,
+      "export": 1,
+      "print": 1,
+      "read": 1,
+      "report": 1,
+      "role": "TukTuk Driver",
+      "share": 1
+     },
+     {
+      "create": 1,
+      "email": 1,
+      "export": 1,
+      "print": 1,
+      "read": 1,
+      "report": 1,
+      "role": "System Manager",
+      "share": 1,
+      "write": 1
+     },
+     {
+      "read": 1,
+      "role": "Driver"
+     }
+    ],
+    "sort_field": "modified",
+    "sort_order": "DESC",
+    "states": [],
+    "track_changes": 1
+   }
