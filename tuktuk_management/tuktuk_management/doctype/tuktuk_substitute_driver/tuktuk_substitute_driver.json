@@ -1,232 +1,238 @@
 {
-    "actions": [],
-    "allow_rename": 1,
-    "autoname": "format:SUB-212{#####}",
-    "creation": "2024-01-15 10:00:00.000000",
-    "doctype": "DocType",
-    "editable_grid": 1,
-    "engine": "InnoDB",
-    "field_order": [
-     "basic_info_section",
-     "first_name",
-     "last_name",
-     "phone_number",
-     "national_id",
-     "column_break_basic",
-     "status",
-     "date_joined",
-     "driver_type",
-     "assignment_section",
-     "assigned_tuktuk",
-     "assignment_date",
-     "column_break_assignment",
-     "last_worked_date",
-     "total_days_worked",
-     "performance_section",
-     "daily_target",
-     "fare_percentage_to_driver",
-     "column_break_performance",
-     "todays_earnings",
-     "todays_target_contribution",
-     "target_balance",
-     "financial_section",
-     "total_earnings",
-     "column_break_financial",
-     "total_rides",
-     "average_daily_earnings"
-    ],
-    "fields": [
-     {
-      "fieldname": "basic_info_section",
-      "fieldtype": "Section Break",
-      "label": "Basic Information"
-     },
-     {
-      "fieldname": "first_name",
-      "fieldtype": "Data",
-      "in_list_view": 1,
-      "label": "First Name",
-      "reqd": 1
-     },
-     {
-      "fieldname": "last_name",
-      "fieldtype": "Data",
-      "in_list_view": 1,
-      "label": "Last Name",
-      "reqd": 1
-     },
-     {
-      "fieldname": "phone_number",
-      "fieldtype": "Data",
-      "label": "Phone Number",
-      "reqd": 1
-     },
-     {
-      "fieldname": "national_id",
-      "fieldtype": "Data",
-      "label": "National ID",
-      "unique": 1
-     },
-     {
-      "fieldname": "column_break_basic",
-      "fieldtype": "Column Break"
-     },
-     {
-      "fieldname": "status",
-      "fieldtype": "Select",
-      "in_list_view": 1,
-      "label": "Status",
-      "options": "Active\nInactive\nOn Assignment",
-      "default": "Active"
-     },
-     {
-      "fieldname": "date_joined",
-      "fieldtype": "Date",
-      "label": "Date Joined",
-      "default": "Today"
-     },
-     {
-      "fieldname": "driver_type",
-      "fieldtype": "Data",
-      "label": "Driver Type",
-      "read_only": 1,
-      "default": "Substitute",
-      "hidden": 1
-     },
-     {
-      "fieldname": "assignment_section",
-      "fieldtype": "Section Break",
-      "label": "Current Assignment"
-     },
-     {
-      "fieldname": "assigned_tuktuk",
-      "fieldtype": "Link",
-      "label": "Assigned TukTuk",
-      "options": "TukTuk Vehicle"
-     },
-     {
-      "fieldname": "assignment_date",
-      "fieldtype": "Datetime",
-      "label": "Assignment Date",
-      "read_only": 1
-     },
-     {
-      "fieldname": "column_break_assignment",
-      "fieldtype": "Column Break"
-     },
-     {
-      "fieldname": "last_worked_date",
-      "fieldtype": "Date",
-      "label": "Last Worked Date",
-      "read_only": 1
-     },
-     {
-      "fieldname": "total_days_worked",
-      "fieldtype": "Int",
-      "label": "Total Days Worked",
-      "read_only": 1,
-      "default": 0
-     },
-     {
-      "fieldname": "performance_section",
-      "fieldtype": "Section Break",
-      "label": "Performance & Targets"
-     },
-     {
-      "fieldname": "daily_target",
-      "fieldtype": "Currency",
-      "label": "Daily Target (KSH)",
-      "description": "Leave blank to use global setting"
-     },
-     {
-      "fieldname": "fare_percentage_to_driver",
-      "fieldtype": "Percent",
-      "label": "Fare Percentage to Driver",
-      "description": "Leave blank to use global setting (default 50%)"
-     },
-     {
-      "fieldname": "column_break_performance",
-      "fieldtype": "Column Break"
-     },
-     {
-      "fieldname": "todays_earnings",
-      "fieldtype": "Currency",
-      "label": "Today's Earnings",
-      "read_only": 1,
-      "default": 0
-     },
-     {
-      "fieldname": "todays_target_contribution",
-      "fieldtype": "Currency",
-      "label": "Today's Target Contribution",
-      "read_only": 1,
-      "default": 0
-     },
-     {
-      "fieldname": "target_balance",
-      "fieldtype": "Currency",
-      "label": "Today's Target Balance",
-      "read_only": 1,
-      "default": 0,
-      "description": "Does not roll over for substitute drivers"
-     },
-     {
-      "fieldname": "financial_section",
-      "fieldtype": "Section Break",
-      "label": "Financial Summary"
-     },
-     {
-      "fieldname": "total_earnings",
-      "fieldtype": "Currency",
-      "label": "Total Earnings",
-      "read_only": 1,
-      "default": 0
-     },
-     {
-      "fieldname": "column_break_financial",
-      "fieldtype": "Column Break"
-     },
-     {
-      "fieldname": "total_rides",
-      "fieldtype": "Int",
-      "label": "Total Rides",
-      "read_only": 1,
-      "default": 0
-     },
-     {
-      "fieldname": "average_daily_earnings",
-      "fieldtype": "Currency",
-      "label": "Average Daily Earnings",
-      "read_only": 1,
-      "default": 0
-     }
-    ],
-    "index_web_pages_for_search": 1,
-    "links": [],
-    "modified": "2024-01-15 10:00:00.000000",
-    "modified_by": "Administrator",
-    "module": "TukTuk Management",
-    "name": "TukTuk Substitute Driver",
-    "naming_rule": "Expression",
-    "owner": "Administrator",
-    "permissions": [
-     {
-      "create": 1,
-      "delete": 1,
-      "email": 1,
-      "export": 1,
-      "print": 1,
-      "read": 1,
-      "report": 1,
-      "role": "System Manager",
-      "share": 1,
-      "write": 1
-     }
-    ],
-    "sort_field": "modified",
-    "sort_order": "DESC",
-    "states": [],
-    "title_field": "first_name",
-    "track_changes": 1
-   }
-   
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format:SUB-212{#####}",
+ "creation": "2024-01-15 10:00:00",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "basic_info_section",
+  "first_name",
+  "last_name",
+  "phone_number",
+  "national_id",
+  "column_break_basic",
+  "mpesa_number",
+  "status",
+  "date_joined",
+  "driver_type",
+  "assignment_section",
+  "assigned_tuktuk",
+  "assignment_date",
+  "column_break_assignment",
+  "last_worked_date",
+  "total_days_worked",
+  "performance_section",
+  "daily_target",
+  "fare_percentage_to_driver",
+  "column_break_performance",
+  "todays_earnings",
+  "todays_target_contribution",
+  "target_balance",
+  "financial_section",
+  "total_earnings",
+  "column_break_financial",
+  "total_rides",
+  "average_daily_earnings"
+ ],
+ "fields": [
+  {
+   "fieldname": "basic_info_section",
+   "fieldtype": "Section Break",
+   "label": "Basic Information"
+  },
+  {
+   "fieldname": "first_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "First Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "last_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Last Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "phone_number",
+   "fieldtype": "Data",
+   "label": "Phone Number",
+   "reqd": 1
+  },
+  {
+   "fieldname": "national_id",
+   "fieldtype": "Data",
+   "label": "National ID",
+   "unique": 1
+  },
+  {
+   "fieldname": "column_break_basic",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Active",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Active\nInactive\nOn Assignment"
+  },
+  {
+   "default": "Today",
+   "fieldname": "date_joined",
+   "fieldtype": "Date",
+   "label": "Date Joined"
+  },
+  {
+   "default": "Substitute",
+   "fieldname": "driver_type",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Driver Type",
+   "read_only": 1
+  },
+  {
+   "fieldname": "assignment_section",
+   "fieldtype": "Section Break",
+   "label": "Current Assignment"
+  },
+  {
+   "fieldname": "assigned_tuktuk",
+   "fieldtype": "Link",
+   "label": "Assigned TukTuk",
+   "options": "TukTuk Vehicle"
+  },
+  {
+   "fieldname": "assignment_date",
+   "fieldtype": "Datetime",
+   "label": "Assignment Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_assignment",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "last_worked_date",
+   "fieldtype": "Date",
+   "label": "Last Worked Date",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "total_days_worked",
+   "fieldtype": "Int",
+   "label": "Total Days Worked",
+   "read_only": 1
+  },
+  {
+   "fieldname": "performance_section",
+   "fieldtype": "Section Break",
+   "label": "Performance & Targets"
+  },
+  {
+   "description": "Leave blank to use global setting",
+   "fieldname": "daily_target",
+   "fieldtype": "Currency",
+   "label": "Daily Target (KSH)"
+  },
+  {
+   "description": "Leave blank to use global setting (default 50%)",
+   "fieldname": "fare_percentage_to_driver",
+   "fieldtype": "Percent",
+   "label": "Fare Percentage to Driver"
+  },
+  {
+   "fieldname": "column_break_performance",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "todays_earnings",
+   "fieldtype": "Currency",
+   "label": "Today's Earnings",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "todays_target_contribution",
+   "fieldtype": "Currency",
+   "label": "Today's Target Contribution",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "description": "Does not roll over for substitute drivers",
+   "fieldname": "target_balance",
+   "fieldtype": "Currency",
+   "label": "Today's Target Balance",
+   "read_only": 1
+  },
+  {
+   "fieldname": "financial_section",
+   "fieldtype": "Section Break",
+   "label": "Financial Summary"
+  },
+  {
+   "default": "0",
+   "fieldname": "total_earnings",
+   "fieldtype": "Currency",
+   "label": "Total Earnings",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_financial",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "total_rides",
+   "fieldtype": "Int",
+   "label": "Total Rides",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "average_daily_earnings",
+   "fieldtype": "Currency",
+   "label": "Average Daily Earnings",
+   "read_only": 1
+  },
+  {
+   "fieldname": "mpesa_number",
+   "fieldtype": "Data",
+   "label": "Mpesa Phone Number"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-12-17 09:57:07.717177",
+ "modified_by": "Administrator",
+ "module": "Tuktuk Management",
+ "name": "TukTuk Substitute Driver",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "first_name",
+ "track_changes": 1
+}

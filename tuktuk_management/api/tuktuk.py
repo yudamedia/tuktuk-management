@@ -75,7 +75,7 @@ def process_regular_driver_payment(driver_doc, tuktuk, transaction_id, amount, c
     fare_percentage = driver_doc.get_fare_percentage() if hasattr(driver_doc, 'get_fare_percentage') else driver_doc.fare_percentage or 50
     
     # Calculate shares based on target status
-    target_met = (driver_doc.todays_target_contribution or 0) >= daily_target
+    target_met = (driver_doc.current_balance or 0) >= daily_target
     
     if target_met:
         # Target already met - driver gets 100%
@@ -107,13 +107,10 @@ def process_regular_driver_payment(driver_doc, tuktuk, transaction_id, amount, c
     # Update driver stats atomically
     frappe.db.sql("""
         UPDATE `tabTukTuk Driver`
-        SET todays_earnings = todays_earnings + %s,
-            todays_target_contribution = todays_target_contribution + %s,
-            target_balance = target_balance - %s,
-            total_earnings = total_earnings + %s,
-            total_rides = total_rides + 1
+        SET current_balance = current_balance + %s,
+            left_to_target = GREATEST(0, %s - (current_balance + %s))
         WHERE name = %s
-    """, (driver_share, target_contribution, target_contribution, driver_share, driver_doc.name))
+    """, (target_contribution, daily_target, target_contribution, driver_doc.name))
     
     return {
         'transaction_name': transaction.name,
@@ -523,7 +520,9 @@ def mpesa_confirmation(**kwargs):
         # Find the tuktuk
         tuktuk = frappe.db.get_value("TukTuk Vehicle", {"mpesa_account": account_number}, "name")
         if not tuktuk:
-            frappe.log_error(f"M-Pesa Confirmation: TukTuk not found for account: {account_number}")
+            # Don't log error if this was a Sunny ID payment (already handled)
+            if not is_sunny_id_format(account_number):
+                frappe.log_error(f"M-Pesa Confirmation: TukTuk not found for account: {account_number}")
             
             # Log failed transaction
             try:

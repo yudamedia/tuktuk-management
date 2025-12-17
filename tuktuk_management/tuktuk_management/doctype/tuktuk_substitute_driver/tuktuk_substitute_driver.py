@@ -150,11 +150,19 @@ def get_available_substitutes():
 
 @frappe.whitelist()
 def suggest_substitute_for_vehicle(vehicle_name):
-    """Suggest best available substitute driver for a vehicle"""
+    """Suggest best available substitute driver for an AVAILABLE vehicle"""
     available_subs = get_available_substitutes()
     
     if not available_subs:
         return {"success": False, "message": "No substitute drivers available"}
+    
+    # Verify vehicle is available (no regular driver)
+    vehicle = frappe.get_doc("TukTuk Vehicle", vehicle_name)
+    if vehicle.assigned_driver:
+        return {
+            "success": False, 
+            "message": "This vehicle has a regular driver. Substitutes are only for available vehicles."
+        }
     
     # Sort by total days worked (experience) and average earnings
     sorted_subs = sorted(
@@ -169,21 +177,23 @@ def suggest_substitute_for_vehicle(vehicle_name):
         "all_available": sorted_subs
     }
 
+
+
+
+
 @frappe.whitelist()
 def get_available_vehicles_for_substitute():
-    """Get list of vehicles available for substitute assignment"""
+    """Get list of AVAILABLE vehicles (no regular driver) for substitute assignment"""
     return frappe.get_all(
         "TukTuk Vehicle",
         filters={
-            "assigned_driver": ["is", "set"],  # Must have regular driver
+            "assigned_driver": ["is", "not set"],  # NO regular driver (key change)
             "current_substitute_driver": ["is", "not set"],  # No substitute assigned
             "status": ["not in", ["Maintenance", "Offline"]]  # Not in maintenance
         },
         fields=[
             "name",
-            "tuktuk_id",  # CORRECT field name
-            "assigned_driver",
-            "assigned_driver_name",
+            "tuktuk_id",
             "status",
             "battery_level"
         ]
@@ -191,17 +201,28 @@ def get_available_vehicles_for_substitute():
 
 @frappe.whitelist()
 def assign_substitute_to_vehicle(substitute_driver, vehicle_name):
-    """Assign a substitute driver to a vehicle"""
+    """Assign a substitute driver to an AVAILABLE vehicle (no regular driver)"""
     try:
         # Get the substitute driver
         sub_driver = frappe.get_doc("TukTuk Substitute Driver", substitute_driver)
         
         # Check if substitute is available
-        if sub_driver.status == "On Assignment":
-            return {"success": False, "message": "Substitute driver is already on assignment"}
+        if sub_driver.status != "Active":
+            return {"success": False, "message": "Substitute driver is not active"}
+        
+        if sub_driver.assigned_tuktuk:
+            return {"success": False, "message": "Substitute driver is already assigned to another vehicle"}
         
         # Get the vehicle
         vehicle = frappe.get_doc("TukTuk Vehicle", vehicle_name)
+        
+        # UPDATED LOGIC: Vehicle should NOT have a regular driver (for available vehicles)
+        # This is the key change - substitutes are for vehicles without regular drivers
+        if vehicle.assigned_driver:
+            return {
+                "success": False, 
+                "message": "This vehicle already has a regular driver assigned. Substitutes are only for available vehicles."
+            }
         
         # Check if vehicle already has a substitute
         if vehicle.current_substitute_driver:
@@ -219,7 +240,6 @@ def assign_substitute_to_vehicle(substitute_driver, vehicle_name):
     except Exception as e:
         frappe.log_error(f"Error assigning substitute: {str(e)}")
         return {"success": False, "message": str(e)}
-
 
 @frappe.whitelist()
 def unassign_substitute_from_vehicle(substitute_driver):
