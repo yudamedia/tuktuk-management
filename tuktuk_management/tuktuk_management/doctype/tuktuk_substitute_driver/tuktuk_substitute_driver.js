@@ -35,8 +35,8 @@ frappe.ui.form.on('TukTuk Substitute Driver', {
         // Set indicators
         set_status_indicator(frm);
         
-        // Show target progress
-        if (frm.doc.todays_target_contribution && frm.doc.daily_target) {
+        // Show target progress (uses individual daily_target when set, otherwise global_daily_target)
+        if (get_effective_daily_target(frm)) {
             show_target_progress(frm);
         }
     },
@@ -78,9 +78,43 @@ function set_status_indicator(frm) {
     );
 }
 
+function get_effective_daily_target(frm) {
+    // Prefer individual daily_target when set and > 0
+    const docTargetRaw = frm.doc.daily_target;
+    const docTarget = typeof docTargetRaw === 'number'
+        ? docTargetRaw
+        : parseFloat(docTargetRaw);
+
+    if (!isNaN(docTarget) && docTarget > 0) {
+        return docTarget;
+    }
+
+    // Fall back to global_daily_target from boot settings when available
+    const settings = (frappe.boot && frappe.boot.tuktuk_settings) || {};
+    const globalTargetRaw = settings.global_daily_target;
+    const globalTarget = typeof globalTargetRaw === 'number'
+        ? globalTargetRaw
+        : parseFloat(globalTargetRaw);
+
+    if (!isNaN(globalTarget) && globalTarget > 0) {
+        return globalTarget;
+    }
+
+    // Final fallback matches server-side default in get_daily_target()
+    return 3000;
+}
+
 function show_target_progress(frm) {
-    const target = frm.doc.daily_target || 3000;
-    const contribution = frm.doc.todays_target_contribution || 0;
+    const target = get_effective_daily_target(frm);
+    const contributionRaw = frm.doc.todays_target_contribution;
+    const contribution = typeof contributionRaw === 'number'
+        ? contributionRaw
+        : parseFloat(contributionRaw) || 0;
+
+    if (!target || isNaN(target) || target <= 0) {
+        return;
+    }
+
     const percentage = Math.min((contribution / target * 100), 100).toFixed(1);
     
     const progress_html = `
@@ -200,11 +234,36 @@ function unassign_from_vehicle(frm) {
 }
 
 function show_daily_summary(frm) {
-    const target = frm.doc.daily_target || 3000;
-    const earnings = frm.doc.todays_earnings || 0;
-    const contribution = frm.doc.todays_target_contribution || 0;
-    const balance = frm.doc.target_balance || target;
-    const rides = frm.doc.total_rides || 0;
+    const target = get_effective_daily_target(frm);
+
+    const earningsRaw = frm.doc.todays_earnings;
+    const earnings = typeof earningsRaw === 'number'
+        ? earningsRaw
+        : parseFloat(earningsRaw) || 0;
+
+    const contributionRaw = frm.doc.todays_target_contribution;
+    const contribution = typeof contributionRaw === 'number'
+        ? contributionRaw
+        : parseFloat(contributionRaw) || 0;
+
+    const ridesRaw = frm.doc.total_rides;
+    const rides = typeof ridesRaw === 'number'
+        ? ridesRaw
+        : parseInt(ridesRaw, 10) || 0;
+
+    let balanceValue;
+    if (frm.doc.target_balance !== undefined && frm.doc.target_balance !== null && frm.doc.target_balance !== '') {
+        const balanceRaw = frm.doc.target_balance;
+        const parsed = typeof balanceRaw === 'number'
+            ? balanceRaw
+            : parseFloat(balanceRaw);
+        balanceValue = !isNaN(parsed) ? parsed : (target - contribution);
+    } else {
+        // If no explicit target_balance is stored, derive it from target and today's contribution
+        balanceValue = target - contribution;
+    }
+
+    const balance = Math.max(0, balanceValue || 0);
     
     const summary_html = `
         <div class="row">

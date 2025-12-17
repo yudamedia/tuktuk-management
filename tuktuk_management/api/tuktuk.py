@@ -67,15 +67,31 @@ def get_active_driver_for_vehicle(tuktuk_name):
 
 def process_regular_driver_payment(driver_doc, tuktuk, transaction_id, amount, customer_phone, trans_time):
     """
-    Process payment for regular driver with standard target logic
-    Returns: dict with transaction details
+    Process payment for regular driver with standard target logic.
+    Uses driver's individual daily_target when set and non-zero,
+    otherwise falls back to TukTuk Settings.global_daily_target.
     """
-    # Get daily target and fare percentage
-    daily_target = driver_doc.get_daily_target() if hasattr(driver_doc, 'get_daily_target') else driver_doc.daily_target or 3000
-    fare_percentage = driver_doc.get_fare_percentage() if hasattr(driver_doc, 'get_fare_percentage') else driver_doc.fare_percentage or 50
+    # Get settings for global target and fare percentage
+    settings = frappe.get_single("TukTuk Settings")
+
+    # Resolve effective daily target:
+    # - If the document has a helper, use it (mainly for future-proofing)
+    # - Otherwise: driver's daily_target or global_daily_target
+    if hasattr(driver_doc, "get_daily_target"):
+        daily_target = driver_doc.get_daily_target()
+    else:
+        daily_target = driver_doc.daily_target or settings.global_daily_target or 0
+
+    # Resolve fare percentage:
+    # - Prefer driver-specific fare_percentage
+    # - Fall back to global_fare_percentage
+    if hasattr(driver_doc, "get_fare_percentage"):
+        fare_percentage = driver_doc.get_fare_percentage()
+    else:
+        fare_percentage = driver_doc.fare_percentage or settings.global_fare_percentage or 50
     
     # Calculate shares based on target status
-    target_met = (driver_doc.current_balance or 0) >= daily_target
+    target_met = (driver_doc.current_balance or 0) >= (daily_target or 0)
     
     if target_met:
         # Target already met - driver gets 100%
@@ -83,7 +99,7 @@ def process_regular_driver_payment(driver_doc, tuktuk, transaction_id, amount, c
         target_contribution = 0
     else:
         # Target not met - apply percentage split
-        driver_share = amount * (fare_percentage / 100)
+        driver_share = amount * (fare_percentage / 100.0)
         target_contribution = amount - driver_share
     
     # Create transaction record
@@ -104,13 +120,24 @@ def process_regular_driver_payment(driver_doc, tuktuk, transaction_id, amount, c
     })
     transaction.insert(ignore_permissions=True)
     
-    # Update driver stats atomically
-    frappe.db.sql("""
+    # Update driver stats atomically using same left_to_target logic as other flows:
+    # left_to_target = GREATEST(0,
+    #   COALESCE(NULLIF(daily_target, 0), global_daily_target) - new_current_balance
+    # )
+    global_target = settings.global_daily_target or 0
+
+    frappe.db.sql(
+        """
         UPDATE `tabTukTuk Driver`
         SET current_balance = current_balance + %s,
-            left_to_target = GREATEST(0, %s - (current_balance + %s))
+            left_to_target = GREATEST(
+                0,
+                COALESCE(NULLIF(daily_target, 0), %s) - (current_balance + %s)
+            )
         WHERE name = %s
-    """, (target_contribution, daily_target, target_contribution, driver_doc.name))
+        """,
+        (target_contribution, global_target, target_contribution, driver_doc.name),
+    )
     
     return {
         'transaction_name': transaction.name,
