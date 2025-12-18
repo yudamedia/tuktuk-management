@@ -1,0 +1,98 @@
+{
+ "actions": [],
+ "creation": "2024-12-18 12:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "date",
+  "substitute_driver",
+  "substitute_driver_name",
+  "column_break_1",
+  "vehicle",
+  "vehicle_id",
+  "regular_driver_off",
+  "regular_driver_name",
+  "column_break_2",
+  "assignment_status"
+ ],
+ "fields": [
+  {
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "substitute_driver",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Substitute Driver",
+   "options": "TukTuk Substitute Driver",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "substitute_driver.first_name",
+   "fieldname": "substitute_driver_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Substitute Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "vehicle",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Vehicle",
+   "options": "TukTuk Vehicle",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "vehicle.tuktuk_id",
+   "fieldname": "vehicle_id",
+   "fieldtype": "Data",
+   "label": "Vehicle ID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "regular_driver_off",
+   "fieldtype": "Link",
+   "label": "Regular Driver (Off)",
+   "options": "TukTuk Driver"
+  },
+  {
+   "fetch_from": "regular_driver_off.driver_name",
+   "fieldname": "regular_driver_name",
+   "fieldtype": "Data",
+   "label": "Regular Driver Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Scheduled",
+   "fieldname": "assignment_status",
+   "fieldtype": "Select",
+   "label": "Assignment Status",
+   "options": "Scheduled\nActive\nCompleted"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2024-12-18 12:00:00",
+ "modified_by": "Administrator",
+ "module": "Tuktuk Management",
+ "name": "TukTuk Substitute Assignment",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

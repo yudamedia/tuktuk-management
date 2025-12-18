@@ -1,0 +1,168 @@
+{
+ "actions": [],
+ "creation": "2024-12-18 12:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "date",
+  "driver",
+  "driver_name",
+  "driver_type",
+  "column_break_1",
+  "day_off_type",
+  "switch_section",
+  "original_driver",
+  "original_driver_name",
+  "switched_with_driver",
+  "switched_with_driver_name",
+  "column_break_switch",
+  "switch_requested_by",
+  "switch_requested_date",
+  "switch_approved_by",
+  "switch_approved_date",
+  "switch_status",
+  "section_break_notes",
+  "notes"
+ ],
+ "fields": [
+  {
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "driver",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Driver",
+   "options": "TukTuk Driver"
+  },
+  {
+   "fetch_from": "driver.driver_name",
+   "fieldname": "driver_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Driver Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "driver_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Driver Type",
+   "options": "Regular Driver\nSubstitute Driver",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Scheduled",
+   "fieldname": "day_off_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Day Off Type",
+   "options": "Scheduled\nSwitched\nSick\nManual Override",
+   "reqd": 1
+  },
+  {
+   "collapsible": 1,
+   "depends_on": "eval:doc.day_off_type=='Switched'",
+   "fieldname": "switch_section",
+   "fieldtype": "Section Break",
+   "label": "Switch Details"
+  },
+  {
+   "depends_on": "eval:doc.day_off_type=='Switched'",
+   "fieldname": "original_driver",
+   "fieldtype": "Link",
+   "label": "Original Scheduled Driver",
+   "options": "TukTuk Driver"
+  },
+  {
+   "depends_on": "eval:doc.day_off_type=='Switched'",
+   "fetch_from": "original_driver.driver_name",
+   "fieldname": "original_driver_name",
+   "fieldtype": "Data",
+   "label": "Original Driver Name",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.day_off_type=='Switched'",
+   "fieldname": "switched_with_driver",
+   "fieldtype": "Link",
+   "label": "Switched With",
+   "options": "TukTuk Driver"
+  },
+  {
+   "depends_on": "eval:doc.day_off_type=='Switched'",
+   "fetch_from": "switched_with_driver.driver_name",
+   "fieldname": "switched_with_driver_name",
+   "fieldtype": "Data",
+   "label": "Switched With Driver Name",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.day_off_type=='Switched'",
+   "fieldname": "column_break_switch",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.day_off_type=='Switched'",
+   "fieldname": "switch_requested_by",
+   "fieldtype": "Link",
+   "label": "Switch Requested By",
+   "options": "User"
+  },
+  {
+   "depends_on": "eval:doc.day_off_type=='Switched'",
+   "fieldname": "switch_requested_date",
+   "fieldtype": "Datetime",
+   "label": "Switch Requested Date"
+  },
+  {
+   "depends_on": "eval:doc.day_off_type=='Switched'",
+   "fieldname": "switch_approved_by",
+   "fieldtype": "Link",
+   "label": "Switch Approved By",
+   "options": "User"
+  },
+  {
+   "depends_on": "eval:doc.day_off_type=='Switched'",
+   "fieldname": "switch_approved_date",
+   "fieldtype": "Datetime",
+   "label": "Switch Approved Date"
+  },
+  {
+   "depends_on": "eval:doc.day_off_type=='Switched'",
+   "fieldname": "switch_status",
+   "fieldtype": "Select",
+   "label": "Switch Status",
+   "options": "\nPending\nApproved\nRejected"
+  },
+  {
+   "fieldname": "section_break_notes",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2024-12-18 12:00:00",
+ "modified_by": "Administrator",
+ "module": "Tuktuk Management",
+ "name": "TukTuk Day Off Schedule",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

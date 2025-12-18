@@ -1,7 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "format:SUB-212{#####}",
+ "autoname": "format:SUB-212{###}",
  "creation": "2024-01-15 10:00:00",
  "doctype": "DocType",
  "editable_grid": 1,
@@ -210,7 +210,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-12-18 06:35:10.632898",
+ "modified": "2025-12-18 10:58:22.042362",
  "modified_by": "Administrator",
  "module": "Tuktuk Management",
  "name": "TukTuk Substitute Driver",
