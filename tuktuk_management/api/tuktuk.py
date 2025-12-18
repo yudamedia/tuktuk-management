@@ -3170,3 +3170,279 @@ def remove_pending_adjustments_for_driver():
         frappe.log_error("Error in remove_pending_adjustments_for_driver", str(e))
         frappe.msgprint(f"❌ Error processing adjustment transactions: {str(e)}")
         return False
+
+# Add these functions to ~/frappe-bench/apps/tuktuk_management/tuktuk_management/api/tuktuk.py
+
+@frappe.whitelist()
+def process_uncaptured_payment_substitute(substitute_driver, tuktuk, transaction_id, customer_phone, amount):
+    """
+    Process uncaptured payment for substitute driver
+    Similar to regular drivers but ONLY sends driver share (no deposit option)
+    
+    Args:
+        substitute_driver: Name of TukTuk Substitute Driver document
+        tuktuk: Name of TukTuk Vehicle document
+        transaction_id: M-Pesa transaction ID
+        customer_phone: Customer's phone number
+        amount: Payment amount
+    
+    Returns:
+        dict: Success status and message
+    """
+    try:
+        # Get substitute driver document
+        sub_driver = frappe.get_doc("TukTuk Substitute Driver", substitute_driver)
+        
+        # Validate substitute has assigned tuktuk
+        if not sub_driver.assigned_tuktuk:
+            return {
+                "success": False,
+                "message": "Substitute driver must have an assigned TukTuk to record uncaptured payments"
+            }
+        
+        # Validate tuktuk matches
+        if sub_driver.assigned_tuktuk != tuktuk:
+            return {
+                "success": False,
+                "message": "TukTuk does not match substitute driver's assigned TukTuk"
+            }
+        
+        # Validate amount
+        amount = float(amount)
+        if amount <= 0:
+            return {
+                "success": False,
+                "message": "Amount must be greater than zero"
+            }
+        
+        # Check for duplicate transaction ID
+        existing = frappe.db.exists("TukTuk Transaction", {"transaction_id": transaction_id})
+        if existing:
+            return {
+                "success": False,
+                "message": f"Transaction ID {transaction_id} already exists in the system"
+            }
+        
+        # Get fare percentage (use substitute's individual setting or global default)
+        settings = frappe.get_single("TukTuk Settings")
+        fare_percentage = sub_driver.fare_percentage_to_driver or settings.global_fare_percentage or 50
+        
+        # Calculate driver share (substitutes always use base fare percentage)
+        # Substitutes don't have target sharing bonus logic
+        driver_share = amount * (fare_percentage / 100.0)
+        target_contribution = amount - driver_share
+        
+        # Create transaction record
+        transaction = frappe.get_doc({
+            "doctype": "TukTuk Transaction",
+            "transaction_type": "Payment",
+            "transaction_id": transaction_id,
+            "tuktuk": tuktuk,
+            "substitute_driver": substitute_driver,  # Link to substitute, not regular driver
+            "driver_type": "Substitute",  # Set driver type
+            "amount": amount,
+            "driver_share": driver_share,
+            "target_contribution": target_contribution,
+            "customer_phone": customer_phone,
+            "payment_status": "Pending",
+            "timestamp": frappe.utils.now_datetime(),  # Correct field name
+            "is_substitute_transaction": 1  # Flag to identify substitute transactions
+        })
+        
+        # Start database transaction
+        frappe.db.sql("START TRANSACTION")
+        
+        try:
+            # Insert the transaction
+            transaction.insert(ignore_permissions=True)
+            
+            # Update substitute driver's target balance
+            frappe.db.set_value(
+                "TukTuk Substitute Driver",
+                substitute_driver,
+                "target_balance",
+                (sub_driver.target_balance or 0) + target_contribution
+            )
+            
+            # Send B2C payment to substitute driver
+            from tuktuk_management.api.sendpay import send_mpesa_payment
+            
+            b2c_success = send_mpesa_payment(
+                mpesa_number=sub_driver.mpesa_number,
+                amount=driver_share,
+                payment_type="FARE"
+            )
+            
+            # Update transaction with B2C result
+            if b2c_success:
+                frappe.db.set_value(
+                    "TukTuk Transaction",
+                    transaction.name,
+                    {
+                        "payment_status": "Completed",
+                        "b2c_payment_sent": 1
+                    }
+                )
+                payment_msg = f"Driver share of KSH {driver_share:.2f} sent via M-Pesa B2C"
+            else:
+                frappe.db.set_value(
+                    "TukTuk Transaction",
+                    transaction.name,
+                    {
+                        "payment_status": "Pending",
+                        "b2c_payment_sent": 0
+                    }
+                )
+                payment_msg = f"Transaction recorded but B2C payment failed. Check Error Log for details."
+            
+            # Add comment to transaction
+            transaction.add_comment(
+                "Comment",
+                f"Uncaptured payment processed for substitute driver {sub_driver.first_name} {sub_driver.last_name}. "
+                f"Amount: KSH {amount:.2f}, Driver Share: KSH {driver_share:.2f}, "
+                f"Target Contribution: KSH {target_contribution:.2f}. {payment_msg}"
+            )
+            
+            # Commit transaction
+            frappe.db.commit()
+            
+            # Log success
+            frappe.log_error(
+                f"Uncaptured payment processed for substitute {substitute_driver}: "
+                f"Transaction {transaction_id}, Amount: {amount}, Driver Share: {driver_share}",
+                "Substitute Uncaptured Payment Success"
+            )
+            
+            return {
+                "success": True,
+                "message": f"Payment processed successfully. {payment_msg}. New target balance: KSH {(sub_driver.target_balance or 0) + target_contribution:.2f}",
+                "transaction_name": transaction.name,
+                "driver_share": driver_share,
+                "target_contribution": target_contribution,
+                "new_balance": (sub_driver.target_balance or 0) + target_contribution
+            }
+            
+        except Exception as e:
+            # Rollback on error
+            frappe.db.rollback()
+            raise
+            
+    except Exception as e:
+        frappe.log_error(f"Error processing uncaptured payment for substitute: {str(e)}", "Substitute Uncaptured Payment Error")
+        return {
+            "success": False,
+            "message": f"Error processing payment: {str(e)}"
+        }
+
+
+@frappe.whitelist()
+def reconcile_substitute_balance(substitute_driver):
+    """
+    Reconcile substitute driver's balance with transactions
+    
+    Args:
+        substitute_driver: Name of TukTuk Substitute Driver document
+    
+    Returns:
+        dict: Balance verification data
+    """
+    try:
+        # Get substitute driver
+        sub_driver = frappe.get_doc("TukTuk Substitute Driver", substitute_driver)
+        
+        # Get today's date range
+        today = frappe.utils.today()
+        start_time = f"{today} 00:00:00"
+        end_time = f"{today} 23:59:59"
+        
+        # Get all transactions for this substitute today
+        transactions = frappe.get_all(
+            "TukTuk Transaction",
+            filters={
+                "substitute_driver": substitute_driver,
+                "timestamp": ["between", [start_time, end_time]]
+            },
+            fields=["name", "transaction_id", "amount", "target_contribution", "timestamp"],
+            order_by="timestamp desc"
+        )
+        
+        # Calculate expected balance from transactions
+        calculated_balance = sum(txn.get("target_contribution", 0) for txn in transactions)
+        
+        # Get current balance
+        current_balance = sub_driver.target_balance or 0
+        
+        # Calculate discrepancy
+        discrepancy = current_balance - calculated_balance
+        
+        return {
+            "success": True,
+            "current_balance": current_balance,
+            "calculated_balance": calculated_balance,
+            "discrepancy_amount": discrepancy,
+            "transaction_count": len(transactions),
+            "transactions": transactions
+        }
+        
+    except Exception as e:
+        frappe.log_error(f"Error reconciling substitute balance: {str(e)}", "Substitute Balance Reconciliation Error")
+        return {
+            "success": False,
+            "message": f"Error: {str(e)}"
+        }
+
+
+@frappe.whitelist()
+def fix_substitute_balance(substitute_driver, correct_balance):
+    """
+    Fix substitute driver's balance to the correct calculated amount
+    
+    Args:
+        substitute_driver: Name of TukTuk Substitute Driver document
+        correct_balance: The correct balance to set
+    
+    Returns:
+        dict: Success status and message
+    """
+    try:
+        correct_balance = float(correct_balance)
+        
+        # Get substitute driver
+        sub_driver = frappe.get_doc("TukTuk Substitute Driver", substitute_driver)
+        old_balance = sub_driver.target_balance or 0
+        
+        # Update balance
+        frappe.db.set_value(
+            "TukTuk Substitute Driver",
+            substitute_driver,
+            "target_balance",
+            correct_balance
+        )
+        
+        # Add comment to audit trail
+        sub_driver.add_comment(
+            "Comment",
+            f"Balance corrected from KSH {old_balance:.2f} to KSH {correct_balance:.2f} "
+            f"via Transaction Verification on {frappe.utils.now_datetime()}"
+        )
+        
+        frappe.db.commit()
+        
+        frappe.log_error(
+            f"Substitute balance fixed for {substitute_driver}: {old_balance} -> {correct_balance}",
+            "Substitute Balance Fix"
+        )
+        
+        return {
+            "success": True,
+            "message": f"Balance updated from KSH {old_balance:.2f} to KSH {correct_balance:.2f}",
+            "old_balance": old_balance,
+            "new_balance": correct_balance
+        }
+        
+    except Exception as e:
+        frappe.log_error(f"Error fixing substitute balance: {str(e)}", "Substitute Balance Fix Error")
+        return {
+            "success": False,
+            "message": f"Error: {str(e)}"
+        }
