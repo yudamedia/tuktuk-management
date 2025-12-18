@@ -17,6 +17,7 @@
   "status",
   "date_joined",
   "driver_type",
+  "preferred_day_off",
   "assignment_section",
   "assigned_tuktuk",
   "assignment_date",
@@ -93,6 +94,13 @@
    "hidden": 1,
    "label": "Driver Type",
    "read_only": 1
+  },
+  {
+   "description": "Preferred weekly day off for roster scheduling",
+   "fieldname": "preferred_day_off",
+   "fieldtype": "Select",
+   "label": "Preferred Day Off",
+   "options": "MONDAY\nTUESDAY\nWEDNESDAY\nTHURSDAY\nFRIDAY\nSATURDAY\nSUNDAY\nNo Preference"
   },
   {
    "fieldname": "assignment_section",

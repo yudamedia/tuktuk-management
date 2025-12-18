@@ -16,6 +16,7 @@
   "driver_dob",
   "driver_national_id",
   "driver_license",
+  "preferred_day_off",
   "column_break_hyib",
   "driver_address",
   "sunny_id",	
@@ -192,6 +193,13 @@
    "fieldtype": "Data",
    "label": "Driving License",
    "reqd": 1
+  },
+  {
+   "description": "Preferred weekly day off for roster scheduling",
+   "fieldname": "preferred_day_off",
+   "fieldtype": "Select",
+   "label": "Preferred Day Off",
+   "options": "MONDAY\nTUESDAY\nWEDNESDAY\nTHURSDAY\nFRIDAY\nSATURDAY\nSUNDAY\nNo Preference"
   },
   {
    "fieldname": "driver_dob",

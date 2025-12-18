@@ -76,7 +76,7 @@ def generate_roster(start_date, end_date=None):
 	
 	substitute_drivers = frappe.get_all(
 		"TukTuk Substitute Driver",
-		filters={"status": "Active"},
+		filters={"status": ["in", ["Active", "On Assignment"]]},
 		fields=["name", "first_name", "last_name", "preferred_day_off"]
 	)
 	
