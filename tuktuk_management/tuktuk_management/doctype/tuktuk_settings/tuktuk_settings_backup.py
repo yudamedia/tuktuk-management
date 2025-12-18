@@ -50,15 +50,6 @@ class TukTukSettings(Document):
                     frappe.throw("TextSMS Partner ID is required when SMS notifications are enabled and TextSMS is selected as the provider")
                 if not sender_id:
                     frappe.throw("TextSMS Sender ID is required when SMS notifications are enabled and TextSMS is selected as the provider")
-            
-            elif sms_provider == "Africa's Talking":
-                api_key = self.get_password("africastalking_api_key")
-                username = self.africastalking_username
-                
-                if not api_key:
-                    frappe.throw("Africa's Talking API Key is required when SMS notifications are enabled and Africa's Talking is selected as the provider")
-                if not username:
-                    frappe.throw("Africa's Talking Username is required when SMS notifications are enabled and Africa's Talking is selected as the provider")
     
     def on_update(self):
         """

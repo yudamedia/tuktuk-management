@@ -210,161 +210,6 @@ def send_textsms_sms(phone_number, message):
         return False
 
 
-def send_africastalking_sms(phone_number, message):
-    """
-    Send SMS via Africa's Talking API
-    
-    Args:
-        phone_number (str): Phone number in format 254XXXXXXXXX or +254XXXXXXXXX
-        message (str): SMS message text
-        
-    Returns:
-        bool: True if SMS sent successfully, False otherwise
-    """
-    try:
-        # Get API credentials from TukTuk Settings
-        settings = frappe.get_single("TukTuk Settings")
-        api_key = settings.get_password("africastalking_api_key")
-        username = settings.africastalking_username
-        sender_id = settings.africastalking_sender_id or None  # Optional sender ID
-        
-        if not api_key:
-            frappe.log_error("Africa's Talking API key not configured in TukTuk Settings", "SMS Send Error")
-            return False
-        
-        if not username:
-            frappe.log_error("Africa's Talking Username not configured in TukTuk Settings", "SMS Send Error")
-            return False
-        
-        # Ensure phone number has + prefix for Africa's Talking
-        if not phone_number.startswith("+"):
-            phone_number = f"+{phone_number}"
-        
-        # Prepare request payload according to Africa's Talking API documentation
-        # https://developers.africastalking.com/docs/sms/sending/bulk
-        payload = {
-            "username": username,
-            "to": phone_number,
-            "message": message
-        }
-        
-        # Add sender ID if configured
-        if sender_id:
-            payload["from"] = sender_id
-        
-        # Prepare headers
-        headers = {
-            "Content-Type": "application/x-www-form-urlencoded",
-            "apiKey": api_key,
-            "Accept": "application/json"
-        }
-        
-        # Send request to Africa's Talking API
-        response = requests.post(
-            "https://api.africastalking.com/version1/messaging",
-            data=payload,
-            headers=headers,
-            timeout=10
-        )
-        
-        # Check response
-        if response.status_code == 201:  # Africa's Talking returns 201 for successful SMS submission
-            try:
-                response_data = response.json()
-                
-                # Check if SMS recipients exist in response
-                if "SMSMessageData" in response_data:
-                    sms_data = response_data["SMSMessageData"]
-                    recipients = sms_data.get("Recipients", [])
-                    
-                    if recipients and len(recipients) > 0:
-                        first_recipient = recipients[0]
-                        status = first_recipient.get("status", "").lower()
-                        status_code = first_recipient.get("statusCode", 0)
-                        
-                        # Status codes:
-                        # 100 - Processed (queued for delivery)
-                        # 101 - Sent (delivered to mobile network)
-                        # 102 - Queued (still in queue)
-                        # 401 - Risk Hold (suspicious activity)
-                        # 402 - Invalid Sender ID
-                        # 403 - Invalid Phone Number
-                        # 404 - Unsupported Number Type
-                        # 405 - Insufficient Balance
-                        # 406 - User In Black List
-                        # 407 - Could Not Route
-                        # 500 - Internal Server Error
-                        
-                        if status_code in [100, 101, 102]:  # Success statuses
-                            frappe.log_error(
-                                f"SMS sent successfully to {phone_number}\nMessage: {message}\nStatus: {status}\nStatus Code: {status_code}\nResponse: {response.text}",
-                                "SMS Success"
-                            )
-                            return True
-                        else:
-                            # Map error codes to messages
-                            error_messages = {
-                                401: "Risk Hold - Suspicious activity detected",
-                                402: "Invalid Sender ID",
-                                403: "Invalid Phone Number",
-                                404: "Unsupported Number Type",
-                                405: "Insufficient Balance",
-                                406: "User In Black List",
-                                407: "Could Not Route",
-                                500: "Internal Server Error"
-                            }
-                            error_msg = error_messages.get(status_code, f"Unknown error - Status: {status}")
-                            frappe.log_error(
-                                f"Failed to send SMS to {phone_number}\nStatus Code: {status_code}\nError: {error_msg}\nMessage: {message}\nResponse: {response.text}",
-                                "SMS Send Error"
-                            )
-                            return False
-                    else:
-                        frappe.log_error(
-                            f"No recipients in Africa's Talking response for {phone_number}\nResponse: {response.text}",
-                            "SMS Send Error"
-                        )
-                        return False
-                else:
-                    frappe.log_error(
-                        f"Invalid response format from Africa's Talking API\nResponse: {response.text}",
-                        "SMS Send Error"
-                    )
-                    return False
-                    
-            except json.JSONDecodeError:
-                frappe.log_error(
-                    f"Invalid JSON response from Africa's Talking API\nStatus Code: {response.status_code}\nResponse: {response.text}",
-                    "SMS Send Error"
-                )
-                return False
-        else:
-            frappe.log_error(
-                f"Failed to send SMS to {phone_number}\nStatus Code: {response.status_code}\nResponse: {response.text}\nMessage: {message}",
-                "SMS Send Error"
-            )
-            return False
-            
-    except requests.exceptions.Timeout:
-        frappe.log_error(
-            f"Timeout while sending SMS to {phone_number} via Africa's Talking\nMessage: {message}",
-            "SMS Timeout Error"
-        )
-        return False
-    except requests.exceptions.RequestException as e:
-        frappe.log_error(
-            f"Network error while sending SMS to {phone_number} via Africa's Talking\nError: {str(e)}\nMessage: {message}",
-            "SMS Network Error"
-        )
-        return False
-    except Exception as e:
-        frappe.log_error(
-            f"Unexpected error while sending SMS to {phone_number} via Africa's Talking\nError: {str(e)}\nMessage: {message}",
-            "SMS Unexpected Error"
-        )
-        return False
-
-
 def send_sms(phone_number, message):
     """
     Generic SMS sending function that routes to the appropriate provider
@@ -383,8 +228,6 @@ def send_sms(phone_number, message):
         
         if sms_provider == "TextSMS":
             return send_textsms_sms(phone_number, message)
-        elif sms_provider == "Africa's Talking":
-            return send_africastalking_sms(phone_number, message)
         else:
             return send_textbee_sms(phone_number, message)
             
@@ -459,15 +302,6 @@ def send_driver_target_reminder():
             if not api_key or not partner_id or not sender_id:
                 frappe.log_error(
                     "TextSMS credentials not fully configured in TukTuk Settings. Cannot send SMS reminders.",
-                    "SMS Reminder Error"
-                )
-                return
-        elif sms_provider == "Africa's Talking":
-            api_key = settings.get_password("africastalking_api_key")
-            username = settings.africastalking_username
-            if not api_key or not username:
-                frappe.log_error(
-                    "Africa's Talking credentials not fully configured in TukTuk Settings. Cannot send SMS reminders.",
                     "SMS Reminder Error"
                 )
                 return
@@ -633,26 +467,27 @@ def get_sms_status():
                 "partner_id_configured": partner_id_configured,
                 "sender_id_configured": sender_id_configured
             }
-        elif sms_provider == "Africa's Talking":
-            api_key_configured = bool(settings.get_password("africastalking_api_key"))
-            username_configured = bool(settings.africastalking_username)
-            sender_id_configured = bool(settings.africastalking_sender_id)
-            provider_configured = api_key_configured and username_configured
-            provider_config_details = {
-                "api_key_configured": api_key_configured,
-                "username_configured": username_configured,
-                "sender_id_configured": sender_id_configured  # Optional
-            }
         
         # Get eligible drivers count
         eligible_drivers = get_eligible_drivers_for_reminder()
         
         return {
+            "success": True,
             "sms_enabled": sms_enabled,
             "sms_provider": sms_provider,
             "provider_configured": provider_configured,
             "provider_config_details": provider_config_details,
-            "eligible_drivers_count": len(eligible_drivers)
+            "eligible_drivers_count": len(eligible_drivers),
+            "eligible_drivers": [
+                {
+                    "name": d.get("name"),
+                    "driver_name": d.get("driver_name"),
+                    "mpesa_number": d.get("mpesa_number"),
+                    "left_to_target": flt(d.get("left_to_target"))
+                }
+                for d in eligible_drivers
+            ],
+            "message": f"SMS notification system is ready (using {sms_provider})" if (sms_enabled and provider_configured) else f"SMS notifications not fully configured for {sms_provider}"
         }
         
     except Exception as e:
@@ -661,26 +496,63 @@ def get_sms_status():
             "SMS Status Error"
         )
         return {
-            "error": str(e)
+            "success": False,
+            "message": f"Error: {str(e)}"
+        }
+
+
+@frappe.whitelist()
+def get_all_drivers_for_broadcast():
+    """
+    Get all drivers with their details for SMS broadcast interface
+    
+    Returns:
+        dict: List of all drivers with name, driver_name, mpesa_number, assigned_tuktuk
+    """
+    try:
+        drivers = frappe.get_all(
+            "TukTuk Driver",
+            fields=["name", "driver_name", "mpesa_number", "assigned_tuktuk"],
+            order_by="driver_name"
+        )
+        
+        return {
+            "success": True,
+            "drivers": drivers
+        }
+        
+    except Exception as e:
+        frappe.log_error(
+            f"Error fetching drivers for broadcast: {str(e)}",
+            "SMS Broadcast Error"
+        )
+        return {
+            "success": False,
+            "message": f"Error: {str(e)}"
         }
 
 
 @frappe.whitelist()
 def send_driver_sms_with_fields(driver_name, message_template):
     """
-    Send SMS to a driver with field interpolation
+    Send SMS to a single driver with field interpolation
     
     Args:
         driver_name (str): Driver ID
-        message_template (str): Message template with {field} placeholders
+        message_template (str): Message with field placeholders like {driver_name}, {left_to_target}
         
     Returns:
-        dict: Result with success status and interpolated message
+        dict: Result with success status and message
     """
     try:
         # Get driver details
         driver = frappe.get_doc("TukTuk Driver", driver_name)
-        settings = frappe.get_single("TukTuk Settings")
+        
+        if not driver:
+            return {
+                "success": False,
+                "message": f"Driver {driver_name} not found"
+            }
         
         if not driver.mpesa_number:
             return {
@@ -688,10 +560,11 @@ def send_driver_sms_with_fields(driver_name, message_template):
                 "message": f"Driver {driver.driver_name} has no M-Pesa number configured"
             }
         
-        # Calculate daily target
-        daily_target = driver.daily_target if driver.daily_target else settings.global_daily_target
+        # Get global target for fallback
+        settings = frappe.get_single("TukTuk Settings")
+        daily_target = flt(driver.daily_target or settings.global_daily_target)
         
-        # Get M-Pesa account if assigned
+        # Get mpesa_account from vehicle if assigned
         mpesa_account = ""
         if driver.assigned_tuktuk:
             try:
@@ -742,30 +615,50 @@ def send_driver_sms_with_fields(driver_name, message_template):
 @frappe.whitelist()
 def send_bulk_sms_with_fields(driver_ids, message_template):
     """
-    Send SMS to multiple drivers with field interpolation
+    Send SMS to multiple drivers with field interpolation for each driver
     
     Args:
-        driver_ids (list or str): List of driver IDs or JSON string
-        message_template (str): Message template with {field} placeholders
+        driver_ids (str|list): Comma-separated string or list of driver IDs
+        message_template (str): Message with field placeholders like {driver_name}, {left_to_target}
         
     Returns:
-        dict: Result with success/failure counts and details
+        dict: Result with success count, failure count, and details
     """
     try:
-        # Parse driver_ids if it's a JSON string
+        # Parse driver_ids if it's a string
         if isinstance(driver_ids, str):
-            driver_ids = json.loads(driver_ids)
+            driver_ids = json.loads(driver_ids) if driver_ids.startswith('[') else [d.strip() for d in driver_ids.split(",") if d.strip()]
         
-        # Get all drivers in one query
+        if not driver_ids:
+            return {
+                "success": False,
+                "message": "No drivers selected"
+            }
+        
+        if not message_template or not message_template.strip():
+            return {
+                "success": False,
+                "message": "Message cannot be empty"
+            }
+        
+        # Get driver details
         drivers = frappe.get_all(
             "TukTuk Driver",
             filters={"name": ["in", driver_ids]},
-            fields=["name", "driver_name", "sunny_id", "mpesa_number", "left_to_target", 
-                    "current_balance", "daily_target", "assigned_tuktuk", "current_deposit_balance"]
+            fields=["name", "driver_name", "sunny_id", "mpesa_number", "left_to_target", "current_balance", "daily_target", "assigned_tuktuk", "current_deposit_balance"]
         )
         
-        settings = frappe.get_single("TukTuk Settings")
+        if not drivers:
+            return {
+                "success": False,
+                "message": "No valid drivers found"
+            }
         
+        # Get global target for fallback
+        settings = frappe.get_single("TukTuk Settings")
+        global_target = flt(settings.global_daily_target)
+        
+        # Send SMS to each driver with personalized message
         results = []
         success_count = 0
         failure_count = 0
@@ -774,7 +667,6 @@ def send_bulk_sms_with_fields(driver_ids, message_template):
             driver_name_str = driver.get("driver_name", "Driver")
             mpesa_number = driver.get("mpesa_number")
             
-            # Validate phone number exists
             if not mpesa_number:
                 results.append({
                     "driver_id": driver.get("name"),
@@ -785,27 +677,24 @@ def send_bulk_sms_with_fields(driver_ids, message_template):
                 failure_count += 1
                 continue
             
-            # Calculate daily target
-            daily_target = driver.get("daily_target") if driver.get("daily_target") else settings.global_daily_target
-            
-            # Get M-Pesa account if assigned
+            # Get mpesa_account from vehicle if assigned
             mpesa_account = ""
             if driver.get("assigned_tuktuk"):
                 try:
-                    vehicle = frappe.get_doc("TukTuk Vehicle", driver.get("assigned_tuktuk"))
-                    mpesa_account = vehicle.mpesa_account or ""
+                    mpesa_account = frappe.db.get_value("TukTuk Vehicle", driver.get("assigned_tuktuk"), "mpesa_account") or ""
                 except Exception:
                     mpesa_account = ""
             
-            # Interpolate fields in the message
+            # Interpolate fields for this specific driver
+            daily_target = flt(driver.get("daily_target") or global_target)
             message = message_template
-            message = message.replace("{driver_name}", driver.get("driver_name", "") or "")
-            message = message.replace("{sunny_id}", driver.get("sunny_id", "") or "")
+            message = message.replace("{driver_name}", driver_name_str)
+            message = message.replace("{sunny_id}", driver.get("sunny_id") or "")
             message = message.replace("{left_to_target}", f"{flt(driver.get('left_to_target'), 0):,.0f}")
             message = message.replace("{current_balance}", f"{flt(driver.get('current_balance'), 0):,.0f}")
             message = message.replace("{daily_target}", f"{daily_target:,.0f}")
-            message = message.replace("{assigned_tuktuk}", driver.get("assigned_tuktuk", "") or "None")
-            message = message.replace("{mpesa_number}", driver.get("mpesa_number", "") or "")
+            message = message.replace("{assigned_tuktuk}", driver.get("assigned_tuktuk") or "None")
+            message = message.replace("{mpesa_number}", mpesa_number)
             message = message.replace("{mpesa_paybill}", settings.mpesa_paybill or "")
             message = message.replace("{mpesa_account}", mpesa_account)
             message = message.replace("{current_deposit_balance}", f"{flt(driver.get('current_deposit_balance'), 0):,.0f}")
@@ -863,30 +752,60 @@ def send_bulk_sms_with_fields(driver_ids, message_template):
 
 
 @frappe.whitelist()
-def send_broadcast_sms(driver_ids, message, include_target_info=False):
+def send_broadcast_sms(driver_ids, message):
     """
-    Send broadcast SMS to multiple drivers
+    Send SMS to multiple selected drivers
     
     Args:
-        driver_ids (list or str): List of driver IDs or JSON string
-        message (str): Message to send
-        include_target_info (bool): Whether to append target info
+        driver_ids (str|list): Comma-separated string or list of driver IDs
+        message (str): SMS message to send
         
     Returns:
-        dict: Result with success/failure counts and details
+        dict: Result with success count, failure count, and details
     """
     try:
-        # Parse driver_ids if it's a JSON string
+        # Parse driver_ids if it's a string
         if isinstance(driver_ids, str):
-            driver_ids = json.loads(driver_ids)
+            driver_ids = [d.strip() for d in driver_ids.split(",") if d.strip()]
         
-        # Get all drivers in one query
+        if not driver_ids:
+            return {
+                "success": False,
+                "message": "No drivers selected"
+            }
+        
+        if not message or not message.strip():
+            return {
+                "success": False,
+                "message": "Message cannot be empty"
+            }
+        
+        # Get driver details
+        # Debug: Log the driver_ids being passed
+        frappe.log_error(
+            f"DEBUG: send_broadcast_sms received driver_ids: {driver_ids} (type: {type(driver_ids)})",
+            "SMS Broadcast Debug"
+        )
+
         drivers = frappe.get_all(
             "TukTuk Driver",
             filters={"name": ["in", driver_ids]},
-            fields=["name", "driver_name", "mpesa_number", "left_to_target"]
+            fields=["name", "driver_name", "mpesa_number"]
         )
+
+        # Debug: Log what was found
+        frappe.log_error(
+            f"DEBUG: Found {len(drivers)} drivers matching the IDs: {[d.get('name') for d in drivers]}",
+            "SMS Broadcast Debug"
+        )
+
+        if not drivers:
+            return {
+                "success": False,
+                "message": "No valid drivers found"
+            }
         
+        # Send SMS to each driver
         results = []
         success_count = 0
         failure_count = 0
@@ -895,7 +814,6 @@ def send_broadcast_sms(driver_ids, message, include_target_info=False):
             driver_name = driver.get("driver_name", "Driver")
             mpesa_number = driver.get("mpesa_number")
             
-            # Validate phone number exists
             if not mpesa_number:
                 results.append({
                     "driver_id": driver.get("name"),
@@ -906,15 +824,8 @@ def send_broadcast_sms(driver_ids, message, include_target_info=False):
                 failure_count += 1
                 continue
             
-            # Build final message
-            final_message = message
-            if include_target_info:
-                left_to_target = flt(driver.get("left_to_target", 0))
-                if left_to_target > 0:
-                    final_message += f"\n\nYou have KES {left_to_target:,.0f} to complete today's target."
-            
             # Send SMS using generic router
-            success = send_sms(mpesa_number, final_message.strip())
+            success = send_sms(mpesa_number, message.strip())
             
             if success:
                 results.append({
@@ -962,3 +873,4 @@ def send_broadcast_sms(driver_ids, message, include_target_info=False):
             "success": False,
             "message": f"Error: {str(e)}"
         }
+
