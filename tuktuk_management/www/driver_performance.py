@@ -16,7 +16,7 @@ def get_context(context):
         # Get driver details
         tuktuk_driver = frappe.get_all("TukTuk Driver", 
                                filters={"user_account": frappe.session.user},
-                               fields=["name", "driver_name"],
+                               fields=["name", "driver_name", "sunny_id"],
                                limit=1)
         
         if not tuktuk_driver:
@@ -35,6 +35,7 @@ def get_context(context):
             "current_page": "performance",
             "driver_name": driver.driver_name,
             "today_date": format_date(today(), "dd MMM yyyy"),
+            "sunny_id": driver.get("sunny_id", ""),
             "consecutive_misses": performance_data.get("consecutive_misses", 0),
             "current_balance": performance_data.get("current_balance", 0),
             "daily_target": performance_data.get("daily_target", 0),

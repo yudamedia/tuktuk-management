@@ -88,21 +88,19 @@
     </div>
 </div>
 
-<!-- Operating Information -->
+<!-- Sunny Information -->
 <div class="card">
     <div class="card-header">
-        <h2 class="card-title">Operating Information</h2>
+        <h2 class="card-title">SUNNY ID</h2>
     </div>
     <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border-color);">
-        <span>Operating Hours:</span>
-        <strong>{{ operating_hours.start or "N/A" }} - {{ operating_hours.end or "N/A" }}</strong>
+        <span>SUNNY ID:</span>
+        <strong>{{ sunny_id or "N/A" }}</strong>
     </div>
-    {% if mpesa_number %}
     <div style="display: flex; justify-content: space-between; padding: 12px 0;">
-        <span>M-Pesa Number:</span>
-        <strong>{{ mpesa_number }}</strong>
+        <span>Paybill:</span>
+        <strong>4165253</strong>
     </div>
-    {% endif %}
 </div>
 {% endif %}
 {% endblock %}

@@ -3,7 +3,31 @@
 {% block head_include %}
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <link rel="stylesheet" href="/assets/tuktuk_management/css/driver_dashboard.css">
+<style>
+    /* Hide ERPNext default header and footer */
+    .navbar, .navbar-default, .navbar-header, .navbar-nav, .navbar-brand,
+    .frappe-navbar, .web-footer, footer, .footer, .page-footer,
+    .page-header, .page-header-wrapper, .page-header-content,
+    .breadcrumb-container, .page-breadcrumbs, .sidebar, .sidebar-menu,
+    .sidebar-overlay, .navbar-collapse, .navbar-toggle, .nav, .main-nav {
+        display: none !important;
+    }
+    
+    body {
+        padding-top: 0 !important;
+        margin-top: 0 !important;
+    }
+    
+    .web-page {
+        min-height: 100vh;
+        padding: 0;
+        margin: 0;
+    }
+</style>
 {% endblock %}
+
+{% block navbar %}{% endblock %}
+{% block footer %}{% endblock %}
 
 {% block page_content %}
 <div class="driver-app">
@@ -15,7 +39,7 @@
                 <p class="header-date">{{ today_date or "" }}</p>
             </div>
             <div class="header-right">
-                <a href="/logout" class="logout-btn">Logout</a>
+                <a href="/?cmd=web_logout" class="logout-btn">Logout</a>
             </div>
         </div>
     </header>
