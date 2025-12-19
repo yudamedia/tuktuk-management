@@ -21,44 +21,77 @@ def boot_session(bootinfo):
         "initialized": True
     }
     
-    # Check user roles and set appropriate redirects
+    # Get user roles
     user_roles = frappe.get_roles(frappe.session.user)
     
-    # Priority-based redirect system - TukTuk Driver has highest priority
-    # IMPORTANT: Check TukTuk Driver FIRST, before any other role checks
+    # CRITICAL: Priority-based redirect system
+    # Check roles in strict priority order with early returns to prevent conflicts
+    
+    # HIGHEST PRIORITY: TukTuk Driver
+    # If user is a driver, they ALWAYS go to driver dashboard, regardless of other roles
     if "TukTuk Driver" in user_roles:
-        # TukTuk Drivers ALWAYS go to their dashboard, regardless of other roles
-        bootinfo.tuktuk_redirect = "/tuktuk-driver-dashboard"
+        bootinfo.tuktuk_redirect = "/driver/home"
         bootinfo.tuktuk_redirect_role = "TukTuk Driver"
-        # Log for debugging
         frappe.logger().info(f"TukTuk Driver redirect set for user: {frappe.session.user}")
+        # Still load settings for driver, then return
+        _load_tuktuk_settings(bootinfo, user_roles)
+        return  # EXIT EARLY - Don't check other roles
     
-    elif "Tuktuk Manager" in user_roles:
-        # TukTuk Managers go to management workspace (only if not a driver)
-        if not frappe.local.request or not frappe.local.request.path.startswith('/app/tuktuk-management'):
-            bootinfo.tuktuk_redirect = "/app/tuktuk-management"
-            bootinfo.tuktuk_redirect_role = "Tuktuk Manager"
+    # SECOND PRIORITY: Tuktuk Executive (if you have this role)
+    if "Tuktuk Executive" in user_roles:
+        bootinfo.tuktuk_redirect = "/app/tuktuk-management"
+        bootinfo.tuktuk_redirect_role = "Tuktuk Executive"
+        frappe.logger().info(f"Tuktuk Executive redirect set for user: {frappe.session.user}")
+        _load_tuktuk_settings(bootinfo, user_roles)
+        return  # EXIT EARLY
     
-    elif "System Manager" in user_roles:
-        # System Managers can choose, but default to TukTuk management if they have that role too
-        # First check if they also have TukTuk Manager role, if not, assign it
-        # BUT: Only do this if they are NOT a TukTuk Driver
+    # THIRD PRIORITY: Tuktuk Manager
+    if "Tuktuk Manager" in user_roles:
+        bootinfo.tuktuk_redirect = "/app/tuktuk-management"
+        bootinfo.tuktuk_redirect_role = "Tuktuk Manager"
+        frappe.logger().info(f"Tuktuk Manager redirect set for user: {frappe.session.user}")
+        _load_tuktuk_settings(bootinfo, user_roles)
+        return  # EXIT EARLY
+    
+    # FOURTH PRIORITY: System Manager
+    # System Managers go to tuktuk-management ONLY if they don't have driver/manager roles
+    if "System Manager" in user_roles:
+        # Auto-assign Tuktuk Manager role to System Managers for convenience
+        # This allows them to manage the TukTuk system
         try:
             user = frappe.get_doc("User", frappe.session.user)
             user_roles_list = [role.role for role in user.roles]
             
-            # Double-check: ensure we don't redirect System Managers who are also Drivers
-            if "TukTuk Driver" not in user_roles_list and "Tuktuk Manager" not in user_roles_list:
+            # Only add Tuktuk Manager if they don't already have it
+            if "Tuktuk Manager" not in user_roles_list:
                 user.append("roles", {"role": "Tuktuk Manager"})
                 user.save(ignore_permissions=True)
-                # After adding role, redirect to TukTuk management
+                frappe.db.commit()
+                frappe.logger().info(f"Auto-assigned Tuktuk Manager role to System Manager: {frappe.session.user}")
+                # Redirect to TukTuk management after adding role
                 bootinfo.tuktuk_redirect = "/app/tuktuk-management"
                 bootinfo.tuktuk_redirect_role = "System Manager (Auto-assigned Tuktuk Manager)"
         except Exception as e:
             frappe.log_error(f"Boot role assignment error: {str(e)}")
+        
+        # Redirect System Managers to tuktuk-management
+        bootinfo.tuktuk_redirect = "/app/tuktuk-management"
+        bootinfo.tuktuk_redirect_role = "System Manager"
+        frappe.logger().info(f"System Manager redirect set for user: {frappe.session.user}")
+        _load_tuktuk_settings(bootinfo, user_roles)
+        return  # EXIT EARLY
     
+    # No TukTuk-specific redirect needed for other roles
+    frappe.logger().info(f"No TukTuk redirect for user: {frappe.session.user}")
+
+
+def _load_tuktuk_settings(bootinfo, user_roles):
+    """
+    Helper function to load TukTuk settings for all TukTuk users
+    Separated to avoid code duplication
+    """
     # Basic settings for all TukTuk users
-    if any(role in user_roles for role in ["TukTuk Driver", "Tuktuk Manager", "System Manager"]):
+    if any(role in user_roles for role in ["TukTuk Driver", "Tuktuk Manager", "Tuktuk Executive", "System Manager"]):
         try:
             settings = frappe.get_single("TukTuk Settings")
             bootinfo.tuktuk_settings = {
@@ -67,11 +100,12 @@ def boot_session(bootinfo):
                 "global_daily_target": settings.global_daily_target,
                 "global_fare_percentage": settings.global_fare_percentage
             }
-        except Exception:
+        except Exception as e:
             # Provide defaults if settings don't exist
+            frappe.logger().warning(f"Failed to load TukTuk Settings, using defaults: {str(e)}")
             bootinfo.tuktuk_settings = {
                 "operating_hours_start": "06:00:00",
                 "operating_hours_end": "00:00:00",
-                "global_daily_target": 3000,
+                "global_daily_target": 1400,
                 "global_fare_percentage": 50
             }
