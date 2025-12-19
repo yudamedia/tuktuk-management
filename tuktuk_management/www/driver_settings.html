@@ -1,0 +1,121 @@
+{% extends "tuktuk_management/www/driver_base.html" %}
+
+{% block title %}{{ _("Settings") }} - Sunny TukTuk{% endblock %}
+
+{% block driver_content %}
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% else %}
+<!-- Change Password Card -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Change Password</h2>
+    </div>
+    <form id="change-password-form">
+        <div style="margin-bottom: 16px;">
+            <label for="old-password" style="display: block; margin-bottom: 8px; font-weight: 500;">Current Password</label>
+            <input type="password" id="old-password" name="old_password" required 
+                   style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1rem; box-sizing: border-box;"
+                   placeholder="Enter current password">
+        </div>
+        <div style="margin-bottom: 16px;">
+            <label for="new-password" style="display: block; margin-bottom: 8px; font-weight: 500;">New Password</label>
+            <input type="password" id="new-password" name="new_password" required 
+                   style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1rem; box-sizing: border-box;"
+                   placeholder="Enter new password (min. 6 characters)"
+                   minlength="6">
+        </div>
+        <div style="margin-bottom: 20px;">
+            <label for="confirm-password" style="display: block; margin-bottom: 8px; font-weight: 500;">Confirm New Password</label>
+            <input type="password" id="confirm-password" name="confirm_password" required 
+                   style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1rem; box-sizing: border-box;"
+                   placeholder="Confirm new password"
+                   minlength="6">
+        </div>
+        <div id="password-error" style="display: none; margin-bottom: 16px;" class="alert alert-danger"></div>
+        <div id="password-success" style="display: none; margin-bottom: 16px;" class="alert alert-info"></div>
+        <button type="submit" class="btn btn-primary btn-block" id="change-password-btn">
+            Change Password
+        </button>
+    </form>
+</div>
+{% endif %}
+
+<script>
+(function() {
+    'use strict';
+    
+    const form = document.getElementById('change-password-form');
+    const errorDiv = document.getElementById('password-error');
+    const successDiv = document.getElementById('password-success');
+    const submitBtn = document.getElementById('change-password-btn');
+    
+    if (form) {
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            // Hide previous messages
+            errorDiv.style.display = 'none';
+            successDiv.style.display = 'none';
+            
+            const oldPassword = document.getElementById('old-password').value;
+            const newPassword = document.getElementById('new-password').value;
+            const confirmPassword = document.getElementById('confirm-password').value;
+            
+            // Validate passwords match
+            if (newPassword !== confirmPassword) {
+                errorDiv.textContent = 'New password and confirm password do not match';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            // Validate password length
+            if (newPassword.length < 6) {
+                errorDiv.textContent = 'New password must be at least 6 characters long';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            // Disable submit button
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Changing Password...';
+            
+            try {
+                const response = await frappe.call({
+                    method: 'tuktuk_management.api.driver_auth.change_driver_password',
+                    args: {
+                        old_password: oldPassword,
+                        new_password: newPassword
+                    },
+                    callback: function(r) {
+                        if (r.message && r.message.success) {
+                            successDiv.textContent = r.message.message || 'Password changed successfully!';
+                            successDiv.style.display = 'block';
+                            form.reset();
+                            
+                            // Clear after 3 seconds
+                            setTimeout(() => {
+                                successDiv.style.display = 'none';
+                            }, 3000);
+                        }
+                    },
+                    error: function(r) {
+                        errorDiv.textContent = r.message || 'Failed to change password. Please try again.';
+                        errorDiv.style.display = 'block';
+                    },
+                    always: function() {
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Change Password';
+                    }
+                });
+            } catch (error) {
+                errorDiv.textContent = error.message || 'An error occurred. Please try again.';
+                errorDiv.style.display = 'block';
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Change Password';
+            }
+        });
+    }
+})();
+</script>
+{% endblock %}

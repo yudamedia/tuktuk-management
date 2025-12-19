@@ -38,7 +38,13 @@
                 <h1 class="driver-name">{{ driver_name or "Driver" }}</h1>
                 <p class="header-date">{{ today_date or "" }}</p>
             </div>
-            <div class="header-right">
+            <div class="header-right" style="display: flex; align-items: center; gap: 12px;">
+                <a href="/driver/settings" class="settings-btn" title="Settings" style="background: rgba(33, 37, 41, 0.1); color: #212529; padding: 8px; border-radius: 50%; text-decoration: none; display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; transition: background 0.2s;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M12 1v6m0 6v6M5.64 5.64l4.24 4.24m4.24 4.24l4.24 4.24M1 12h6m6 0h6M5.64 18.36l4.24-4.24m4.24-4.24l4.24-4.24"></path>
+                    </svg>
+                </a>
                 <a href="/?cmd=web_logout" class="logout-btn">Logout</a>
             </div>
         </div>

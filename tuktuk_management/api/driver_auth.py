@@ -425,6 +425,63 @@ def get_driver_performance_data():
         frappe.throw(f"Failed to load performance data: {str(e)}")
 
 @frappe.whitelist()
+def change_driver_password(old_password, new_password):
+    """Change password for logged-in driver"""
+    try:
+        # Check if user is logged in
+        if frappe.session.user == "Guest":
+            frappe.throw(_("Please login to change password"), frappe.PermissionError)
+        
+        # Verify user is a driver
+        user_roles = frappe.get_roles(frappe.session.user)
+        if "TukTuk Driver" not in user_roles:
+            frappe.throw(_("Access denied - TukTuk Driver role required"), frappe.PermissionError)
+        
+        # Get current user
+        user = frappe.get_doc("User", frappe.session.user)
+        
+        # Verify old password using Frappe's password utilities
+        # The password is stored in the __Auth table
+        from frappe.utils.password import check_password
+        
+        # Query the __Auth table to get the password hash
+        auth_record = frappe.db.sql("""
+            SELECT password 
+            FROM `__Auth` 
+            WHERE doctype = 'User' AND name = %s
+        """, (frappe.session.user,), as_dict=True)
+        
+        if not auth_record or not auth_record[0].get('password'):
+            frappe.throw(_("Unable to verify current password. Please contact administrator."))
+        
+        password_hash = auth_record[0]['password']
+        
+        # Verify the password
+        if not check_password(old_password, password_hash):
+            frappe.throw(_("Current password is incorrect"))
+        
+        # Validate new password
+        if not new_password or len(new_password) < 6:
+            frappe.throw(_("New password must be at least 6 characters long"))
+        
+        # Set new password
+        user.new_password = new_password
+        user.save(ignore_permissions=True)
+        
+        frappe.db.commit()
+        
+        return {
+            "success": True,
+            "message": _("Password changed successfully")
+        }
+        
+    except frappe.ValidationError:
+        raise
+    except Exception as e:
+        frappe.log_error(f"Password change error: {str(e)}")
+        frappe.throw(f"Failed to change password: {str(e)}")
+
+@frappe.whitelist()
 def get_driver_roster_data():
     """Get roster schedule and pending requests for logged-in driver"""
     try:

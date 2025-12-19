@@ -82,6 +82,7 @@ whitelisted_methods = [
     "tuktuk_management.api.driver_auth.get_driver_performance_data",
     "tuktuk_management.api.driver_auth.get_driver_roster_data",
     "tuktuk_management.api.driver_auth.get_available_drivers_for_switch",
+    "tuktuk_management.api.driver_auth.change_driver_password",
     "tuktuk_management.api.driver_auth.get_tuktuk_driver_transaction_history",
     "tuktuk_management.api.driver_auth.get_tuktuk_driver_rental_history",
     "tuktuk_management.api.driver_auth.request_tuktuk_rental",
@@ -266,6 +267,7 @@ website_route_rules = [
     {"from_route": "/driver/transactions", "to_route": "driver_transactions"},
     {"from_route": "/driver/deposit", "to_route": "driver_deposit"},
     {"from_route": "/driver/performance", "to_route": "driver_performance"},
+    {"from_route": "/driver/settings", "to_route": "driver_settings"},
     {"from_route": "/sms-broadcast", "to_route": "sms_broadcast"},
 ]
 
