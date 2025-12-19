@@ -20,16 +20,18 @@ def get_context(context):
         # Get driver details
         tuktuk_driver = frappe.get_all("TukTuk Driver", 
                                filters={"user_account": frappe.session.user},
-                               fields=["name", "driver_name", "current_deposit_balance"],
+                               fields=["name", "driver_name", "current_deposit_balance", "left_to_target"],
                                limit=1)
         
         if tuktuk_driver:
             driver = tuktuk_driver[0]
             context.driver_name = driver.driver_name
             context.current_deposit_balance = driver.current_deposit_balance or 0
+            context.left_to_target = driver.left_to_target or 0
         else:
             context.driver_name = "Driver"
             context.current_deposit_balance = 0
+            context.left_to_target = 0
         
         context.update({
             "show_sidebar": False,
@@ -39,6 +41,7 @@ def get_context(context):
             "today_earnings": dashboard_data.get("today_earnings", 0),
             "daily_target": dashboard_data.get("daily_target", 0),
             "current_balance": dashboard_data.get("tuktuk_driver", {}).get("current_balance", 0),
+            "left_to_target": context.left_to_target,
             "target_progress": dashboard_data.get("target_progress", 0),
             "tuktuk": dashboard_data.get("tuktuk"),
             "consecutive_misses": dashboard_data.get("tuktuk_driver", {}).get("consecutive_misses", 0)

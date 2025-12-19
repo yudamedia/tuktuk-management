@@ -14,9 +14,9 @@
     </div>
     
     <div class="stat-card">
-        <div class="stat-label">Current Balance</div>
-        <div class="stat-value {% if current_balance >= 0 %}success{% else %}danger{% endif %}">
-            KSH {{ "{:,.0f}".format(current_balance) }}
+        <div class="stat-label">Left to Target</div>
+        <div class="stat-value {% if left_to_target == 0 %}success{% elif left_to_target <= daily_target * 0.2 %}warning{% else %}danger{% endif %}">
+            KSH {{ "{:,.0f}".format(left_to_target) }}
         </div>
     </div>
 </div>
