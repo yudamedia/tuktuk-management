@@ -28,14 +28,17 @@ def boot_session(bootinfo):
     # Check roles in strict priority order with early returns to prevent conflicts
     
     # HIGHEST PRIORITY: TukTuk Driver
-    # If user is a driver, they ALWAYS go to driver dashboard, regardless of other roles
+    # If user is a driver WITH an actual TukTuk Driver record, redirect to dashboard
+    # This prevents Administrator from being redirected (they get all roles by default)
     if "TukTuk Driver" in user_roles:
-        bootinfo.tuktuk_redirect = "/driver/home"
-        bootinfo.tuktuk_redirect_role = "TukTuk Driver"
-        frappe.logger().info(f"TukTuk Driver redirect set for user: {frappe.session.user}")
-        # Still load settings for driver, then return
-        _load_tuktuk_settings(bootinfo, user_roles)
-        return  # EXIT EARLY - Don't check other roles
+        # Check if user actually has a TukTuk Driver record
+        driver_record = frappe.db.exists("TukTuk Driver", {"user_account": frappe.session.user})
+        if driver_record:
+            bootinfo.tuktuk_redirect = "/driver/home"
+            bootinfo.tuktuk_redirect_role = "TukTuk Driver"
+            frappe.logger().info(f"TukTuk Driver redirect set for user: {frappe.session.user}")
+            _load_tuktuk_settings(bootinfo, user_roles)
+            return  # EXIT EARLY
     
     # SECOND PRIORITY: Tuktuk Executive (if you have this role)
     if "Tuktuk Executive" in user_roles:
