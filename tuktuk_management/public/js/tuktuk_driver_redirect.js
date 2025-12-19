@@ -1,110 +1,78 @@
 // ~/frappe-bench/apps/tuktuk_management/tuktuk_management/public/js/tuktuk_driver_redirect.js
 
-// Automatic redirect for TukTuk users based on roles - WITH STRICT PRIORITY
-$(document).ready(function() {
-    // Wait for frappe to be fully loaded
-    if (typeof frappe === 'undefined' || !frappe.boot) {
-        setTimeout(function() {
-            handleTukTukRedirect();
-        }, 1000);
-        return;
-    }
+// Automatic redirect for TukTuk users based on roles - SIMPLIFIED AND FIXED
+(function() {
+    'use strict';
     
-    handleTukTukRedirect();
-});
-
-function handleTukTukRedirect() {
-    const currentPath = window.location.pathname;
+    let redirectProcessed = false; // Prevent double execution
     
-    // Don't redirect from special pages
-    if (currentPath.includes('/login') ||
-        currentPath.includes('/logout') ||
-        currentPath.includes('/update-password')) {
-        return;
-    }
-    
-    // Check if we have boot info with redirect preference
-    if (frappe.boot && frappe.boot.tuktuk_redirect) {
+    function handleTukTukRedirect() {
+        // Prevent multiple executions
+        if (redirectProcessed) {
+            return;
+        }
+        
+        // Wait for frappe to be ready
+        if (typeof frappe === 'undefined' || !frappe.boot || !frappe.user_roles) {
+            return;
+        }
+        
+        const currentPath = window.location.pathname;
+        
+        // NEVER redirect from these pages
+        if (currentPath.includes('/login') ||
+            currentPath.includes('/logout') ||
+            currentPath.includes('/update-password') ||
+            currentPath.includes('/driver/') ||
+            currentPath.includes('/tuktuk-driver-dashboard')) {
+            return;
+        }
+        
+        // NEVER redirect if already on the correct page
+        if (currentPath.includes('/app/tuktuk-management') && 
+            !frappe.user_roles.includes('TukTuk Driver')) {
+            // Already on management page and not a driver - don't redirect
+            return;
+        }
+        
+        // Get redirect info from boot (set by boot.py)
         const targetUrl = frappe.boot.tuktuk_redirect;
         const redirectRole = frappe.boot.tuktuk_redirect_role;
         
-        // Only redirect if currently on a redirectable page
-        const redirectablePages = [
-            '/app',
-            '/app/',
-            '/desk',
-            '/app/home',
-            '/app/tuktuk-management'
-        ];
+        if (!targetUrl) {
+            // No redirect needed
+            return;
+        }
         
-        // Check if current path matches any redirectable page
-        const shouldRedirect = redirectablePages.some(page => 
-            currentPath === page || currentPath.startsWith(page + '/')
+        // Define pages where redirect should happen
+        const needsRedirect = (
+            currentPath === '/app' || 
+            currentPath === '/app/' || 
+            currentPath === '/desk' ||
+            currentPath === '/app/home'
         );
         
-        if (shouldRedirect) {
-            // Special handling for TukTuk Driver - they should NEVER see management interface
-            if (redirectRole === "TukTuk Driver" && !currentPath.includes('/driver/')) {
-                console.log(`TukTuk Redirect: ${redirectRole} → ${targetUrl} (forced)`);
-                setTimeout(function() {
-                    window.location.href = targetUrl;
-                }, 300);
-                return;
-            }
-            
-            // For managers/executives, only redirect if not already on management page
-            if ((redirectRole === "Tuktuk Manager" || 
-                 redirectRole === "Tuktuk Executive" || 
-                 redirectRole === "System Manager") && 
-                currentPath !== targetUrl) {
-                
-                // Don't redirect if already on the management workspace
-                if (!currentPath.includes('/app/tuktuk-management')) {
-                    console.log(`TukTuk Redirect: ${redirectRole} → ${targetUrl}`);
-                    setTimeout(function() {
-                        window.location.href = targetUrl;
-                    }, 300);
-                }
-            }
+        // Special case: Drivers on management pages
+        if (redirectRole === "TukTuk Driver" && currentPath.includes('/app/')) {
+            redirectProcessed = true;
+            console.log(`TukTuk Redirect: ${redirectRole} → ${targetUrl} (driver on app page)`);
+            window.location.href = targetUrl;
+            return;
+        }
+        
+        // Normal redirect for initial pages
+        if (needsRedirect && currentPath !== targetUrl) {
+            redirectProcessed = true;
+            console.log(`TukTuk Redirect: ${redirectRole} → ${targetUrl}`);
+            setTimeout(function() {
+                window.location.href = targetUrl;
+            }, 200);
         }
     }
     
-    // Fallback: Direct role check (in case boot info is missing)
-    // This provides redundancy in the redirect system
-    if (frappe.user_roles && frappe.user_roles.length > 0) {
-        // HIGHEST PRIORITY: TukTuk Driver
-        if (frappe.user_roles.includes('TukTuk Driver')) {
-            if (!currentPath.includes('/driver/') && 
-                !currentPath.includes('/tuktuk-driver-dashboard')) {
-                
-                const redirectablePages = ['/app', '/app/', '/desk', '/app/home'];
-                if (redirectablePages.some(page => currentPath === page || currentPath.startsWith(page + '/'))) {
-                    console.log('TukTuk Driver fallback redirect: forcing to /driver/home');
-                    setTimeout(function() {
-                        window.location.href = '/driver/home';
-                    }, 300);
-                }
-            }
-            return; // Don't check other roles
-        }
-        
-        // LOWER PRIORITY: Managers and Executives
-        if (frappe.user_roles.includes('Tuktuk Executive') || 
-            frappe.user_roles.includes('Tuktuk Manager') ||
-            frappe.user_roles.includes('System Manager')) {
-            
-            if (currentPath === '/app' || currentPath === '/app/' || currentPath === '/desk') {
-                console.log('Manager/Executive fallback redirect to /app/tuktuk-management');
-                setTimeout(function() {
-                    window.location.href = '/app/tuktuk-management';
-                }, 300);
-            }
-        }
-    }
-}
-
-// Additional safety: frappe.ready event handler
-frappe.ready(function() {
-    // Run redirect check again when frappe is fully ready
-    handleTukTukRedirect();
-});
+    // Run on document ready
+    $(document).ready(function() {
+        setTimeout(handleTukTukRedirect, 500);
+    });
+    
+})();

@@ -214,7 +214,7 @@ boot_session = "tuktuk_management.boot.boot_session"
 translate_app = True
 
 # Login hooks for automatic redirect
-on_session_creation = "tuktuk_management.api.driver_auth.on_session_creation"
+# on_session_creation = "tuktuk_management.api.driver_auth.on_session_creation"
 
 fixtures = [
     {
