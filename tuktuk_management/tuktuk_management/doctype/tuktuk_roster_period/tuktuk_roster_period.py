@@ -148,7 +148,7 @@ def _generate_roster_logic(start_date, end_date, regular_drivers, substitute_dri
 	special_driver = "DRV-112017"
 	if start_date.month == 12 and special_driver in driver_preferences:
 		# Assign Dec 28, 29, 30, 31 if they fall in this roster
-		special_dates = [getdate(f"2024-12-{day}") for day in [28, 29, 30, 31]]
+		special_dates = [getdate(f"2025-12-{day}") for day in [28, 29, 30, 31]]
 		for special_date in special_dates:
 			if start_date <= special_date <= end_date:
 				day_offs.append({
