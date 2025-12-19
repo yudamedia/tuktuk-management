@@ -1,0 +1,315 @@
+{% extends "tuktuk_management/www/driver_base.html" %}
+
+{% block title %}{{ _("Roster") }} - Sunny TukTuk{% endblock %}
+
+{% block driver_content %}
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% else %}
+
+{% if not has_active_roster %}
+<div class="alert alert-info">
+    <strong>No Active Roster:</strong> There is currently no active roster period. Please contact management.
+</div>
+{% else %}
+
+<!-- Roster Period Info -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Roster Period</h2>
+    </div>
+    <p style="text-align: center; margin: 10px 0;">
+        <strong>{{ roster_period.start_date_formatted }}</strong> to 
+        <strong>{{ roster_period.end_date_formatted }}</strong>
+    </p>
+</div>
+
+<!-- Pending Switch Requests -->
+{% if pending_requests and pending_requests|length > 0 %}
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Pending Switch Requests</h2>
+        <span class="badge badge-warning">{{ pending_requests|length }}</span>
+    </div>
+    {% for request in pending_requests %}
+    <div class="alert alert-warning" style="margin-bottom: 12px;">
+        <strong>{{ request.requesting_driver_name or request.requesting_driver }}</strong> wants to switch days off.<br>
+        <small>
+            They offer their day off: <strong>{{ request.my_off_date_formatted if request.my_off_date_formatted else "N/A" }}</strong><br>
+            They want your day off: <strong>{{ request.requested_date_formatted if request.requested_date_formatted else "N/A" }}</strong><br>
+            {% if request.reason %}
+            Reason: {{ request.reason }}<br>
+            {% endif %}
+        </small>
+        <div style="margin-top: 12px; display: flex; gap: 8px;">
+            <button class="btn btn-success" onclick="approveSwitch('{{ request.roster_name }}', '{{ request.requesting_driver }}', '{{ request.requested_date if request.requested_date else "" }}', '{{ request.my_off_date if request.my_off_date else "" }}')">
+                Approve
+            </button>
+            <button class="btn btn-danger" onclick="rejectSwitch('{{ request.roster_name }}', '{{ request.requesting_driver }}', '{{ request.requested_date if request.requested_date else "" }}')">
+                Reject
+            </button>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- My Schedule -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">My Schedule</h2>
+    </div>
+</div>
+
+{% if schedule and schedule|length > 0 %}
+<ul class="transaction-list">
+    {% for day_off in schedule %}
+    <li class="transaction-item">
+        <div class="transaction-info">
+            <div class="transaction-date">{{ day_off.date_formatted }}</div>
+            <div class="transaction-type">
+                <span class="badge {% if day_off.day_off_type == 'Scheduled' %}badge-info{% elif day_off.day_off_type == 'Switched' %}badge-warning{% elif day_off.day_off_type == 'Sick' %}badge-danger{% else %}badge-info{% endif %}">
+                    {{ day_off.day_off_type }}
+                </span>
+                {% if day_off.switch_status == 'Pending' %}
+                <span class="badge badge-warning">Switch Pending</span>
+                {% elif day_off.switch_status == 'Approved' %}
+                <span class="badge badge-success">Switch Approved</span>
+                {% endif %}
+                {% if day_off.notes %}
+                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">
+                    {{ day_off.notes }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        <div style="text-align: right;">
+            {% if day_off.day_off_type == 'Scheduled' and day_off.switch_status != 'Pending' %}
+            <button class="btn btn-primary" style="padding: 6px 12px; font-size: 0.875rem;" 
+                    onclick="requestSwitch('{{ day_off.date }}')">
+                Request Switch
+            </button>
+            {% endif %}
+        </div>
+    </li>
+    {% endfor %}
+</ul>
+{% else %}
+<div class="empty-state">
+    <div class="empty-state-icon">📅</div>
+    <p>No scheduled days off in this period</p>
+</div>
+{% endif %}
+
+<!-- Actions -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Actions</h2>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 12px;">
+        <button class="btn btn-primary btn-block" onclick="markSickDay()">
+            Mark Sick Day
+        </button>
+    </div>
+</div>
+
+{% endif %}
+{% endif %}
+
+<script>
+function approveSwitch(rosterName, requestingDriver, theirOffDate, myOffDate) {
+    if (!confirm('Approve this switch request?')) return;
+    
+    frappe.call({
+        method: 'tuktuk_management.api.roster.approve_switch',
+        args: {
+            roster_name: rosterName,
+            requesting_driver: requestingDriver,
+            my_driver_id: '{{ driver_id }}',
+            their_off_date: theirOffDate,
+            my_off_date: myOffDate
+        },
+        callback: function(r) {
+            if (r.message && r.message.success) {
+                frappe.show_alert({
+                    message: 'Switch request approved!',
+                    indicator: 'green'
+                });
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                frappe.show_alert({
+                    message: r.message.message || 'Failed to approve switch',
+                    indicator: 'red'
+                });
+            }
+        }
+    });
+}
+
+function rejectSwitch(rosterName, requestingDriver, requestedDate) {
+    if (!confirm('Reject this switch request?')) return;
+    
+    frappe.call({
+        method: 'tuktuk_management.api.roster.reject_switch',
+        args: {
+            roster_name: rosterName,
+            requesting_driver: requestingDriver,
+            requested_date: requestedDate
+        },
+        callback: function(r) {
+            if (r.message && r.message.success) {
+                frappe.show_alert({
+                    message: 'Switch request rejected',
+                    indicator: 'orange'
+                });
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                frappe.show_alert({
+                    message: r.message.message || 'Failed to reject switch',
+                    indicator: 'red'
+                });
+            }
+        }
+    });
+}
+
+function requestSwitch(myScheduledOff) {
+    // Get available drivers
+    frappe.call({
+        method: 'tuktuk_management.api.driver_auth.get_available_drivers_for_switch',
+        callback: function(r) {
+            if (!r.message || !r.message.success || !r.message.drivers || r.message.drivers.length === 0) {
+                frappe.show_alert({
+                    message: 'No other drivers available for switch',
+                    indicator: 'orange'
+                });
+                return;
+            }
+            
+            // Create dialog for switch request
+            let drivers = r.message.drivers;
+            let driverOptions = drivers.map(d => d.driver_name + ' (' + (d.sunny_id || d.name) + ')').join('\\n');
+            let driverIds = drivers.map(d => d.name);
+            
+            let switchWith = prompt('Enter driver name to switch with:\\n\\n' + driverOptions);
+            if (!switchWith) return;
+            
+            // Find driver ID
+            let selectedDriver = null;
+            for (let i = 0; i < drivers.length; i++) {
+                if (drivers[i].driver_name === switchWith || drivers[i].name === switchWith || drivers[i].sunny_id === switchWith) {
+                    selectedDriver = drivers[i].name;
+                    break;
+                }
+            }
+            
+            if (!selectedDriver) {
+                frappe.show_alert({
+                    message: 'Driver not found',
+                    indicator: 'red'
+                });
+                return;
+            }
+            
+            let requestedDate = prompt('Enter the date you want off (YYYY-MM-DD):');
+            if (!requestedDate) return;
+            
+            let reason = prompt('Reason for switch (optional):') || '';
+            
+            frappe.call({
+                method: 'tuktuk_management.api.roster.request_switch',
+                args: {
+                    my_driver_id: '{{ driver_id }}',
+                    my_scheduled_off: myScheduledOff,
+                    switch_with_driver: selectedDriver,
+                    requested_date: requestedDate,
+                    reason: reason
+                },
+                callback: function(r) {
+                    if (r.message && r.message.success) {
+                        frappe.show_alert({
+                            message: 'Switch request sent!',
+                            indicator: 'green'
+                        });
+                        setTimeout(() => location.reload(), 1500);
+                    } else {
+                        frappe.show_alert({
+                            message: r.message.message || 'Failed to send switch request',
+                            indicator: 'red'
+                        });
+                    }
+                }
+            });
+        }
+    });
+}
+
+function markSickDay() {
+    let date = prompt('Enter date for sick day (YYYY-MM-DD) or leave blank for today:');
+    if (date === null) return;
+    
+    if (!date) {
+        let today = new Date();
+        date = today.getFullYear() + '-' + 
+               String(today.getMonth() + 1).padStart(2, '0') + '-' + 
+               String(today.getDate()).padStart(2, '0');
+    }
+    
+    let notes = prompt('Notes (optional):') || 'Sick day';
+    
+    frappe.call({
+        method: 'tuktuk_management.api.roster.mark_sick_day',
+        args: {
+            driver_id: '{{ driver_id }}',
+            date: date,
+            notes: notes
+        },
+        callback: function(r) {
+            if (r.message && r.message.success) {
+                frappe.show_alert({
+                    message: 'Sick day marked',
+                    indicator: 'green'
+                });
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                frappe.show_alert({
+                    message: r.message.message || 'Failed to mark sick day',
+                    indicator: 'red'
+                });
+            }
+        }
+    });
+}
+
+// Include frappe if not available
+if (typeof frappe === 'undefined') {
+    var frappe = {
+        call: function(opts) {
+            fetch('/api/method/' + opts.method, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Frappe-CSRF-Token': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify(opts.args || {})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (opts.callback) {
+                    opts.callback({message: data.message});
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                if (opts.callback) {
+                    opts.callback({message: {success: false, message: 'Network error'}});
+                }
+            });
+        },
+        show_alert: function(opts) {
+            alert(opts.message);
+        }
+    };
+}
+</script>
+{% endblock %}

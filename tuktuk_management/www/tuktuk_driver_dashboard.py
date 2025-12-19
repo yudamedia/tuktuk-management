@@ -2,7 +2,7 @@ import frappe
 from frappe import _
 
 def get_context(context):
-    """TukTuk Driver dashboard context"""
+    """TukTuk Driver dashboard context - Redirects to new multi-page dashboard"""
     try:
         # Check if user is logged in and is a driver
         if frappe.session.user == "Guest":
@@ -13,31 +13,14 @@ def get_context(context):
         if "TukTuk Driver" not in user_roles:
             frappe.throw(_("Access denied - TukTuk Driver role required"), frappe.PermissionError)
         
-        # Get driver dashboard data using our API
-        try:
-            from tuktuk_management.api.driver_auth import get_tuktuk_driver_dashboard_data
-            dashboard_data = get_tuktuk_driver_dashboard_data()
-        except ImportError:
-            # Handle case where driver_auth.py doesn't exist yet
-            context.update({
-                "error": "TukTuk driver authentication module not found. Please ensure driver_auth.py is created.",
-                "show_sidebar": False,
-                "no_breadcrumbs": True
-            })
-            return
-        
-        context.update({
-            "show_sidebar": False,
-            "no_breadcrumbs": True,
-            **dashboard_data
-        })
+        # Redirect to new multi-page dashboard home
+        frappe.local.flags.redirect_location = "/driver/home"
+        raise frappe.Redirect
         
     except frappe.Redirect:
         raise
     except Exception as e:
-        frappe.log_error(f"TukTuk driver dashboard error: {str(e)}")
-        context.update({
-            "error": str(e),
-            "show_sidebar": False,
-            "no_breadcrumbs": True
-        })
+        frappe.log_error(f"TukTuk driver dashboard redirect error: {str(e)}")
+        # Fallback: redirect anyway
+        frappe.local.flags.redirect_location = "/driver/home"
+        raise frappe.Redirect

@@ -1,0 +1,108 @@
+{% extends "tuktuk_management/www/driver_base.html" %}
+
+{% block title %}{{ _("Performance") }} - Sunny TukTuk{% endblock %}
+
+{% block driver_content %}
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% else %}
+<!-- Consecutive Misses Warning -->
+{% if consecutive_misses >= 2 %}
+<div class="alert alert-danger">
+    <strong>⚠️ Critical Warning:</strong> You have {{ consecutive_misses }} consecutive target misses. 
+    Please meet your daily target to avoid termination.
+</div>
+{% elif consecutive_misses == 1 %}
+<div class="alert alert-warning">
+    <strong>⚠️ Warning:</strong> You have 1 consecutive target miss. Please meet your daily target.
+</div>
+{% else %}
+<div class="alert alert-info">
+    <strong>✓ Good Standing:</strong> No consecutive target misses.
+</div>
+{% endif %}
+
+<!-- Consecutive Misses Card -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Consecutive Misses</h2>
+    </div>
+    <div class="stat-value {% if consecutive_misses >= 2 %}danger{% elif consecutive_misses == 1 %}warning{% else %}success{% endif %}" 
+         style="text-align: center; margin: 20px 0; font-size: 3rem;">
+        {{ consecutive_misses }}/3
+    </div>
+    <p style="text-align: center; color: var(--text-secondary);">
+        {% if consecutive_misses >= 2 %}
+        ⚠️ At risk of termination
+        {% elif consecutive_misses == 1 %}
+        ⚠️ One miss recorded
+        {% else %}
+        ✓ No misses recorded
+        {% endif %}
+    </p>
+</div>
+
+<!-- Today's Performance -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Today's Performance</h2>
+    </div>
+    <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border-color);">
+        <span>Total Transactions:</span>
+        <strong>{{ today_transaction_count }}</strong>
+    </div>
+    <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border-color);">
+        <span>Total Amount:</span>
+        <strong>KSH {{ "{:,.0f}".format(today_total) }}</strong>
+    </div>
+    <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border-color);">
+        <span>Your Earnings:</span>
+        <strong class="success">KSH {{ "{:,.0f}".format(today_earnings) }}</strong>
+    </div>
+    <div style="display: flex; justify-content: space-between; padding: 12px 0;">
+        <span>Target Contribution:</span>
+        <strong>KSH {{ "{:,.0f}".format(today_target_contribution) }}</strong>
+    </div>
+</div>
+
+<!-- Target Status -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Target Status</h2>
+    </div>
+    <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border-color);">
+        <span>Daily Target:</span>
+        <strong>KSH {{ "{:,.0f}".format(daily_target) }}</strong>
+    </div>
+    <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border-color);">
+        <span>Current Balance:</span>
+        <strong class="{% if current_balance >= 0 %}success{% else %}danger{% endif %}">
+            KSH {{ "{:,.0f}".format(current_balance) }}
+        </strong>
+    </div>
+    <div style="display: flex; justify-content: space-between; padding: 12px 0;">
+        <span>Left to Target:</span>
+        <strong class="{% if left_to_target == 0 %}success{% elif left_to_target <= daily_target * 0.2 %}warning{% else %}danger{% endif %}">
+            KSH {{ "{:,.0f}".format(left_to_target) }}
+        </strong>
+    </div>
+</div>
+
+<!-- Operating Information -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Operating Information</h2>
+    </div>
+    <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border-color);">
+        <span>Operating Hours:</span>
+        <strong>{{ operating_hours.start or "N/A" }} - {{ operating_hours.end or "N/A" }}</strong>
+    </div>
+    {% if mpesa_number %}
+    <div style="display: flex; justify-content: space-between; padding: 12px 0;">
+        <span>M-Pesa Number:</span>
+        <strong>{{ mpesa_number }}</strong>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

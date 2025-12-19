@@ -76,6 +76,12 @@ whitelisted_methods = [
     "tuktuk_management.api.driver_auth.create_all_tuktuk_driver_accounts", 
     "tuktuk_management.api.driver_auth.reset_tuktuk_driver_password",
     "tuktuk_management.api.driver_auth.get_tuktuk_driver_dashboard_data",
+    "tuktuk_management.api.driver_auth.get_driver_target_data",
+    "tuktuk_management.api.driver_auth.get_driver_transactions",
+    "tuktuk_management.api.driver_auth.get_driver_deposit_data",
+    "tuktuk_management.api.driver_auth.get_driver_performance_data",
+    "tuktuk_management.api.driver_auth.get_driver_roster_data",
+    "tuktuk_management.api.driver_auth.get_available_drivers_for_switch",
     "tuktuk_management.api.driver_auth.get_tuktuk_driver_transaction_history",
     "tuktuk_management.api.driver_auth.get_tuktuk_driver_rental_history",
     "tuktuk_management.api.driver_auth.request_tuktuk_rental",
@@ -114,7 +120,16 @@ whitelisted_methods = [
     "tuktuk_management.api.sms_notifications.send_broadcast_sms",
 
     # From weekly_report.py
-    "tuktuk_management.api.weekly_report.generate_weekly_report"
+    "tuktuk_management.api.weekly_report.generate_weekly_report",
+    
+    # Roster API methods
+    "tuktuk_management.api.roster.request_switch",
+    "tuktuk_management.api.roster.approve_switch",
+    "tuktuk_management.api.roster.reject_switch",
+    "tuktuk_management.api.roster.mark_sick_day",
+    "tuktuk_management.api.roster.get_pending_switch_requests",
+    "tuktuk_management.api.roster.is_driver_scheduled_off",
+    "tuktuk_management.tuktuk_management.doctype.tuktuk_roster_period.tuktuk_roster_period.get_driver_schedule"
 ]
 
 # Email templates
@@ -245,6 +260,12 @@ reports = [
 # Website Routes - Add the new TukTuk driver dashboard route
 website_route_rules = [
     {"from_route": "/tuktuk-driver-dashboard", "to_route": "tuktuk_driver_dashboard"},
+    {"from_route": "/driver/home", "to_route": "driver_home"},
+    {"from_route": "/driver/target", "to_route": "driver_target"},
+    {"from_route": "/driver/roster", "to_route": "driver_roster"},
+    {"from_route": "/driver/transactions", "to_route": "driver_transactions"},
+    {"from_route": "/driver/deposit", "to_route": "driver_deposit"},
+    {"from_route": "/driver/performance", "to_route": "driver_performance"},
     {"from_route": "/sms-broadcast", "to_route": "sms_broadcast"},
 ]
 

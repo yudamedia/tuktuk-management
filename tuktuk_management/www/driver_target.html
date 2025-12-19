@@ -1,0 +1,79 @@
+{% extends "tuktuk_management/www/driver_base.html" %}
+
+{% block title %}{{ _("Target Progress") }} - Sunny TukTuk{% endblock %}
+
+{% block driver_content %}
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% else %}
+<!-- Left to Target Display -->
+<div class="card" style="text-align: center;">
+    <div class="stat-label">Left to Target</div>
+    <div class="large-number {% if left_to_target == 0 %}success{% elif left_to_target <= daily_target * 0.2 %}warning{% else %}danger{% endif %}">
+        KSH {{ "{:,.0f}".format(left_to_target) }}
+    </div>
+    <p style="color: var(--text-secondary); margin-top: 8px;">
+        Amount remaining to reach daily target
+    </p>
+</div>
+
+<!-- Target Progress Card -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Daily Target</h2>
+    </div>
+    <div class="progress-container">
+        <div class="progress-label">
+            <span>Target: KSH {{ "{:,.0f}".format(daily_target) }}</span>
+            <span>{{ "%.0f"|format(target_progress) }}%</span>
+        </div>
+        <div class="progress-bar-wrapper">
+            <div class="progress-bar {% if target_progress >= 100 %}success{% elif target_progress >= 80 %}warning{% else %}danger{% endif %}" 
+                 style="width: {{ target_progress }}%">
+                {% if target_progress >= 100 %}✓ Target Met{% else %}{{ "%.0f"|format(target_progress) }}%{% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Current Balance Card -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Current Balance</h2>
+    </div>
+    <div class="stat-value {% if current_balance >= 0 %}success{% else %}danger{% endif %}" style="text-align: center; margin: 20px 0;">
+        KSH {{ "{:,.0f}".format(current_balance) }}
+    </div>
+    <p style="text-align: center; color: var(--text-secondary);">
+        Amount contributed toward target today
+    </p>
+</div>
+
+<!-- Target Details -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Target Details</h2>
+    </div>
+    <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border-color);">
+        <span>Daily Target:</span>
+        <strong>KSH {{ "{:,.0f}".format(daily_target) }}</strong>
+    </div>
+    <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border-color);">
+        <span>Current Balance:</span>
+        <strong>KSH {{ "{:,.0f}".format(current_balance) }}</strong>
+    </div>
+    <div style="display: flex; justify-content: space-between; padding: 12px 0;">
+        <span>Left to Target:</span>
+        <strong class="{% if left_to_target == 0 %}success{% elif left_to_target <= daily_target * 0.2 %}warning{% else %}danger{% endif %}">
+            KSH {{ "{:,.0f}".format(left_to_target) }}
+        </strong>
+    </div>
+</div>
+
+{% if not assigned_tuktuk %}
+<div class="alert alert-warning">
+    <strong>Notice:</strong> You are not currently assigned to a TukTuk. Target tracking is paused.
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}

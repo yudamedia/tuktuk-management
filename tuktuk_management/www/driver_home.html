@@ -1,0 +1,108 @@
+{% extends "tuktuk_management/www/driver_base.html" %}
+
+{% block title %}{{ _("Driver Home") }} - Sunny TukTuk{% endblock %}
+
+{% block driver_content %}
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% else %}
+<!-- Quick Stats -->
+<div class="grid grid-2">
+    <div class="stat-card">
+        <div class="stat-label">Today's Earnings</div>
+        <div class="stat-value success">KSH {{ "{:,.0f}".format(today_earnings) }}</div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-label">Current Balance</div>
+        <div class="stat-value {% if current_balance >= 0 %}success{% else %}danger{% endif %}">
+            KSH {{ "{:,.0f}".format(current_balance) }}
+        </div>
+    </div>
+</div>
+
+<!-- Target Progress Card -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Daily Target Progress</h2>
+    </div>
+    <div class="progress-container">
+        <div class="progress-label">
+            <span>Target: KSH {{ "{:,.0f}".format(daily_target) }}</span>
+            <span>{{ "%.0f"|format(target_progress) }}%</span>
+        </div>
+        <div class="progress-bar-wrapper">
+            <div class="progress-bar {% if target_progress >= 100 %}success{% elif target_progress >= 80 %}warning{% else %}danger{% endif %}" 
+                 style="width: {{ target_progress }}%">
+                {% if target_progress >= 100 %}✓ Target Met{% else %}{{ "%.0f"|format(target_progress) }}%{% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Deposit Balance Card -->
+{% if current_deposit_balance > 0 %}
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Deposit Balance</h2>
+    </div>
+    <div class="stat-value info" style="text-align: center; margin: 20px 0;">
+        KSH {{ "{:,.0f}".format(current_deposit_balance) }}
+    </div>
+    <a href="/driver/deposit" class="btn btn-primary btn-block">View Deposit Details</a>
+</div>
+{% endif %}
+
+<!-- TukTuk Status Card -->
+{% if tuktuk %}
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Your TukTuk</h2>
+    </div>
+    <div>
+        <p><strong>TukTuk ID:</strong> {{ tuktuk.tuktuk_id }}</p>
+        <p><strong>Status:</strong> <span class="badge badge-info">{{ tuktuk.status }}</span></p>
+        <p><strong>Battery Level:</strong> {{ tuktuk.battery_level }}%</p>
+        {% if tuktuk.battery_level <= 20 %}
+        <div class="alert alert-warning">
+            ⚠️ Low Battery Warning! Consider returning to charging station.
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% else %}
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">TukTuk Assignment</h2>
+    </div>
+    <p style="text-align: center; color: var(--text-secondary);">
+        No TukTuk assigned
+    </p>
+</div>
+{% endif %}
+
+<!-- Consecutive Misses Warning -->
+{% if consecutive_misses >= 2 %}
+<div class="alert alert-danger">
+    <strong>⚠️ Warning:</strong> You have {{ consecutive_misses }} consecutive target misses. 
+    Please meet your daily target to avoid termination.
+</div>
+{% elif consecutive_misses == 1 %}
+<div class="alert alert-warning">
+    <strong>⚠️ Notice:</strong> You have 1 consecutive target miss. Please meet your daily target.
+</div>
+{% endif %}
+
+<!-- Quick Links -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Quick Links</h2>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 12px;">
+        <a href="/driver/target" class="btn btn-primary btn-block">View Target Progress</a>
+        <a href="/driver/transactions" class="btn btn-primary btn-block">View Transactions</a>
+        <a href="/driver/performance" class="btn btn-primary btn-block">View Performance</a>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

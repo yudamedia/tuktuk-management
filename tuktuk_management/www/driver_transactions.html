@@ -1,0 +1,64 @@
+{% extends "tuktuk_management/www/driver_base.html" %}
+
+{% block title %}{{ _("Transactions") }} - Sunny TukTuk{% endblock %}
+
+{% block driver_content %}
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% else %}
+<!-- Latest Transactions Header -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Latest Transactions</h2>
+        <span class="badge badge-info">{{ transaction_count }}</span>
+    </div>
+</div>
+
+<!-- Transactions List -->
+{% if transactions and transactions|length > 0 %}
+<ul class="transaction-list">
+    {% for transaction in transactions %}
+    <li class="transaction-item">
+        <div class="transaction-info">
+            <div class="transaction-date">{{ transaction.timestamp_formatted }}</div>
+            <div class="transaction-type">
+                {{ transaction.transaction_type or "Payment" }}
+                {% if transaction.payment_status == "Completed" %}
+                <span class="badge badge-success">Completed</span>
+                {% else %}
+                <span class="badge badge-warning">{{ transaction.payment_status }}</span>
+                {% endif %}
+            </div>
+            <div style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 4px;">
+                Your Share: KSH {{ "{:,.0f}".format(transaction.driver_share) }} | 
+                Target: KSH {{ "{:,.0f}".format(transaction.target_contribution) }}
+            </div>
+        </div>
+        <div class="transaction-amount">
+            KSH {{ "{:,.0f}".format(transaction.amount) }}
+        </div>
+    </li>
+    {% endfor %}
+</ul>
+{% else %}
+<div class="empty-state">
+    <div class="empty-state-icon">📊</div>
+    <p>No transactions found</p>
+    <p style="font-size: 0.875rem; color: var(--text-secondary);">
+        Your transactions will appear here once you start receiving payments.
+    </p>
+</div>
+{% endif %}
+
+<!-- View All Transactions Link -->
+{% if transactions and transactions|length > 0 %}
+<div class="card">
+    <a href="/app/tuktuk-transaction?driver={{ driver_name|urlencode }}" 
+       class="btn btn-primary btn-block" 
+       target="_blank">
+        View All Transactions
+    </a>
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}

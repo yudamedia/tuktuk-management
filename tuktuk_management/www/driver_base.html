@@ -1,0 +1,71 @@
+{% extends "templates/web.html" %}
+
+{% block head_include %}
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<link rel="stylesheet" href="/assets/tuktuk_management/css/driver_dashboard.css">
+{% endblock %}
+
+{% block page_content %}
+<div class="driver-app">
+    <!-- Header -->
+    <header class="driver-header">
+        <div class="header-content">
+            <div class="header-left">
+                <h1 class="driver-name">{{ driver_name or "Driver" }}</h1>
+                <p class="header-date">{{ today_date or "" }}</p>
+            </div>
+            <div class="header-right">
+                <a href="/logout" class="logout-btn">Logout</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="driver-main">
+        {% block driver_content %}{% endblock %}
+    </main>
+
+    <!-- Bottom Navigation -->
+    <nav class="driver-nav">
+        <a href="/driver/home" class="nav-item {% if current_page == 'home' %}active{% endif %}" data-page="home">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                <polyline points="9 22 9 12 15 12 15 22"></polyline>
+            </svg>
+            <span class="nav-label">Home</span>
+        </a>
+        <a href="/driver/target" class="nav-item {% if current_page == 'target' %}active{% endif %}" data-page="target">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            <span class="nav-label">Target</span>
+        </a>
+        <a href="/driver/roster" class="nav-item {% if current_page == 'roster' %}active{% endif %}" data-page="roster">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+            </svg>
+            <span class="nav-label">Roster</span>
+        </a>
+        <a href="/driver/transactions" class="nav-item {% if current_page == 'transactions' %}active{% endif %}" data-page="transactions">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <line x1="12" y1="1" x2="12" y2="23"></line>
+                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+            </svg>
+            <span class="nav-label">Transactions</span>
+        </a>
+        <a href="/driver/deposit" class="nav-item {% if current_page == 'deposit' %}active{% endif %}" data-page="deposit">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                <line x1="1" y1="10" x2="23" y2="10"></line>
+            </svg>
+            <span class="nav-label">Deposit</span>
+        </a>
+    </nav>
+</div>
+
+<script src="/assets/tuktuk_management/js/driver_dashboard.js"></script>
+{% endblock %}

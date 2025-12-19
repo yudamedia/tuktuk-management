@@ -2,7 +2,7 @@
 
 import frappe
 from frappe import _
-from frappe.utils import now_datetime, today, get_datetime, add_to_date, format_date, format_datetime
+from frappe.utils import now_datetime, today, get_datetime, add_to_date, format_date, format_datetime, getdate
 import re
 import random
 import string
@@ -289,6 +289,262 @@ def get_tuktuk_driver_dashboard_data():
     except Exception as e:
         frappe.log_error(f"TukTuk driver dashboard data error: {str(e)}")
         frappe.throw(f"Failed to load tuktuk driver dashboard data: {str(e)}")
+
+@frappe.whitelist()
+def get_driver_target_data():
+    """Get target progress data with left_to_target for logged-in driver"""
+    try:
+        tuktuk_driver = get_current_tuktuk_driver()
+        settings = frappe.get_single("TukTuk Settings")
+        
+        daily_target = tuktuk_driver.daily_target or settings.global_daily_target
+        current_balance = tuktuk_driver.current_balance or 0
+        left_to_target = tuktuk_driver.left_to_target or 0
+        
+        # Calculate progress percentage
+        if daily_target > 0:
+            target_progress = min((current_balance / daily_target) * 100, 100)
+        else:
+            target_progress = 0
+        
+        return {
+            "daily_target": daily_target,
+            "current_balance": current_balance,
+            "left_to_target": left_to_target,
+            "target_progress": target_progress,
+            "assigned_tuktuk": tuktuk_driver.assigned_tuktuk or None
+        }
+    except Exception as e:
+        frappe.log_error(f"Driver target data error: {str(e)}")
+        frappe.throw(f"Failed to load target data: {str(e)}")
+
+@frappe.whitelist()
+def get_driver_transactions(limit=5):
+    """Get latest transactions for logged-in driver"""
+    try:
+        tuktuk_driver = get_current_tuktuk_driver()
+        
+        transactions = frappe.get_all("TukTuk Transaction",
+                                     filters={"driver": tuktuk_driver.name},
+                                     fields=[
+                                         "name", "timestamp", "transaction_id", "amount",
+                                         "driver_share", "target_contribution",
+                                         "payment_status", "transaction_type"
+                                     ],
+                                     order_by="timestamp desc",
+                                     limit=int(limit))
+        
+        # Format timestamps
+        for transaction in transactions:
+            transaction.timestamp_formatted = format_datetime(transaction.timestamp, "dd MMM yyyy, hh:mm a")
+        
+        return {
+            "transactions": transactions,
+            "count": len(transactions)
+        }
+    except Exception as e:
+        frappe.log_error(f"Driver transactions error: {str(e)}")
+        frappe.throw(f"Failed to load transactions: {str(e)}")
+
+@frappe.whitelist()
+def get_driver_deposit_data():
+    """Get deposit balance and transaction history for logged-in driver"""
+    try:
+        tuktuk_driver = get_current_tuktuk_driver()
+        
+        # Get deposit transactions
+        deposit_transactions = []
+        if tuktuk_driver.deposit_transactions:
+            for dt in tuktuk_driver.deposit_transactions:
+                deposit_transactions.append({
+                    "transaction_date": dt.transaction_date,
+                    "transaction_type": dt.transaction_type,
+                    "amount": dt.amount,
+                    "balance_after_transaction": dt.balance_after_transaction,
+                    "description": dt.description or dt.transaction_type,
+                    "transaction_reference": dt.transaction_reference or ""
+                })
+        
+        # Sort by date descending
+        deposit_transactions.sort(key=lambda x: x.get("transaction_date", ""), reverse=True)
+        
+        return {
+            "current_deposit_balance": tuktuk_driver.current_deposit_balance or 0,
+            "initial_deposit_amount": tuktuk_driver.initial_deposit_amount or 0,
+            "deposit_required": tuktuk_driver.deposit_required or 0,
+            "deposit_transactions": deposit_transactions[:20],  # Latest 20
+            "transaction_count": len(deposit_transactions),
+            "refund_status": tuktuk_driver.refund_status or "N/A",
+            "refund_amount": tuktuk_driver.refund_amount or 0
+        }
+    except Exception as e:
+        frappe.log_error(f"Driver deposit data error: {str(e)}")
+        frappe.throw(f"Failed to load deposit data: {str(e)}")
+
+@frappe.whitelist()
+def get_driver_performance_data():
+    """Get performance metrics including target misses for logged-in driver"""
+    try:
+        tuktuk_driver = get_current_tuktuk_driver()
+        settings = frappe.get_single("TukTuk Settings")
+        
+        # Calculate today's performance
+        today_transactions = frappe.get_all("TukTuk Transaction",
+                                           filters={
+                                               "driver": tuktuk_driver.name,
+                                               "timestamp": [">=", today()],
+                                               "payment_status": "Completed",
+                                               "transaction_type": ["not in", ["Adjustment", "Driver Repayment"]]
+                                           },
+                                           fields=["driver_share", "target_contribution", "amount"])
+        
+        today_earnings = sum([t.driver_share for t in today_transactions])
+        today_target_contribution = sum([t.target_contribution for t in today_transactions])
+        today_total = sum([t.amount for t in today_transactions])
+        
+        daily_target = tuktuk_driver.daily_target or settings.global_daily_target
+        current_balance = tuktuk_driver.current_balance or 0
+        
+        return {
+            "consecutive_misses": tuktuk_driver.consecutive_misses or 0,
+            "current_balance": current_balance,
+            "daily_target": daily_target,
+            "left_to_target": tuktuk_driver.left_to_target or 0,
+            "today_earnings": today_earnings,
+            "today_target_contribution": today_target_contribution,
+            "today_total": today_total,
+            "today_transaction_count": len(today_transactions),
+            "operating_hours": {
+                "start": settings.operating_hours_start,
+                "end": settings.operating_hours_end
+            },
+            "mpesa_number": tuktuk_driver.mpesa_number or ""
+        }
+    except Exception as e:
+        frappe.log_error(f"Driver performance data error: {str(e)}")
+        frappe.throw(f"Failed to load performance data: {str(e)}")
+
+@frappe.whitelist()
+def get_driver_roster_data():
+    """Get roster schedule and pending requests for logged-in driver"""
+    try:
+        tuktuk_driver = get_current_tuktuk_driver()
+        
+        # Get active roster
+        active_roster = frappe.get_all(
+            "TukTuk Roster Period",
+            filters={"status": "Active"},
+            limit=1
+        )
+        
+        if not active_roster:
+            return {
+                "has_active_roster": False,
+                "message": "No active roster found",
+                "schedule": [],
+                "pending_requests": [],
+                "roster_period": None
+            }
+        
+        roster = frappe.get_doc("TukTuk Roster Period", active_roster[0]["name"])
+        
+        # Get driver's schedule (next 14 days)
+        from tuktuk_management.tuktuk_management.doctype.tuktuk_roster_period.tuktuk_roster_period import get_driver_schedule
+        schedule_data = get_driver_schedule(tuktuk_driver.name, roster.start_date, roster.end_date)
+        
+        # Get pending switch requests
+        from tuktuk_management.api.roster import get_pending_switch_requests
+        pending_data = get_pending_switch_requests(tuktuk_driver.name)
+        
+        # Format schedule dates
+        formatted_schedule = []
+        for day_off in schedule_data.get("day_offs", []):
+            formatted_schedule.append({
+                "date": day_off.get("date"),
+                "date_formatted": format_date(day_off.get("date"), "dd MMM yyyy (EEE)"),
+                "day_off_type": day_off.get("day_off_type", "Scheduled"),
+                "switch_status": day_off.get("switch_status"),
+                "notes": day_off.get("notes", "")
+            })
+        
+        # Format pending requests - need to find the original off date from roster
+        formatted_pending = []
+        for req in pending_data.get("pending_requests", []):
+            # Find the original off date by looking at the roster
+            # The requesting driver's original scheduled off date is stored in a schedule where
+            # they are the driver and original_driver matches the current driver
+            original_off_date = None
+            requesting_driver_id = req.get("requesting_driver")
+            
+            for schedule in roster.day_off_schedules:
+                # Find the schedule where requesting driver is giving up their original off day
+                if (schedule.driver == requesting_driver_id and
+                    schedule.original_driver == requesting_driver_id and
+                    schedule.switched_with_driver == tuktuk_driver.name and
+                    schedule.switch_status == "Pending"):
+                    original_off_date = schedule.date
+                    break
+            
+            formatted_pending.append({
+                "requesting_driver": requesting_driver_id,
+                "requesting_driver_name": req.get("requesting_driver_name"),
+                "requested_date": req.get("requested_date"),
+                "requested_date_formatted": format_date(req.get("requested_date"), "dd MMM yyyy") if req.get("requested_date") else "",
+                "my_off_date": original_off_date,
+                "my_off_date_formatted": format_date(original_off_date, "dd MMM yyyy") if original_off_date else "",
+                "reason": req.get("reason", ""),
+                "roster_name": req.get("roster_name")
+            })
+        
+        return {
+            "has_active_roster": True,
+            "roster_period": {
+                "name": roster.name,
+                "start_date": roster.start_date,
+                "end_date": roster.end_date,
+                "start_date_formatted": format_date(roster.start_date, "dd MMM yyyy"),
+                "end_date_formatted": format_date(roster.end_date, "dd MMM yyyy")
+            },
+            "schedule": formatted_schedule,
+            "pending_requests": formatted_pending
+        }
+    except Exception as e:
+        frappe.log_error(f"Driver roster data error: {str(e)}")
+        return {
+            "has_active_roster": False,
+            "error": str(e),
+            "schedule": [],
+            "pending_requests": []
+        }
+
+@frappe.whitelist()
+def get_available_drivers_for_switch():
+    """Get list of other drivers for switch requests"""
+    try:
+        tuktuk_driver = get_current_tuktuk_driver()
+        
+        # Get all other assigned drivers
+        other_drivers = frappe.get_all(
+            "TukTuk Driver",
+            filters={
+                "name": ["!=", tuktuk_driver.name],
+                "assigned_tuktuk": ["is", "set"]
+            },
+            fields=["name", "driver_name", "sunny_id"],
+            order_by="driver_name"
+        )
+        
+        return {
+            "success": True,
+            "drivers": other_drivers
+        }
+    except Exception as e:
+        frappe.log_error(f"Error getting available drivers: {str(e)}")
+        return {
+            "success": False,
+            "message": str(e),
+            "drivers": []
+        }
 
 @frappe.whitelist()
 def get_tuktuk_driver_transaction_history(limit=50, offset=0):

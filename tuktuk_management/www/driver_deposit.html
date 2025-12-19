@@ -1,0 +1,94 @@
+{% extends "tuktuk_management/www/driver_base.html" %}
+
+{% block title %}{{ _("Deposit") }} - Sunny TukTuk{% endblock %}
+
+{% block driver_content %}
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% else %}
+<!-- Current Deposit Balance -->
+<div class="card" style="text-align: center;">
+    <div class="stat-label">Current Deposit Balance</div>
+    <div class="large-number info">
+        KSH {{ "{:,.0f}".format(current_deposit_balance) }}
+    </div>
+</div>
+
+<!-- Deposit Information -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Deposit Information</h2>
+    </div>
+    <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border-color);">
+        <span>Initial Deposit:</span>
+        <strong>KSH {{ "{:,.0f}".format(initial_deposit_amount) }}</strong>
+    </div>
+    <div style="display: flex; justify-content: space-between; padding: 12px 0;">
+        <span>Current Balance:</span>
+        <strong class="info">KSH {{ "{:,.0f}".format(current_deposit_balance) }}</strong>
+    </div>
+</div>
+
+<!-- Refund Status -->
+{% if refund_status != "N/A" and refund_status %}
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Refund Status</h2>
+    </div>
+    <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border-color);">
+        <span>Status:</span>
+        <span class="badge {% if refund_status == 'Completed' %}badge-success{% elif refund_status == 'Pending' %}badge-warning{% else %}badge-info{% endif %}">
+            {{ refund_status }}
+        </span>
+    </div>
+    {% if refund_amount > 0 %}
+    <div style="display: flex; justify-content: space-between; padding: 12px 0;">
+        <span>Refund Amount:</span>
+        <strong>KSH {{ "{:,.0f}".format(refund_amount) }}</strong>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- Deposit Transaction History -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Transaction History</h2>
+        <span class="badge badge-info">{{ transaction_count }}</span>
+    </div>
+</div>
+
+{% if deposit_transactions and deposit_transactions|length > 0 %}
+<ul class="transaction-list">
+    {% for transaction in deposit_transactions %}
+    <li class="transaction-item">
+        <div class="transaction-info">
+            <div class="transaction-date">{{ transaction.date_formatted or transaction.transaction_date }}</div>
+            <div class="transaction-type">
+                {{ transaction.transaction_type }}
+                {% if transaction.description %}
+                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">
+                    {{ transaction.description }}
+                </div>
+                {% endif %}
+            </div>
+            {% if transaction.balance_after_transaction %}
+            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">
+                Balance: KSH {{ "{:,.0f}".format(transaction.balance_after_transaction) }}
+            </div>
+            {% endif %}
+        </div>
+        <div class="transaction-amount {% if transaction.amount < 0 %}negative{% endif %}">
+            {% if transaction.amount > 0 %}+{% endif %}KSH {{ "{:,.0f}".format(transaction.amount) }}
+        </div>
+    </li>
+    {% endfor %}
+</ul>
+{% else %}
+<div class="empty-state">
+    <div class="empty-state-icon">💰</div>
+    <p>No deposit transactions found</p>
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}
