@@ -53,10 +53,9 @@
 <!-- View All Transactions Link -->
 {% if transactions and transactions|length > 0 %}
 <div class="card">
-    <a href="/app/tuktuk-transaction?driver={{ driver_name|urlencode }}" 
-       class="btn btn-primary btn-block" 
-       target="_blank">
-        View All Transactions
+    <a href="/driver_all_transactions" 
+       class="btn btn-primary btn-block">
+        📊 View All Transactions
     </a>
 </div>
 {% endif %}

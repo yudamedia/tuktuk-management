@@ -1,0 +1,214 @@
+{% extends "tuktuk_management/www/driver_base.html" %}
+
+{% block title %}{{ _("All Transactions") }} - Sunny TukTuk{% endblock %}
+
+{% block driver_content %}
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% else %}
+
+<!-- Page Header -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">All Transactions</h2>
+        <span class="badge badge-info">{{ transaction_count }} total</span>
+    </div>
+</div>
+
+<!-- Summary Cards -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px;">
+    <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+        <div style="padding: 16px;">
+            <div style="font-size: 0.875rem; opacity: 0.9; margin-bottom: 4px;">Total Amount</div>
+            <div style="font-size: 1.5rem; font-weight: 600;">KSH {{ "{:,.0f}".format(total_amount) }}</div>
+        </div>
+    </div>
+    
+    <div class="card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">
+        <div style="padding: 16px;">
+            <div style="font-size: 0.875rem; opacity: 0.9; margin-bottom: 4px;">Your Share</div>
+            <div style="font-size: 1.5rem; font-weight: 600;">KSH {{ "{:,.0f}".format(total_driver_share) }}</div>
+        </div>
+    </div>
+    
+    <div class="card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white;">
+        <div style="padding: 16px;">
+            <div style="font-size: 0.875rem; opacity: 0.9; margin-bottom: 4px;">Target Contribution</div>
+            <div style="font-size: 1.5rem; font-weight: 600;">KSH {{ "{:,.0f}".format(total_target) }}</div>
+        </div>
+    </div>
+</div>
+
+<!-- Transactions by Date -->
+{% if grouped_transactions and grouped_transactions|length > 0 %}
+    {% for group in grouped_transactions %}
+    <div class="card" style="margin-bottom: 20px;">
+        <div class="card-header" style="background: var(--bg-light);">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0; font-size: 1rem; font-weight: 600;">{{ group.date }}</h3>
+                <div style="font-size: 0.875rem; color: var(--text-secondary);">
+                    {{ group.transactions|length }} transaction{{ 's' if group.transactions|length != 1 else '' }}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Daily Summary -->
+        <div style="padding: 12px 16px; background: var(--bg-light); border-bottom: 1px solid var(--border-color);">
+            <div style="display: flex; gap: 24px; font-size: 0.875rem; flex-wrap: wrap;">
+                <div>
+                    <span style="color: var(--text-secondary);">Total:</span>
+                    <strong>KSH {{ "{:,.0f}".format(group.total_amount) }}</strong>
+                </div>
+                <div>
+                    <span style="color: var(--text-secondary);">Your Share:</span>
+                    <strong style="color: var(--success);">KSH {{ "{:,.0f}".format(group.total_driver_share) }}</strong>
+                </div>
+                <div>
+                    <span style="color: var(--text-secondary);">Target:</span>
+                    <strong style="color: var(--primary);">KSH {{ "{:,.0f}".format(group.total_target) }}</strong>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Transactions List -->
+        <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="background: var(--bg-light); border-bottom: 2px solid var(--border-color);">
+                        <th style="padding: 12px; text-align: left; font-size: 0.875rem; font-weight: 600;">Time</th>
+                        <th style="padding: 12px; text-align: left; font-size: 0.875rem; font-weight: 600;">Transaction ID</th>
+                        <th style="padding: 12px; text-align: right; font-size: 0.875rem; font-weight: 600;">Amount</th>
+                        <th style="padding: 12px; text-align: right; font-size: 0.875rem; font-weight: 600;">Your Share</th>
+                        <th style="padding: 12px; text-align: right; font-size: 0.875rem; font-weight: 600;">Target</th>
+                        <th style="padding: 12px; text-align: center; font-size: 0.875rem; font-weight: 600;">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for transaction in group.transactions %}
+                    <tr style="border-bottom: 1px solid var(--border-color);">
+                        <td style="padding: 12px; font-size: 0.875rem;">
+                            {{ transaction.timestamp_formatted.split(' ')[-1] }}
+                        </td>
+                        <td style="padding: 12px; font-size: 0.875rem; font-family: monospace;">
+                            {{ transaction.transaction_id[:20] }}
+                        </td>
+                        <td style="padding: 12px; text-align: right; font-weight: 500;">
+                            KSH {{ "{:,.0f}".format(transaction.amount) }}
+                        </td>
+                        <td style="padding: 12px; text-align: right; font-weight: 500; color: var(--success);">
+                            KSH {{ "{:,.0f}".format(transaction.driver_share) }}
+                        </td>
+                        <td style="padding: 12px; text-align: right; font-weight: 500; color: var(--primary);">
+                            KSH {{ "{:,.0f}".format(transaction.target_contribution) }}
+                        </td>
+                        <td style="padding: 12px; text-align: center;">
+                            {% if transaction.payment_status == "Completed" %}
+                            <span class="badge badge-success">✓ Paid</span>
+                            {% elif transaction.payment_status == "Pending" %}
+                            <span class="badge badge-warning">⏳ Pending</span>
+                            {% else %}
+                            <span class="badge badge-danger">✗ Failed</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endfor %}
+    
+    <!-- Pagination -->
+    {% if total_pages > 1 %}
+    <div class="card">
+        <div style="padding: 16px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-size: 0.875rem; color: var(--text-secondary);">
+                Page {{ page }} of {{ total_pages }}
+            </div>
+            <div style="display: flex; gap: 8px;">
+                {% if has_previous %}
+                <a href="/driver_all_transactions?page={{ page - 1 }}" class="btn btn-secondary">
+                    ← Previous
+                </a>
+                {% endif %}
+                
+                {% if has_next %}
+                <a href="/driver_all_transactions?page={{ page + 1 }}" class="btn btn-primary">
+                    Next →
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+{% else %}
+<div class="empty-state">
+    <div class="empty-state-icon">📊</div>
+    <p>No transactions found</p>
+    <p style="font-size: 0.875rem; color: var(--text-secondary);">
+        Your transactions will appear here once you start receiving payments.
+    </p>
+</div>
+{% endif %}
+
+<!-- Back Button -->
+<div style="margin-top: 20px;">
+    <a href="/driver/transactions" class="btn btn-secondary btn-block">
+        ← Back to Dashboard
+    </a>
+</div>
+
+{% endif %}
+
+<style>
+:root {
+    --success: #28a745;
+    --primary: #007bff;
+    --bg-light: #f8f9fa;
+    --border-color: #dee2e6;
+    --text-secondary: #6c757d;
+}
+
+.badge {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.badge-success {
+    background: #28a745;
+    color: white;
+}
+
+.badge-warning {
+    background: #ffc107;
+    color: #000;
+}
+
+.badge-danger {
+    background: #dc3545;
+    color: white;
+}
+
+.badge-info {
+    background: #17a2b8;
+    color: white;
+}
+
+@media (max-width: 768px) {
+    table {
+        font-size: 0.75rem;
+    }
+    
+    th, td {
+        padding: 8px !important;
+    }
+    
+    .card-header h3 {
+        font-size: 0.875rem !important;
+    }
+}
+</style>
+{% endblock %}
