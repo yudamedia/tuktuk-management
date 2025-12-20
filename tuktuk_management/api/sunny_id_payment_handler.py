@@ -122,52 +122,57 @@ def handle_sunny_id_payment(transaction_id, amount, sunny_id, customer_phone, tr
             
             transaction.insert(ignore_permissions=True)
             
-            # CORRECTED: Update driver's current_balance (ADD payment to running total)
-            # and recalculate left_to_target
-            # Use atomic SQL UPDATE to prevent race conditions
-            if target_reduction > 0:
-                frappe.db.sql("""
-                    UPDATE `tabTukTuk Driver`
-                    SET current_balance = current_balance + %s
-                    WHERE name = %s
-                """, (target_reduction, driver_data.name))
-                
-                # Recalculate left_to_target based on new current_balance
-                settings = frappe.get_single("TukTuk Settings")
-                global_target = settings.global_daily_target or 0
-                
-                frappe.db.sql("""
-                    UPDATE `tabTukTuk Driver`
-                    SET left_to_target = GREATEST(0, 
-                        COALESCE(NULLIF(daily_target, 0), %s) - current_balance
-                    )
-                    WHERE name = %s
-                """, (global_target, driver_data.name))
-            
-            # Add deposit transaction if there's deposited amount
+            # FIXED: Use single atomic SQL UPDATE to prevent race conditions
+            # Updates current_balance, left_to_target, and deposit_balance in one statement
+            # This prevents the before_save hook from overwriting correct values
+
+            # Get global target for calculation
+            settings = frappe.get_single("TukTuk Settings")
+            global_target = settings.global_daily_target or 0
+
+            # Get current deposit balance for the new balance calculation
+            current_deposit = flt(driver_data.get('current_deposit_balance', 0))
+            new_deposit_balance = current_deposit + deposited_amount
+
+            # Single atomic SQL update for ALL fields (prevents race condition)
+            frappe.db.sql("""
+                UPDATE `tabTukTuk Driver`
+                SET
+                    current_balance = current_balance + %s,
+                    left_to_target = GREATEST(0,
+                        COALESCE(NULLIF(daily_target, 0), %s) - (current_balance + %s)
+                    ),
+                    current_deposit_balance = current_deposit_balance + %s
+                WHERE name = %s
+            """, (target_reduction, global_target, target_reduction, deposited_amount, driver_data.name))
+
+            # Add deposit transaction to child table using direct SQL INSERT
+            # This avoids loading/saving the driver document which would trigger before_save hook
             if deposited_amount > 0:
-                # Get driver document
-                driver_doc = frappe.get_doc("TukTuk Driver", driver_data.name)
-                
-                # Update deposit balance
-                new_deposit_balance = flt(driver_doc.current_deposit_balance or 0) + deposited_amount
-                driver_doc.current_deposit_balance = new_deposit_balance
-                
-                # Add deposit transaction to child table
-                driver_doc.append("deposit_transactions", {
-                    "transaction_date": getdate(),
-                    "transaction_type": "Top Up",
-                    "amount": deposited_amount,
-                    "balance_after_transaction": new_deposit_balance,
-                    "transaction_reference": transaction_id,
-                    "description": f"Automatic top-up from sunny_id payment. Target reduction: {target_reduction} KSH, Excess deposited: {deposited_amount} KSH",
-                    "approved_by": driver_doc.user or frappe.session.user
-                })
-                
-                # Save driver document
-                driver_doc.flags.ignore_validate_update_after_submit = True
-                driver_doc.flags.ignore_permissions = True
-                driver_doc.save(ignore_permissions=True)
+                # Generate unique name for child table row
+                from frappe.model.naming import make_autoname
+                child_name = make_autoname('hash', 'Driver Deposit Transaction')
+
+                frappe.db.sql("""
+                    INSERT INTO `tabDriver Deposit Transaction`
+                    (name, parent, parenttype, parentfield, idx, creation, modified,
+                     transaction_date, transaction_type, amount, balance_after_transaction,
+                     transaction_reference, description, approved_by)
+                    VALUES (%s, %s, 'TukTuk Driver', 'deposit_transactions',
+                            (SELECT COALESCE(MAX(idx), 0) + 1 FROM `tabDriver Deposit Transaction` WHERE parent = %s),
+                            NOW(), NOW(), %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    child_name,
+                    driver_data.name,
+                    driver_data.name,
+                    getdate(),
+                    'Top Up',
+                    deposited_amount,
+                    new_deposit_balance,
+                    transaction_id,
+                    f"Automatic top-up from sunny_id payment. Target reduction: {target_reduction} KSH, Excess deposited: {deposited_amount} KSH",
+                    driver_data.get('user') or frappe.session.user
+                ))
             
             # Commit all changes
             frappe.db.commit()

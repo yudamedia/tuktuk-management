@@ -3446,3 +3446,211 @@ def fix_substitute_balance(substitute_driver, correct_balance):
             "success": False,
             "message": f"Error: {str(e)}"
         }
+
+
+# ===== ATOMIC PAYMENT UPDATE UTILITIES =====
+
+def update_driver_payment_atomic(driver_name, target_contribution, deposit_amount=0):
+    """
+    Atomically update driver payment fields using SQL only.
+
+    This function prevents race conditions by using a single atomic SQL statement
+    to update current_balance, left_to_target, and current_deposit_balance.
+
+    CRITICAL: This avoids the race condition caused by loading/saving driver documents,
+    which triggers the before_save hook and can overwrite correct SQL calculations.
+
+    Args:
+        driver_name: Driver document name (e.g., 'DRV-112059')
+        target_contribution: Amount to add to current_balance (company's share)
+        deposit_amount: Amount to add to deposit balance (optional, default 0)
+
+    Returns:
+        dict: Updated balances
+    """
+    # Get global target for left_to_target calculation
+    settings = frappe.get_single("TukTuk Settings")
+    global_target = settings.global_daily_target or 0
+
+    # Single atomic SQL update for ALL payment-related fields
+    frappe.db.sql("""
+        UPDATE `tabTukTuk Driver`
+        SET
+            current_balance = current_balance + %s,
+            left_to_target = GREATEST(0,
+                COALESCE(NULLIF(daily_target, 0), %s) - (current_balance + %s)
+            ),
+            current_deposit_balance = current_deposit_balance + %s
+        WHERE name = %s
+    """, (target_contribution, global_target, target_contribution, deposit_amount, driver_name))
+
+    # Return updated values
+    updated_driver = frappe.db.get_value(
+        "TukTuk Driver",
+        driver_name,
+        ["current_balance", "left_to_target", "current_deposit_balance"],
+        as_dict=True
+    )
+
+    return {
+        "current_balance": updated_driver.current_balance,
+        "left_to_target": updated_driver.left_to_target,
+        "current_deposit_balance": updated_driver.current_deposit_balance
+    }
+
+
+@frappe.whitelist()
+def reconcile_driver_left_to_target(driver_name):
+    """
+    Reconcile left_to_target for a specific driver based on current_balance.
+
+    Use this to fix discrepancies caused by race conditions or data inconsistencies.
+
+    Args:
+        driver_name: Driver document name (e.g., 'DRV-112059')
+
+    Returns:
+        dict: Before/after values and success status
+    """
+    try:
+        # Get current values
+        driver = frappe.db.get_value(
+            "TukTuk Driver",
+            driver_name,
+            ["current_balance", "left_to_target", "daily_target", "assigned_tuktuk"],
+            as_dict=True
+        )
+
+        if not driver:
+            frappe.throw(f"Driver {driver_name} not found")
+
+        old_left_to_target = driver.left_to_target
+
+        # Get global target
+        settings = frappe.get_single("TukTuk Settings")
+        global_target = settings.global_daily_target or 0
+
+        # Recalculate left_to_target atomically
+        frappe.db.sql("""
+            UPDATE `tabTukTuk Driver`
+            SET left_to_target = GREATEST(0,
+                COALESCE(NULLIF(daily_target, 0), %s) - current_balance
+            )
+            WHERE name = %s
+        """, (global_target, driver_name))
+
+        # Get new value
+        new_left_to_target = frappe.db.get_value("TukTuk Driver", driver_name, "left_to_target")
+
+        frappe.db.commit()
+
+        discrepancy = flt(old_left_to_target) - flt(new_left_to_target)
+
+        frappe.msgprint(
+            f"✅ Reconciled driver {driver_name}<br>"
+            f"Current Balance: {driver.current_balance} KSH<br>"
+            f"Old left_to_target: {old_left_to_target} KSH<br>"
+            f"New left_to_target: {new_left_to_target} KSH<br>"
+            f"Discrepancy Fixed: {discrepancy} KSH"
+        )
+
+        return {
+            "success": True,
+            "driver_name": driver_name,
+            "current_balance": driver.current_balance,
+            "old_left_to_target": old_left_to_target,
+            "new_left_to_target": new_left_to_target,
+            "discrepancy": discrepancy
+        }
+
+    except Exception as e:
+        frappe.log_error(f"Error reconciling driver {driver_name}: {str(e)}", "Driver Reconciliation Error")
+        frappe.throw(f"Failed to reconcile driver: {str(e)}")
+
+
+@frappe.whitelist()
+def reconcile_all_drivers_left_to_target():
+    """
+    Reconcile left_to_target for ALL active drivers based on current_balance.
+
+    This is a bulk operation that fixes discrepancies across the entire fleet.
+    Run this after fixing race condition bugs to clean up existing data.
+
+    Returns:
+        dict: Summary of reconciliation results
+    """
+    try:
+        # Get global target
+        settings = frappe.get_single("TukTuk Settings")
+        global_target = settings.global_daily_target or 0
+
+        # Get all active drivers (assigned to a tuktuk)
+        active_drivers = frappe.db.sql("""
+            SELECT name, driver_name, current_balance, left_to_target, daily_target
+            FROM `tabTukTuk Driver`
+            WHERE assigned_tuktuk IS NOT NULL
+        """, as_dict=True)
+
+        total_drivers = len(active_drivers)
+        discrepancies_found = 0
+        total_discrepancy = 0
+
+        # Calculate expected left_to_target for each driver
+        drivers_with_issues = []
+        for driver in active_drivers:
+            target = flt(driver.daily_target or global_target)
+            expected_left = max(0, target - flt(driver.current_balance))
+            actual_left = flt(driver.left_to_target)
+
+            if abs(expected_left - actual_left) > 0.01:  # Allow for floating point errors
+                discrepancy = actual_left - expected_left
+                discrepancies_found += 1
+                total_discrepancy += abs(discrepancy)
+                drivers_with_issues.append({
+                    "name": driver.name,
+                    "driver_name": driver.driver_name,
+                    "discrepancy": discrepancy
+                })
+
+        # Fix all drivers in a single SQL statement
+        frappe.db.sql("""
+            UPDATE `tabTukTuk Driver`
+            SET left_to_target = GREATEST(0,
+                COALESCE(NULLIF(daily_target, 0), %s) - current_balance
+            )
+            WHERE assigned_tuktuk IS NOT NULL
+        """, (global_target,))
+
+        frappe.db.commit()
+
+        # Create summary message
+        message = f"""
+        <h4>✅ Reconciliation Complete</h4>
+        <ul>
+            <li><b>Total Active Drivers:</b> {total_drivers}</li>
+            <li><b>Discrepancies Found:</b> {discrepancies_found}</li>
+            <li><b>Total Discrepancy Amount:</b> {total_discrepancy:.2f} KSH</li>
+        </ul>
+        """
+
+        if drivers_with_issues:
+            message += "<h5>Drivers with Issues Fixed:</h5><ul>"
+            for d in drivers_with_issues[:10]:  # Show first 10
+                message += f"<li>{d['driver_name']} ({d['name']}): {d['discrepancy']:.2f} KSH</li>"
+            if len(drivers_with_issues) > 10:
+                message += f"<li><i>... and {len(drivers_with_issues) - 10} more</i></li>"
+            message += "</ul>"
+
+        frappe.msgprint(message)
+
+        return {
+            "success": True,
+            "total_drivers": total_drivers,
+            "discrepancies_found": discrepancies_found,
+            "total_discrepancy": total_discrepancy,
+            "drivers_with_issues": drivers_with_issues
+        }
+
+    except Exception as e:
+        frappe.log_error(f"Error in bulk reconciliation: {str(e)}", "Bulk Reconciliation Error")
+        frappe.throw(f"Failed to reconcile all drivers: {str(e)}")

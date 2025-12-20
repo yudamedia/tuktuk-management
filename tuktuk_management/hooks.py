@@ -39,6 +39,10 @@ whitelisted_methods = [
     "tuktuk_management.api.tuktuk.get_system_status",
     "tuktuk_management.api.tuktuk.check_daraja_connection",
 
+    # Reconciliation utilities (race condition fixes)
+    "tuktuk_management.api.tuktuk.reconcile_driver_left_to_target",
+    "tuktuk_management.api.tuktuk.reconcile_all_drivers_left_to_target",
+
     # B2C endpoints from sendpay.py
     "tuktuk_management.api.sendpay.b2c_result",
     "tuktuk_management.api.sendpay.b2c_timeout",

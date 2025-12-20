@@ -39,16 +39,21 @@ class TukTukDriver(Document):
         # Skip automatic update if manually set during reset
         if self.flags.get('skip_left_to_target_update'):
             return
-        
+
+        # CRITICAL FIX: Skip if being saved after SQL payment processing
+        # This prevents overwriting correct SQL-calculated values with stale in-memory values
+        if self.flags.get('skip_payment_recalculation'):
+            return
+
         # If driver is unassigned, don't calculate target (they are on pause)
         if not self.assigned_tuktuk:
             self.left_to_target = 0
             return
-            
+
         settings = frappe.get_single("TukTuk Settings")
         target = flt(self.daily_target or settings.global_daily_target)
         current = flt(self.current_balance or 0)
-        
+
         # Countdown stops at zero (doesn't go negative)
         self.left_to_target = max(0, target - current)
         
