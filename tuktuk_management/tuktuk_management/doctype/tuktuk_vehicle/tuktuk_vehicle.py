@@ -7,6 +7,61 @@ import re
 import json
 from frappe.utils import now_datetime
 
+@frappe.whitelist()
+def fix_missing_assigned_drivers():
+    """
+    Utility function to fix any TukTuk Vehicles that have assigned_driver_name
+    but missing assigned_driver field
+    """
+    # Find all vehicles with assigned_driver_name but no assigned_driver
+    vehicles = frappe.get_all(
+        "TukTuk Vehicle",
+        filters={
+            "assigned_driver_name": ["!=", ""],
+            "assigned_driver": ["in", ["", None]]
+        },
+        fields=["name", "assigned_driver_name"]
+    )
+
+    fixed_count = 0
+    errors = []
+
+    for vehicle in vehicles:
+        try:
+            # Get the vehicle document
+            tuktuk = frappe.get_doc("TukTuk Vehicle", vehicle.name)
+
+            # Find the driver assigned to this tuktuk
+            driver = frappe.db.get_value(
+                "TukTuk Driver",
+                {"assigned_tuktuk": tuktuk.name},
+                ["name", "driver_name"],
+                as_dict=True
+            )
+
+            if driver:
+                tuktuk.assigned_driver = driver.name
+                tuktuk.assigned_driver_name = driver.driver_name
+                tuktuk.save()
+                fixed_count += 1
+                frappe.logger().info(f"Fixed assigned_driver for tuktuk {tuktuk.name}: {driver.name}")
+            else:
+                # No driver found, clear the name field too
+                tuktuk.assigned_driver_name = ""
+                tuktuk.save()
+                frappe.logger().warning(f"Cleared orphaned assigned_driver_name for tuktuk {tuktuk.name}")
+        except Exception as e:
+            error_msg = f"Error fixing tuktuk {vehicle.name}: {str(e)}"
+            errors.append(error_msg)
+            frappe.logger().error(error_msg)
+
+    return {
+        "success": True,
+        "fixed_count": fixed_count,
+        "total_checked": len(vehicles),
+        "errors": errors
+    }
+
 class TukTukVehicle(Document):
     def validate(self):
         """Validate TukTuk Vehicle data"""
@@ -178,6 +233,38 @@ class TukTukVehicle(Document):
         return static_assignment
 
     def update_assigned_driver_name(self):
-        """Update the assigned driver name field"""
-        driver_name = self.get_assigned_driver()
-        self.assigned_driver_name = driver_name if driver_name else ""
+        """Update the assigned driver and assigned driver name fields"""
+        # First check for active rentals
+        active_rental = frappe.db.get_value(
+            "TukTuk Rental",
+            {
+                "rented_tuktuk": self.name,
+                "status": "Active"
+            },
+            ["driver", "driver as driver_id"]
+        )
+
+        if active_rental:
+            # Rental case: set driver from rental
+            driver_id = active_rental[0] if isinstance(active_rental, tuple) else active_rental
+            driver_name = frappe.db.get_value("TukTuk Driver", driver_id, "driver_name")
+            self.assigned_driver = driver_id
+            self.assigned_driver_name = driver_name if driver_name else ""
+        else:
+            # Static assignment case: check for driver with this tuktuk assigned
+            driver_assignment = frappe.db.get_value(
+                "TukTuk Driver",
+                {
+                    "assigned_tuktuk": self.name
+                },
+                ["name", "driver_name"],
+                as_dict=True
+            )
+
+            if driver_assignment:
+                self.assigned_driver = driver_assignment.name
+                self.assigned_driver_name = driver_assignment.driver_name or ""
+            else:
+                # No assignment found - clear both fields
+                self.assigned_driver = ""
+                self.assigned_driver_name = ""

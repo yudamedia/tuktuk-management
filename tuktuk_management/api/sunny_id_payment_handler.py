@@ -1,19 +1,25 @@
 # -*- coding: utf-8 -*-
 """
-Enhanced M-Pesa Confirmation Webhook Handler for Sunny ID Payments - CORRECTED VERSION
+Enhanced M-Pesa Confirmation Webhook Handler for Sunny ID Payments
 
-CRITICAL FIX:
-- Now uses left_to_target (actual outstanding debt) instead of current_balance
-- left_to_target = daily_target - current_balance (live calculation of what's owed)
+CRITICAL FIX (2025-12-22):
+- Now CALCULATES left_to_target FRESH from current_balance and target
+- Previous version used stale left_to_target from database which could be incorrect
+- left_to_target = max(0, daily_target - current_balance)
+- This ensures payments are always applied correctly regardless of DB state
+
+How it works:
+- left_to_target = exact amount needed to clear daily target (calculated fresh)
 - current_balance = running total of payments toward target
-- left_to_target = exact amount needed to clear daily target
+- daily_target = driver's individual target OR global_daily_target
 
 This module adds support for driver repayment via sunny_id as Bill Reference Number.
 When a payment comes in with sunny_id, it:
-1. Reduces driver's left_to_target (outstanding debt) by payment amount
-2. Adds payment to current_balance (running total toward target)
-3. Any excess after clearing left_to_target goes to deposit
-4. No B2C payment is sent
+1. Calculates left_to_target fresh from current balance and target
+2. Reduces driver's left_to_target (outstanding debt) by payment amount
+3. Adds payment to current_balance (running total toward target)
+4. Any excess after clearing left_to_target goes to deposit
+5. No B2C payment is sent
 """
 
 import frappe
@@ -37,11 +43,11 @@ def handle_sunny_id_payment(transaction_id, amount, sunny_id, customer_phone, tr
     try:
         frappe.flags.ignore_permissions = True
         
-        # Find driver by sunny_id - CORRECTED: Now fetches left_to_target
+        # Find driver by sunny_id
         driver_data = frappe.db.get_value(
             "TukTuk Driver",
             {"sunny_id": sunny_id},
-            ["name", "driver_name", "current_balance", "left_to_target", 
+            ["name", "driver_name", "current_balance", "daily_target",
              "current_deposit_balance", "assigned_tuktuk", "user"],
             as_dict=True
         )
@@ -72,14 +78,19 @@ def handle_sunny_id_payment(transaction_id, amount, sunny_id, customer_phone, tr
                 f"Transaction ID: {transaction_id}"
             )
             return {"ResultCode": "0", "ResultDesc": "Success"}
-        
-        # CORRECTED: Calculate target reduction based on left_to_target (actual debt)
-        left_to_target = flt(driver_data.left_to_target or 0)
+
+        # CRITICAL FIX: Calculate left_to_target FRESH instead of using stale DB value
+        # This prevents issues where left_to_target in DB might be incorrect
+        settings = frappe.get_single("TukTuk Settings")
+        driver_target = flt(driver_data.daily_target or settings.global_daily_target or 0)
+        current_balance = flt(driver_data.current_balance or 0)
+        left_to_target = max(0, driver_target - current_balance)
+
         payment_amount = flt(amount)
-        
+
         # Target reduction is min of left_to_target (debt) and payment amount
         target_reduction = min(left_to_target, payment_amount)
-        
+
         # Deposited amount is any excess after clearing debt
         deposited_amount = payment_amount - target_reduction
         
@@ -184,18 +195,19 @@ def handle_sunny_id_payment(transaction_id, amount, sunny_id, customer_phone, tr
                 Driver: {driver_data.driver_name} ({sunny_id})
                 Transaction ID: {transaction_id}
                 Total Amount: {payment_amount} KSH
-                
+
                 BEFORE:
-                - left_to_target (debt): {left_to_target} KSH
-                - current_balance (total earned): {driver_data.current_balance} KSH
-                
+                - Target: {driver_target} KSH
+                - left_to_target (calculated fresh): {left_to_target} KSH
+                - current_balance: {driver_data.current_balance} KSH
+
                 APPLIED:
                 - Target Reduction: {target_reduction} KSH
                 - Deposited Amount: {deposited_amount} KSH
-                
+
                 AFTER:
-                - left_to_target (debt): {left_to_target - target_reduction} KSH
-                - current_balance (total earned): {driver_data.current_balance + target_reduction} KSH
+                - left_to_target: {max(0, left_to_target - target_reduction)} KSH
+                - current_balance: {driver_data.current_balance + target_reduction} KSH
                 - deposit_balance: {flt(driver_data.current_deposit_balance or 0) + deposited_amount} KSH
                 """
             )

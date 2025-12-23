@@ -14,6 +14,7 @@ class TukTukDriver(Document):
         validate_license(self)
         validate_emergency_contact(self)
         self.validate_deposit_settings()
+        self.validate_rollover_target()
         
     def before_save(self):
         self.set_full_name()
@@ -65,11 +66,28 @@ class TukTukDriver(Document):
         if self.deposit_required:
             if not self.initial_deposit_amount or self.initial_deposit_amount <= 0:
                 frappe.throw("Initial deposit amount is required when deposit is mandatory")
-        
+
         # Ensure current balance is not negative
         if self.current_deposit_balance and self.current_deposit_balance < 0:
             frappe.throw("Deposit balance cannot be negative")
-            
+
+    def validate_rollover_target(self):
+        """Prevent manual editing of system-managed rollover targets"""
+        # Skip validation if this save is happening during the daily reset process
+        if self.flags.get('in_reset'):
+            return
+
+        # Skip validation for new documents
+        if self.is_new():
+            return
+
+        # Check if this is a system-managed rollover target that was manually changed
+        if self.is_rollover_target and self.has_value_changed('daily_target'):
+            frappe.throw(
+                "Cannot manually edit daily_target while it's system-managed for rollover. "
+                "Wait for driver to clear the target or contact administrator."
+            )
+
     def handle_deposit_changes(self):
         """Handle changes to deposit amounts and create transaction records"""
         if self.is_new():
@@ -117,7 +135,8 @@ class TukTukDriver(Document):
             if old_value:
                 old_tuktuk = frappe.get_doc("TukTuk Vehicle", old_value)
                 old_tuktuk.status = "Available"
-                old_tuktuk.update_assigned_driver_name()
+                old_tuktuk.assigned_driver = ""
+                old_tuktuk.assigned_driver_name = ""
                 old_tuktuk.save()
                 
             # Set new assignment
@@ -137,7 +156,8 @@ class TukTukDriver(Document):
                     frappe.throw(f"TukTuk {self.assigned_tuktuk} is already assigned to driver {existing_driver_name}")
                 
                 new_tuktuk.status = "Assigned"
-                new_tuktuk.update_assigned_driver_name()
+                new_tuktuk.assigned_driver = self.name
+                new_tuktuk.assigned_driver_name = self.driver_name
                 new_tuktuk.save()
                 
                 # If this is a reassignment during operating hours, preserve balance and target
@@ -245,63 +265,42 @@ class TukTukDriver(Document):
         frappe.msgprint(f"Driver exit processed. Refund amount: {self.refund_amount} KSH")
     
     def restore_terminated_driver(self):
-        """Restore a terminated driver by reversing the termination process"""
-        # Check if driver has been terminated or has refund data
-        if not self.exit_date and not self.refund_amount:
-            frappe.throw(f"Driver {self.driver_name} has not been terminated or has no refund data to restore")
-        
-        # Store the refund amount (this was their original deposit balance)
-        original_deposit = flt(self.refund_amount) if self.refund_amount else 0
-        
-        # Log the restoration action
+        """
+        DEPRECATED: This method has been disabled to prevent accidental driver restorations.
+
+        To restore a terminated driver:
+        1. First archive the driver using the "Archive Driver" button
+        2. Then restore from the "Terminated TukTuk Driver" record using "Restore to Active" button
+
+        This ensures proper audit trail and prevents accidental data loss.
+        """
+        # Log the attempted restoration for security tracking
         frappe.log_error(
-            f"Restoring terminated driver: {self.driver_name} (ID: {self.name})\n"
+            f"BLOCKED RESTORATION ATTEMPT\n"
+            f"Driver: {self.driver_name} (ID: {self.name})\n"
             f"Exit Date: {self.exit_date}\n"
-            f"Original Deposit to Restore: {original_deposit} KSH\n"
-            f"Consecutive Misses Before: {self.consecutive_misses}\n"
-            f"Current Balance Before: {self.current_balance}\n"
-            f"Restored By: {frappe.session.user}",
-            "Driver Restoration"
+            f"Attempted By: {frappe.session.user}\n"
+            f"Timestamp: {frappe.utils.now_datetime()}\n"
+            f"IP Address: {frappe.local.request_ip if hasattr(frappe.local, 'request_ip') else 'N/A'}",
+            "Blocked Driver Restoration Attempt"
         )
-        
-        # Remove "Refund" type transactions from deposit_transactions child table
-        transactions_to_remove = []
-        for transaction in self.deposit_transactions:
-            if transaction.transaction_type == "Refund":
-                transactions_to_remove.append(transaction)
-        
-        for transaction in transactions_to_remove:
-            self.remove(transaction)
-        
-        # Restore the deposit balance
-        self.current_deposit_balance = original_deposit
-        
-        # Add a restoration transaction record for audit trail (using "Adjustment" type which is allowed)
-        if original_deposit > 0:
-            self.add_deposit_transaction(
-                transaction_type="Adjustment",
-                amount=original_deposit,
-                description=f"Driver restoration - reversed termination from {self.exit_date or 'manual deletion'}. Restored by {frappe.session.user}"
-            )
-        
-        # Clear termination-related fields
-        self.exit_date = None
-        self.refund_amount = 0
-        self.refund_status = None
-        
-        # Reset performance tracking
-        self.consecutive_misses = 0
-        self.current_balance = 0
-        
-        # Save the document
-        self.save()
-        
-        frappe.msgprint(f"✅ Driver {self.driver_name} has been successfully restored with deposit balance of {original_deposit} KSH")
-        
+
+        frappe.throw(
+            """<b>Direct driver restoration has been disabled.</b><br><br>
+            To restore a terminated driver, please follow the proper archival process:<br>
+            1. Archive the driver using the <b>"Archive Driver"</b> button (Actions menu)<br>
+            2. Open the archived record in <b>"Terminated TukTuk Driver"</b> list<br>
+            3. Use the <b>"Restore to Active"</b> button to restore the driver<br><br>
+            This ensures proper audit trail and prevents accidental restorations.<br><br>
+            <i>If you need immediate assistance, please contact your system administrator.</i>""",
+            title="Restoration Method Deprecated",
+            indicator="red"
+        )
+
         return {
-            "success": True,
+            "success": False,
             "driver_name": self.driver_name,
-            "restored_deposit": original_deposit,
+            "restored_deposit": 0,
             "message": "Driver successfully restored"
         }
 

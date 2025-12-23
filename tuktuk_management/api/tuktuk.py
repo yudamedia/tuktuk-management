@@ -1469,6 +1469,9 @@ def reset_daily_targets_with_deposit():
             driver_doc = frappe.get_doc("TukTuk Driver", {
                 "driver_national_id": driver.driver_national_id
             })
+            # Set flag to allow system to modify rollover targets during reset
+            driver_doc.flags.in_reset = True
+
             target = driver_doc.daily_target or settings.global_daily_target
 
             # Check if target sharing is enabled for this driver
@@ -1497,55 +1500,77 @@ def reset_daily_targets_with_deposit():
                     f"Yesterday Balance: {yesterday_balance} KSH\n"
                     f"Target: {target} KSH\n"
                     f"Shortfall: {shortfall} KSH\n"
-                    f"Consecutive Misses: {driver_doc.consecutive_misses}\n"
-                    f"Target Sharing Enabled: {target_sharing_enabled}",
+                    f"Consecutive Misses: {driver_doc.consecutive_misses}",
                     "Target Miss - Recorded"
                 )
 
-                # Only apply penalties when target sharing is enabled
-                if target_sharing_enabled:
-                    # Check if driver allows deposit deduction for missed targets
-                    if (driver_doc.allow_target_deduction_from_deposit and
-                        driver_doc.current_deposit_balance >= shortfall):
+                # NEW BEHAVIOR: Set individual rollover target instead of negative balance
+                # This applies to ALL drivers regardless of target_sharing setting
+                new_individual_target = target + shortfall
+                driver_doc.daily_target = new_individual_target
+                driver_doc.is_rollover_target = 1  # Mark as system-managed
+                driver_doc.rollover_target_set_date = now_datetime()
 
-                        # Log this option for management review
-                        frappe.log_error(
-                            f"Driver {driver_doc.driver_name} missed target by {shortfall} KSH. "
-                            f"Deposit balance: {driver_doc.current_deposit_balance} KSH. "
-                            f"Driver allows automatic deduction: {driver_doc.allow_target_deduction_from_deposit}",
-                            "Target Miss - Deposit Deduction Available"
-                        )
+                frappe.log_error(
+                    f"Setting rollover target for {driver_doc.driver_name}:\n"
+                    f"Previous target: {target} KSH\n"
+                    f"Shortfall: {shortfall} KSH\n"
+                    f"New rollover target: {new_individual_target} KSH\n"
+                    f"Driver must clear {new_individual_target} KSH to reset to global target.",
+                    "Daily Reset - Rollover Target Set"
+                )
 
-                        # Create a notification for management
-                        create_target_miss_notification(driver_doc, shortfall)
+                # Check deposit deduction option (still log for management review)
+                if (driver_doc.allow_target_deduction_from_deposit and
+                    driver_doc.current_deposit_balance >= shortfall):
+                    frappe.log_error(
+                        f"Driver {driver_doc.driver_name} missed target by {shortfall} KSH. "
+                        f"Deposit balance: {driver_doc.current_deposit_balance} KSH. "
+                        f"Driver allows automatic deduction: {driver_doc.allow_target_deduction_from_deposit}",
+                        "Target Miss - Deposit Deduction Available"
+                    )
+                    create_target_miss_notification(driver_doc, shortfall)
 
-                    if driver_doc.consecutive_misses >= 3:
-                        frappe.log_error(
-                            f"TERMINATING DRIVER:\n"
-                            f"Driver: {driver_doc.driver_name} ({driver_doc.name})\n"
-                            f"Consecutive Misses: {driver_doc.consecutive_misses}\n"
-                            f"Deposit Balance: {driver_doc.current_deposit_balance} KSH",
-                            "Target Reset - Driver Termination"
-                        )
-                        terminate_driver_with_deposit_refund(driver_doc)
-                        terminated_count += 1
-                    else:
-                        # Roll over unmet balance as debt when target sharing enabled
-                        driver_doc.current_balance = -shortfall  # Negative balance indicates debt
+                # Check for termination (after 3 consecutive misses)
+                if driver_doc.consecutive_misses >= 3:
+                    frappe.log_error(
+                        f"TERMINATING DRIVER:\n"
+                        f"Driver: {driver_doc.driver_name} ({driver_doc.name})\n"
+                        f"Consecutive Misses: {driver_doc.consecutive_misses}\n"
+                        f"Deposit Balance: {driver_doc.current_deposit_balance} KSH",
+                        "Target Reset - Driver Termination"
+                    )
+                    terminate_driver_with_deposit_refund(driver_doc)
+                    terminated_count += 1
                 else:
-                    # When target sharing disabled, just reset balance without penalties
+                    # Always reset balance to 0 (no negative debt)
                     driver_doc.current_balance = 0
             else:
+                # Driver met their target
                 driver_doc.consecutive_misses = 0
-                # Pay bonus if enabled and criteria met (only when target sharing is enabled)
+
+                # Clear individual daily_target if it was a rollover target (driver cleared their debt)
+                if driver_doc.daily_target and driver_doc.daily_target > 0 and driver_doc.is_rollover_target:
+                    frappe.log_error(
+                        f"Driver {driver_doc.driver_name} cleared their rollover target of {driver_doc.daily_target} KSH. "
+                        f"Resetting to use global target.",
+                        "Daily Reset - Rollover Target Cleared"
+                    )
+                    driver_doc.daily_target = 0  # Reset to use global_daily_target
+                    driver_doc.is_rollover_target = 0
+                    driver_doc.rollover_target_set_date = None
+
+                # Pay bonus if enabled and criteria met (use driver-specific target_sharing override)
                 if target_sharing_enabled and settings.bonus_enabled and settings.bonus_amount:
                     if send_mpesa_payment(driver_doc.mpesa_number, settings.bonus_amount, "BONUS"):
                         frappe.msgprint(f"Bonus payment sent to driver {driver_doc.driver_name}")
+
                 driver_doc.current_balance = 0
             
-            # Reset the countdown field to full target for the new day
-            # Set flag to prevent automatic recalculation in before_save hook
-            driver_doc.left_to_target = target
+            # Reset the countdown field for the new day
+            # This will use the new individual target if set, or global target if not
+            new_target = driver_doc.daily_target or settings.global_daily_target
+            driver_doc.left_to_target = new_target
             driver_doc.flags.skip_left_to_target_update = True
                 
             driver_doc.save()
@@ -1627,6 +1652,106 @@ def create_target_miss_notification(driver_doc, shortfall):
         notification.insert()
     except Exception as e:
         frappe.log_error(f"Failed to create target miss notification: {str(e)}")
+
+@frappe.whitelist()
+def migrate_negative_balances_to_targets():
+    """
+    One-time migration: Convert negative current_balance to individual daily_target
+    Run this BEFORE deploying the new reset logic
+
+    This function converts existing negative balances (debt) into individual rollover targets,
+    providing a clean transition from the old debt system to the new rollover target system.
+    """
+    try:
+        frappe.flags.ignore_permissions = True
+
+        settings = frappe.get_single("TukTuk Settings")
+        global_target = settings.global_daily_target or 1000
+
+        # Find all drivers with negative balance
+        drivers_with_debt = frappe.db.sql("""
+            SELECT name, driver_name, current_balance, daily_target
+            FROM `tabTukTuk Driver`
+            WHERE current_balance < 0
+              AND assigned_tuktuk IS NOT NULL
+              AND assigned_tuktuk != ''
+        """, as_dict=True)
+
+        if not drivers_with_debt:
+            return {
+                "success": True,
+                "migrated_count": 0,
+                "message": "No drivers with negative balance found. Migration not needed."
+            }
+
+        migrated_count = 0
+        migration_details = []
+
+        for driver_data in drivers_with_debt:
+            debt = abs(driver_data.current_balance)
+            current_target = driver_data.daily_target or global_target
+            new_individual_target = current_target + debt
+
+            # Update driver atomically
+            frappe.db.sql("""
+                UPDATE `tabTukTuk Driver`
+                SET
+                    daily_target = %s,
+                    current_balance = 0,
+                    is_rollover_target = 1,
+                    rollover_target_set_date = NOW()
+                WHERE name = %s
+            """, (new_individual_target, driver_data.name))
+
+            migration_info = {
+                "driver": driver_data.driver_name,
+                "driver_id": driver_data.name,
+                "old_balance": driver_data.current_balance,
+                "debt": debt,
+                "old_target": current_target,
+                "new_target": new_individual_target
+            }
+            migration_details.append(migration_info)
+
+            frappe.log_error(
+                f"Migrated driver {driver_data.driver_name} ({driver_data.name}):\n"
+                f"Old balance: {driver_data.current_balance} KSH (debt: {debt})\n"
+                f"Old target: {current_target} KSH\n"
+                f"New individual target: {new_individual_target} KSH\n"
+                f"Rollover flag set: 1",
+                "Negative Balance Migration - Success"
+            )
+
+            migrated_count += 1
+
+        frappe.db.commit()
+
+        # Log summary
+        frappe.log_error(
+            f"Migration completed successfully!\n"
+            f"Total drivers migrated: {migrated_count}\n"
+            f"Details: {migration_details}",
+            "Negative Balance Migration - Summary"
+        )
+
+        return {
+            "success": True,
+            "migrated_count": migrated_count,
+            "migration_details": migration_details,
+            "message": f"Successfully migrated {migrated_count} drivers from negative balance to individual targets"
+        }
+
+    except Exception as e:
+        frappe.db.rollback()
+        frappe.log_error(
+            f"Migration failed: {str(e)}",
+            "Negative Balance Migration - Failed"
+        )
+        return {
+            "success": False,
+            "error": str(e),
+            "message": f"Migration failed: {str(e)}"
+        }
 
 def start_operating_hours():
     """Start of operating hours tasks"""
@@ -2229,34 +2354,331 @@ def process_bulk_refunds(driver_list):
 @frappe.whitelist()
 def restore_driver_termination(driver_name):
     """
-    Restore a terminated driver by reversing the termination process.
+    DEPRECATED: This API endpoint has been disabled to prevent accidental driver restorations.
+
+    Use the new archival system instead:
+    1. Archive the driver using archive_terminated_driver()
+    2. Restore from archived record using restore_archived_driver()
+
+    This ensures proper audit trail and data integrity.
+    """
+    # Log the blocked attempt for security tracking
+    frappe.log_error(
+        f"BLOCKED API RESTORATION ATTEMPT\n"
+        f"Driver: {driver_name}\n"
+        f"Attempted By: {frappe.session.user}\n"
+        f"Timestamp: {frappe.utils.now_datetime()}\n"
+        f"IP Address: {frappe.local.request_ip if hasattr(frappe.local, 'request_ip') else 'N/A'}\n"
+        f"User Agent: {frappe.local.request.headers.get('User-Agent', 'N/A') if hasattr(frappe.local, 'request') else 'N/A'}",
+        "Blocked Driver Restoration API Call"
+    )
+
+    frappe.throw(
+        """<b>This restoration method has been deprecated.</b><br><br>
+        To restore a terminated driver, please use the new archival system:<br>
+        1. Archive the driver: <code>archive_terminated_driver(driver_name, reason)</code><br>
+        2. Restore from archive: <code>restore_archived_driver(driver_id, reason)</code><br><br>
+        Or use the UI buttons in the driver forms.<br><br>
+        This ensures proper audit trail and prevents data loss.""",
+        title="API Method Deprecated",
+        indicator="red"
+    )
+
+    return {
+        "success": False,
+        "error": "Method deprecated - use archival system instead"
+    }
+
+# ===== DRIVER ARCHIVAL FUNCTIONS =====
+
+@frappe.whitelist()
+def archive_terminated_driver(driver_name, archival_reason=""):
+    """
+    Archive a terminated driver to Terminated TukTuk Driver doctype.
     Only accessible by System Manager or Tuktuk Manager.
-    
+
     Args:
-        driver_name: Name/ID of the TukTuk Driver document
-        
+        driver_name: Name/ID of the TukTuk Driver document to archive
+        archival_reason: Reason/notes for archiving the driver
+
     Returns:
-        dict: Success status and restoration details
+        dict: Success status and archived driver ID
     """
     try:
-        # Check permissions - only System Manager or Tuktuk Manager can restore drivers
+        # Permission check
         user_roles = frappe.get_roles(frappe.session.user)
         if "System Manager" not in user_roles and "Tuktuk Manager" not in user_roles:
-            frappe.throw("Access denied. Only System Manager or Tuktuk Manager can restore terminated drivers.")
-        
-        # Get the driver document
+            frappe.throw("Only System Manager or Tuktuk Manager can archive drivers")
+
+        # Load driver
         driver = frappe.get_doc("TukTuk Driver", driver_name)
-        
-        # Call the restoration method
-        result = driver.restore_terminated_driver()
-        
-        # Commit the changes
-        frappe.db.commit()
-        
-        return result
-        
+
+        # VALIDATION RULES
+        if not driver.exit_date:
+            frappe.throw("Cannot archive active driver. Driver must be terminated first.")
+
+        if driver.assigned_tuktuk:
+            frappe.throw("Driver still has tuktuk assignment. Clear assignment before archiving.")
+
+        # Check active rentals
+        active_rentals = frappe.db.count("TukTuk Rental", {
+            "driver": driver_name,
+            "status": "Active"
+        })
+        if active_rentals > 0:
+            frappe.throw(f"Driver has {active_rentals} active rental(s). Complete or cancel before archiving.")
+
+        # Warning for incomplete refunds (non-blocking)
+        if driver.refund_status not in ["Completed", "Cancelled"]:
+            frappe.msgprint(
+                f"Warning: Refund status is '{driver.refund_status}'",
+                indicator="orange",
+                alert=True
+            )
+
+        # Create archived record
+        archived_driver = frappe.get_doc({
+            "doctype": "Terminated TukTuk Driver",
+            "original_driver_id": driver.name,
+            "archived_on": frappe.utils.now_datetime(),
+            "archived_by": frappe.session.user,
+            "archival_reason": archival_reason
+        })
+
+        # Copy all fields
+        driver_dict = driver.as_dict()
+        excluded_fields = ['name', 'doctype', 'modified', 'modified_by',
+                          'creation', 'owner', '__islocal', '__onload', '__unsaved']
+
+        for field, value in driver_dict.items():
+            if field not in excluded_fields and hasattr(archived_driver, field):
+                archived_driver.set(field, value)
+
+        # Copy child table (deposit_transactions)
+        archived_driver.deposit_transactions = []
+        for transaction in driver.deposit_transactions:
+            archived_driver.append("deposit_transactions", {
+                "transaction_date": transaction.transaction_date,
+                "transaction_type": transaction.transaction_type,
+                "amount": transaction.amount,
+                "transaction_reference": transaction.transaction_reference,
+                "balance_after_transaction": transaction.balance_after_transaction,
+                "description": transaction.description,
+                "approved_by": transaction.approved_by
+            })
+
+        # Disable user account if exists
+        if driver.user_account:
+            try:
+                user = frappe.get_doc("User", driver.user_account)
+                if user.enabled:
+                    user.enabled = 0
+                    user.add_comment("Comment", f"Driver archived on {frappe.utils.today()}")
+                    user.save(ignore_permissions=True)
+            except Exception as e:
+                frappe.log_error(f"Failed to disable user account: {str(e)}", "User Account Disable Error")
+
+        # Insert archived driver and delete original
+        # Frappe handles transactions automatically for whitelisted functions
+        archived_driver.insert(ignore_permissions=True)
+        frappe.delete_doc("TukTuk Driver", driver_name, ignore_permissions=True, force=True)
+
+        frappe.msgprint(
+            f"Driver {driver.driver_name} (ID: {driver.name}) successfully archived",
+            indicator="green",
+            alert=True
+        )
+
+        # Log success
+        frappe.log_error(
+            f"Driver archived: {driver_name}\n"
+            f"Archived by: {frappe.session.user}\n"
+            f"Reason: {archival_reason}",
+            "Driver Archival Success"
+        )
+
+        return {"success": True, "archived_id": driver.name}
+
     except Exception as e:
-        frappe.log_error(f"Driver restoration failed for {driver_name}: {str(e)}", "Driver Restoration Error")
+        frappe.log_error(f"Driver archival failed for {driver_name}: {str(e)}", "Driver Archival Error")
+        frappe.throw(f"Failed to archive driver: {str(e)}")
+
+@frappe.whitelist()
+def restore_archived_driver(original_driver_id, restore_reason=""):
+    """
+    Restore an archived driver back to active status.
+    Only accessible by System Manager or Tuktuk Manager.
+
+    Args:
+        original_driver_id: Original driver ID from the archived record
+        restore_reason: Reason for restoring the driver
+
+    Returns:
+        dict: Success status and restored driver ID
+    """
+    try:
+        # Permission check
+        user_roles = frappe.get_roles(frappe.session.user)
+        if "System Manager" not in user_roles and "Tuktuk Manager" not in user_roles:
+            # Log unauthorized attempt
+            frappe.log_error(
+                f"UNAUTHORIZED RESTORATION ATTEMPT\n"
+                f"Driver ID: {original_driver_id}\n"
+                f"Attempted By: {frappe.session.user}\n"
+                f"User Roles: {', '.join(user_roles)}\n"
+                f"Timestamp: {frappe.utils.now_datetime()}\n"
+                f"IP Address: {frappe.local.request_ip if hasattr(frappe.local, 'request_ip') else 'N/A'}",
+                "Unauthorized Driver Restoration Attempt"
+            )
+            frappe.throw("Only System Manager or Tuktuk Manager can restore drivers")
+
+        # Load archived driver
+        archived = frappe.get_doc("Terminated TukTuk Driver", original_driver_id)
+
+        # Comprehensive audit log - BEFORE restoration
+        frappe.log_error(
+            f"DRIVER RESTORATION INITIATED\n"
+            f"{'='*60}\n"
+            f"Driver ID: {original_driver_id}\n"
+            f"Driver Name: {archived.driver_name}\n"
+            f"National ID: {archived.driver_national_id}\n"
+            f"Restored By: {frappe.session.user}\n"
+            f"Restore Reason: {restore_reason}\n"
+            f"Timestamp: {frappe.utils.now_datetime()}\n"
+            f"IP Address: {frappe.local.request_ip if hasattr(frappe.local, 'request_ip') else 'N/A'}\n"
+            f"\n"
+            f"ARCHIVED DRIVER DETAILS:\n"
+            f"{'='*60}\n"
+            f"Exit Date: {archived.exit_date}\n"
+            f"Refund Amount: {archived.refund_amount}\n"
+            f"Refund Status: {archived.refund_status}\n"
+            f"Archived On: {archived.archived_on}\n"
+            f"Archived By: {archived.archived_by}\n"
+            f"Original Archival Reason: {archived.archival_reason}\n"
+            f"Deposit Transactions: {len(archived.deposit_transactions)}\n"
+            f"User Account: {archived.user_account or 'None'}",
+            "Driver Restoration - Initiated"
+        )
+
+        # Check for national_id conflicts
+        existing = frappe.db.exists("TukTuk Driver", {
+            "driver_national_id": archived.driver_national_id
+        })
+        if existing:
+            frappe.throw(
+                f"Cannot restore: Active driver with National ID {archived.driver_national_id} already exists"
+            )
+
+        # Create active driver
+        restored_driver = frappe.get_doc({
+            "doctype": "TukTuk Driver"
+        })
+
+        # Set the name to match original driver ID
+        restored_driver.name = archived.original_driver_id
+
+        # Copy fields (exclude archival metadata)
+        archived_dict = archived.as_dict()
+        excluded_fields = ['name', 'doctype', 'modified', 'modified_by',
+                          'creation', 'owner', 'original_driver_id',
+                          'archived_on', 'archived_by', 'archival_reason',
+                          '__islocal', '__onload', '__unsaved']
+
+        for field, value in archived_dict.items():
+            if field not in excluded_fields and hasattr(restored_driver, field):
+                restored_driver.set(field, value)
+
+        # Clear termination data & reset performance
+        restored_driver.exit_date = None
+        restored_driver.refund_amount = 0
+        restored_driver.refund_status = None
+        restored_driver.consecutive_misses = 0
+        restored_driver.current_balance = 0
+        restored_driver.left_to_target = 0
+        restored_driver.assigned_tuktuk = None  # Requires re-assignment
+
+        # Copy deposit transactions
+        restored_driver.deposit_transactions = []
+        for transaction in archived.deposit_transactions:
+            restored_driver.append("deposit_transactions", {
+                "transaction_date": transaction.transaction_date,
+                "transaction_type": transaction.transaction_type,
+                "amount": transaction.amount,
+                "transaction_reference": transaction.transaction_reference,
+                "balance_after_transaction": transaction.balance_after_transaction,
+                "description": transaction.description,
+                "approved_by": transaction.approved_by
+            })
+
+        # Re-enable user account
+        if archived.user_account:
+            try:
+                user = frappe.get_doc("User", archived.user_account)
+                if not user.enabled:
+                    user.enabled = 1
+                    user.add_comment("Comment", f"Driver restored by {frappe.session.user}. Reason: {restore_reason}")
+                    user.save(ignore_permissions=True)
+            except Exception as e:
+                frappe.log_error(f"Failed to enable user account: {str(e)}", "User Account Enable Error")
+
+        # Insert restored driver and delete archived
+        # Frappe handles transactions automatically for whitelisted functions
+        restored_driver.insert(ignore_permissions=True)
+        frappe.delete_doc("Terminated TukTuk Driver", original_driver_id, ignore_permissions=True, force=True)
+
+        frappe.msgprint(
+            f"Driver {restored_driver.driver_name} successfully restored to active status",
+            indicator="green",
+            alert=True
+        )
+
+        # Comprehensive audit log - AFTER successful restoration
+        frappe.log_error(
+            f"DRIVER RESTORATION COMPLETED SUCCESSFULLY\n"
+            f"{'='*60}\n"
+            f"Driver ID: {original_driver_id}\n"
+            f"Driver Name: {restored_driver.driver_name}\n"
+            f"National ID: {restored_driver.driver_national_id}\n"
+            f"Restored By: {frappe.session.user}\n"
+            f"Restore Reason: {restore_reason}\n"
+            f"Timestamp: {frappe.utils.now_datetime()}\n"
+            f"IP Address: {frappe.local.request_ip if hasattr(frappe.local, 'request_ip') else 'N/A'}\n"
+            f"\n"
+            f"RESTORED DRIVER STATE:\n"
+            f"{'='*60}\n"
+            f"Exit Date: {restored_driver.exit_date} (cleared)\n"
+            f"Refund Amount: {restored_driver.refund_amount} (reset to 0)\n"
+            f"Refund Status: {restored_driver.refund_status} (cleared)\n"
+            f"Current Balance: {restored_driver.current_balance} (reset to 0)\n"
+            f"Consecutive Misses: {restored_driver.consecutive_misses} (reset to 0)\n"
+            f"Assigned TukTuk: {restored_driver.assigned_tuktuk or 'None (requires re-assignment)'}\n"
+            f"Deposit Transactions Preserved: {len(restored_driver.deposit_transactions)}\n"
+            f"User Account: {restored_driver.user_account or 'None'}\n"
+            f"User Account Status: {'Enabled' if restored_driver.user_account else 'N/A'}\n"
+            f"\n"
+            f"NEXT STEPS:\n"
+            f"{'='*60}\n"
+            f"1. Re-assign driver to a TukTuk vehicle\n"
+            f"2. Set daily target if needed\n"
+            f"3. Verify deposit balance\n"
+            f"4. Communicate with driver about return to active status",
+            "Driver Restoration - Success"
+        )
+
+        # Also add a comment to the driver record for visibility
+        restored_driver.add_comment(
+            "Comment",
+            f"<b>Driver Restored from Archive</b><br>"
+            f"Restored by: {frappe.session.user}<br>"
+            f"Reason: {restore_reason}<br>"
+            f"Previous Exit Date: {archived.exit_date}<br>"
+            f"Previous Refund Amount: {archived.refund_amount} KSH"
+        )
+
+        return {"success": True, "restored_id": original_driver_id}
+
+    except Exception as e:
+        frappe.log_error(f"Driver restoration failed for {original_driver_id}: {str(e)}", "Driver Restoration Error")
         frappe.throw(f"Failed to restore driver: {str(e)}")
 
 # ===== SETUP AND MANAGEMENT FUNCTIONS =====

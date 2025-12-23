@@ -1,12 +1,19 @@
 {
  "actions": [],
  "allow_import": 1,
- "allow_rename": 1,
- "autoname": "format:DRV-112{###}",
- "creation": "2024-11-26 12:00:00",
+ "allow_rename": 0,
+ "autoname": "field:original_driver_id",
+ "creation": "2025-12-23 10:00:00",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "archival_tab",
+  "archival_section",
+  "original_driver_id",
+  "archived_on",
+  "column_break_archival",
+  "archived_by",
+  "archival_reason",
   "driver_information_tab",
   "section_driver_information",
   "driver_first_name",
@@ -42,6 +49,8 @@
   "section_break_targets",
   "target_sharing_override",
   "daily_target",
+  "is_rollover_target",
+  "rollover_target_set_date",
   "column_break_nwor",
   "fare_percentage",
   "instant_payout_override",
@@ -74,6 +83,50 @@
  ],
  "fields": [
   {
+   "fieldname": "archival_tab",
+   "fieldtype": "Tab Break",
+   "label": "Archival Information"
+  },
+  {
+   "fieldname": "archival_section",
+   "fieldtype": "Section Break",
+   "label": "Archival Metadata"
+  },
+  {
+   "fieldname": "original_driver_id",
+   "fieldtype": "Data",
+   "label": "Original Driver ID",
+   "read_only": 1,
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1,
+   "description": "Original driver ID from active records (e.g., DRV-112016)"
+  },
+  {
+   "fieldname": "archived_on",
+   "fieldtype": "Datetime",
+   "label": "Archived On",
+   "read_only": 1,
+   "in_list_view": 1,
+   "default": "now"
+  },
+  {
+   "fieldname": "column_break_archival",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "archived_by",
+   "fieldtype": "Link",
+   "label": "Archived By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "archival_reason",
+   "fieldtype": "Small Text",
+   "label": "Archival Notes/Reason"
+  },
+  {
    "fetch_from": "driver_first_name,driver_middle_name,driver_last_name",
    "fieldname": "driver_name",
    "fieldtype": "Data",
@@ -87,13 +140,14 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Mpesa Phone Number",
-   "reqd": 1
+   "read_only": 1
   },
   {
    "fieldname": "assigned_tuktuk",
    "fieldtype": "Link",
    "label": "Assigned TukTuk",
-   "options": "TukTuk Vehicle"
+   "options": "TukTuk Vehicle",
+   "read_only": 1
   },
   {
    "fieldname": "section_break_targets",
@@ -106,13 +160,15 @@
    "fieldname": "target_sharing_override",
    "fieldtype": "Select",
    "label": "Target Sharing Override",
-   "options": "\nFollow Global\nEnable\nDisable"
+   "options": "\nFollow Global\nEnable\nDisable",
+   "read_only": 1
   },
   {
    "description": "Leave empty to use global target. Can be set manually OR by system for rollover (check is_rollover_target flag)",
    "fieldname": "daily_target",
    "fieldtype": "Currency",
-   "label": "Individual Daily Target"
+   "label": "Individual Daily Target",
+   "read_only": 1
   },
   {
    "default": "0",
@@ -133,7 +189,8 @@
    "description": "Leave empty to use global percentage",
    "fieldname": "fare_percentage",
    "fieldtype": "Percent",
-   "label": "Individual Fare Percentage"
+   "label": "Individual Fare Percentage",
+   "read_only": 1
   },
   {
    "default": "Follow Global",
@@ -141,7 +198,8 @@
    "fieldname": "instant_payout_override",
    "fieldtype": "Select",
    "label": "Instant Payout Preference",
-   "options": "\nFollow Global\nEnable\nDisable"
+   "options": "\nFollow Global\nEnable\nDisable",
+   "read_only": 1
   },
   {
    "default": "0",
@@ -184,17 +242,20 @@
   {
    "fieldname": "driver_first_name",
    "fieldtype": "Data",
-   "label": "First Name"
+   "label": "First Name",
+   "read_only": 1
   },
   {
    "fieldname": "driver_middle_name",
    "fieldtype": "Data",
-   "label": "Middle Name"
+   "label": "Middle Name",
+   "read_only": 1
   },
   {
    "fieldname": "driver_last_name",
    "fieldtype": "Data",
-   "label": "Last Name"
+   "label": "Last Name",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_qtxl",
@@ -205,26 +266,28 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "National ID",
-   "reqd": 1,
+   "read_only": 1,
    "unique": 1
   },
   {
    "fieldname": "driver_license",
    "fieldtype": "Data",
    "label": "Driving License",
-   "reqd": 1
+   "read_only": 1
   },
   {
    "description": "Preferred weekly day off for roster scheduling",
    "fieldname": "preferred_day_off",
    "fieldtype": "Select",
    "label": "Preferred Day Off",
-   "options": "MONDAY\nTUESDAY\nWEDNESDAY\nTHURSDAY\nFRIDAY\nSATURDAY\nSUNDAY\nNo Preference"
+   "options": "MONDAY\nTUESDAY\nWEDNESDAY\nTHURSDAY\nFRIDAY\nSATURDAY\nSUNDAY\nNo Preference",
+   "read_only": 1
   },
   {
    "fieldname": "driver_dob",
    "fieldtype": "Date",
-   "label": "Date of Birth"
+   "label": "Date of Birth",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_hyib",
@@ -233,7 +296,8 @@
   {
    "fieldname": "driver_address",
    "fieldtype": "Small Text",
-   "label": "Address"
+   "label": "Address",
+   "read_only": 1
   },
   {
    "collapsible": 1,
@@ -244,7 +308,8 @@
   {
    "fieldname": "driver_primary_phone",
    "fieldtype": "Data",
-   "label": "Primary Phone"
+   "label": "Primary Phone",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_odhg",
@@ -253,7 +318,8 @@
   {
    "fieldname": "driver_secondary_phone",
    "fieldtype": "Data",
-   "label": "Alternative Phone"
+   "label": "Alternative Phone",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_qmal",
@@ -262,7 +328,8 @@
   {
    "fieldname": "driver_email",
    "fieldtype": "Data",
-   "label": "Email"
+   "label": "Email",
+   "read_only": 1
   },
   {
    "description": "Linked user account for driver portal access",
@@ -281,7 +348,8 @@
   {
    "fieldname": "driver_emergency_name",
    "fieldtype": "Data",
-   "label": "Contact's Name"
+   "label": "Contact's Name",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_ypwy",
@@ -290,7 +358,8 @@
   {
    "fieldname": "driver_emergency_phone",
    "fieldtype": "Data",
-   "label": "Contact's Phone"
+   "label": "Contact's Phone",
+   "read_only": 1
   },
   {
    "fieldname": "section_driver_information",
@@ -349,14 +418,16 @@
    "default": "1",
    "fieldname": "deposit_required",
    "fieldtype": "Check",
-   "label": "Deposit Required"
+   "label": "Deposit Required",
+   "read_only": 1
   },
   {
    "depends_on": "deposit_required",
    "fieldname": "initial_deposit_amount",
    "fieldtype": "Currency",
    "label": "Initial Deposit Amount",
-   "precision": "2"
+   "precision": "2",
+   "read_only": 1
   },
   {
    "default": "0",
@@ -376,7 +447,8 @@
    "description": "Allow driver to choose if missed targets can be deducted from deposit",
    "fieldname": "allow_target_deduction_from_deposit",
    "fieldtype": "Check",
-   "label": "Allow Target Deduction from Deposit"
+   "label": "Allow Target Deduction from Deposit",
+   "read_only": 1
   },
   {
    "fieldname": "deposit_transactions_section",
@@ -387,7 +459,8 @@
    "fieldname": "deposit_transactions",
    "fieldtype": "Table",
    "label": "Deposit Transactions",
-   "options": "Driver Deposit Transaction"
+   "options": "Driver Deposit Transaction",
+   "read_only": 1
   },
   {
    "collapsible": 1,
@@ -398,7 +471,8 @@
   {
    "fieldname": "exit_date",
    "fieldtype": "Date",
-   "label": "Exit Date"
+   "label": "Exit Date",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_exit",
@@ -417,7 +491,8 @@
    "fieldname": "refund_status",
    "fieldtype": "Select",
    "label": "Refund Status",
-   "options": "Pending\nProcessed\nCompleted\nCancelled"
+   "options": "Pending\nProcessed\nCompleted\nCancelled",
+   "in_list_view": 1
   },
   {
    "fieldname": "hailing_tab",
@@ -425,44 +500,45 @@
    "label": "Hailing"
   },
   {
-    "collapsible": 1,
-    "fieldname": "hailing_section",
-    "fieldtype": "Section Break",
-    "label": "Hailing Service"
-   },
-   {
-    "default": "Offline",
-    "fieldname": "hailing_status",
-    "fieldtype": "Select",
-    "label": "Hailing Status",
-    "options": "Offline\nAvailable\nEn Route\nBusy"
-   },
-   {
-    "fieldname": "column_break_hailing",
-    "fieldtype": "Column Break"
-   },
-   {
-    "default": "0",
-    "fieldname": "total_hailing_trips",
-    "fieldtype": "Int",
-    "label": "Total Hailing Trips",
-    "read_only": 1
-   },
-   {
-    "fieldname": "average_hailing_rating",
-    "fieldtype": "Float",
-    "label": "Average Hailing Rating",
-    "precision": "2",
-    "read_only": 1
-   }
+   "collapsible": 1,
+   "fieldname": "hailing_section",
+   "fieldtype": "Section Break",
+   "label": "Hailing Service"
+  },
+  {
+   "default": "Offline",
+   "fieldname": "hailing_status",
+   "fieldtype": "Select",
+   "label": "Hailing Status",
+   "options": "Offline\nAvailable\nEn Route\nBusy",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_hailing",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "total_hailing_trips",
+   "fieldtype": "Int",
+   "label": "Total Hailing Trips",
+   "read_only": 1
+  },
+  {
+   "fieldname": "average_hailing_rating",
+   "fieldtype": "Float",
+   "label": "Average Hailing Rating",
+   "precision": "2",
+   "read_only": 1
+  }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-12-22 15:55:15.144892",
+ "modified": "2025-12-23 10:00:00",
  "modified_by": "Administrator",
  "module": "Tuktuk Management",
- "name": "TukTuk Driver",
- "naming_rule": "Expression",
+ "name": "Terminated TukTuk Driver",
+ "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
   {
@@ -478,12 +554,6 @@
    "write": 1
   },
   {
-   "read": 1,
-   "role": "Driver"
-  },
-  {
-   "create": 1,
-   "delete": 1,
    "email": 1,
    "export": 1,
    "print": 1,
@@ -494,7 +564,6 @@
    "write": 1
   }
  ],
- "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],
