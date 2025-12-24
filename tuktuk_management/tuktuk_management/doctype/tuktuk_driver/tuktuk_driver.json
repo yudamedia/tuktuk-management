@@ -18,6 +18,7 @@
   "driver_license",
   "preferred_day_off",
   "column_break_hyib",
+  "driver_photo",
   "driver_address",
   "driver_contacts_section",
   "driver_primary_phone",
@@ -70,7 +71,9 @@
   "hailing_status",
   "column_break_hailing",
   "total_hailing_trips",
-  "average_hailing_rating"
+  "average_hailing_rating",
+  "hailing_dashboard_section",
+  "hailing_dashboard_html"
  ],
  "fields": [
   {
@@ -229,6 +232,11 @@
   {
    "fieldname": "column_break_hyib",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "driver_photo",
+   "fieldtype": "Attach Image",
+   "label": "Photo"
   },
   {
    "fieldname": "driver_address",
@@ -454,6 +462,16 @@
     "label": "Average Hailing Rating",
     "precision": "2",
     "read_only": 1
+   },
+   {
+    "fieldname": "hailing_dashboard_section",
+    "fieldtype": "Section Break",
+    "label": "Ride Hailing Dashboard"
+   },
+   {
+    "fieldname": "hailing_dashboard_html",
+    "fieldtype": "HTML",
+    "label": "Hailing Dashboard"
    }
  ],
  "index_web_pages_for_search": 1,
