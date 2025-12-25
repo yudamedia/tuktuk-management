@@ -112,6 +112,11 @@ whitelisted_methods = [
     "tuktuk_management.api.tuktuk.fix_driver_balance",
     "tuktuk_management.api.tuktuk.reconcile_all_drivers_balances",
 
+    # Balance reconciliation utilities (2025-12-25)
+    "tuktuk_management.api.balance_reconciliation.check_balance_discrepancies",
+    "tuktuk_management.api.balance_reconciliation.fix_all_discrepancies",
+    "tuktuk_management.api.balance_reconciliation.get_driver_balance_report",
+
     # User management methods
     "tuktuk_management.api.user_management.create_tuktuk_manager_user",
     "tuktuk_management.api.user_management.resend_welcome_email",
@@ -187,6 +192,13 @@ scheduler_events = {
         ],
         "0 22 * * *": [  # 10 PM EAT (7 PM UTC)
             "tuktuk_management.api.sms_notifications.send_driver_target_reminder"
+        ],
+        # Balance reconciliation checks at 3PM and 9PM EAT
+        "0 15 * * *": [  # 3 PM EAT (12 PM UTC)
+            "tuktuk_management.api.balance_reconciliation.scheduled_reconciliation"
+        ],
+        "0 21 * * *": [  # 9 PM EAT (6 PM UTC)
+            "tuktuk_management.api.balance_reconciliation.scheduled_reconciliation"
         ]
     },
     "hourly": [

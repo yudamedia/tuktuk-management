@@ -126,6 +126,11 @@ def process_regular_driver_payment(driver_doc, tuktuk, transaction_id, amount, c
     # )
     global_target = settings.global_daily_target or 0
 
+    # LOGGING: Capture BEFORE state for verification
+    before_balance = driver_doc.current_balance or 0
+    before_left = driver_doc.left_to_target or 0
+    effective_target = driver_doc.daily_target or global_target
+
     frappe.db.sql(
         """
         UPDATE `tabTukTuk Driver`
@@ -138,6 +143,70 @@ def process_regular_driver_payment(driver_doc, tuktuk, transaction_id, amount, c
         """,
         (target_contribution, global_target, target_contribution, driver_doc.name),
     )
+
+    # LOGGING: Verify the update worked correctly
+    after_state = frappe.db.get_value(
+        "TukTuk Driver",
+        driver_doc.name,
+        ["current_balance", "left_to_target"],
+        as_dict=True
+    )
+
+    expected_balance = before_balance + target_contribution
+    expected_left = max(0, effective_target - expected_balance)
+
+    # Log if there's any discrepancy
+    if abs(after_state.current_balance - expected_balance) > 0.01 or abs(after_state.left_to_target - expected_left) > 0.01:
+        frappe.log_error(
+            f"""⚠️ LEFT_TO_TARGET DISCREPANCY DETECTED
+
+Driver: {driver_doc.driver_name} ({driver_doc.name})
+Transaction ID: {transaction_id}
+Payment Amount: {amount} KSH
+Target Contribution: {target_contribution} KSH
+
+BEFORE UPDATE:
+- current_balance: {before_balance}
+- left_to_target: {before_left}
+- daily_target: {driver_doc.daily_target}
+- global_target: {global_target}
+- effective_target: {effective_target}
+
+EXPECTED AFTER UPDATE:
+- current_balance: {expected_balance}
+- left_to_target: {expected_left}
+
+ACTUAL AFTER UPDATE:
+- current_balance: {after_state.current_balance}
+- left_to_target: {after_state.left_to_target}
+
+DISCREPANCIES:
+- Balance difference: {after_state.current_balance - expected_balance}
+- Left_to_target difference: {after_state.left_to_target - expected_left}
+
+SQL Parameters:
+- target_contribution: {target_contribution}
+- global_target: {global_target}
+- driver_name: {driver_doc.name}
+            """,
+            "Payment Processing - Left_to_Target Mismatch"
+        )
+    else:
+        # Log success for monitoring
+        frappe.log_error(
+            f"""✅ Payment Processed Successfully
+
+Driver: {driver_doc.driver_name} ({driver_doc.name})
+Transaction ID: {transaction_id}
+Amount: {amount} KSH → Contribution: {target_contribution} KSH
+
+UPDATED VALUES:
+- current_balance: {before_balance} → {after_state.current_balance}
+- left_to_target: {before_left} → {after_state.left_to_target}
+- Verification: PASSED ✓
+            """,
+            "Payment Processing - Success"
+        )
     
     return {
         'transaction_name': transaction.name,

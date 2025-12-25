@@ -476,17 +476,11 @@ frappe.listview_settings['TukTuk Driver'] = {
     add_fields: ["assigned_tuktuk", "current_balance", "consecutive_misses", "deposit_required", "current_deposit_balance"],
     
     get_indicator: function(doc) {
-        // Priority indicators based on deposit and performance status
-        if (doc.consecutive_misses >= 2) {
-            return [__("Critical"), "red", "consecutive_misses,>=,2"];
-        } else if (doc.deposit_required && flt(doc.current_deposit_balance) < flt(doc.deposit_required)) {
-            return [__("Deposit Due"), "orange", "current_deposit_balance,<,deposit_required"];
-        } else if (!doc.assigned_tuktuk) {
-            return [__("Unassigned"), "gray", "assigned_tuktuk,=,''"];
-        } else if (flt(doc.current_balance) < 0) {
-            return [__("Negative Balance"), "red", "current_balance,<,0"];
+        // Simple indicator based on tuktuk assignment status
+        if (doc.assigned_tuktuk) {
+            return [__("Assigned"), "green", "assigned_tuktuk,!=,''"];
         } else {
-            return [__("Active"), "green", "consecutive_misses,<,2"];
+            return [__("Unassigned"), "gray", "assigned_tuktuk,=,''"];
         }
     },
     
