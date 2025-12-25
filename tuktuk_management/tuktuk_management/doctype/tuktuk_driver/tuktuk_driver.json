@@ -16,14 +16,14 @@
   "driver_dob",
   "driver_national_id",
   "driver_license",
-  "preferred_day_off",
   "column_break_hyib",
   "driver_photo",
-  "driver_address",
+  "preferred_day_off",
   "driver_contacts_section",
   "driver_primary_phone",
-  "column_break_odhg",
   "driver_secondary_phone",
+  "column_break_odhg",
+  "driver_address",
   "column_break_qmal",
   "driver_email",
   "user_account",
@@ -50,6 +50,10 @@
   "current_balance",
   "column_break_performance",
   "left_to_target",
+  "section_break_sfln",
+  "is_rollover_target",
+  "column_break_rdaa",
+  "rollover_target_set_date",
   "section_break_performance_history",
   "consecutive_misses",
   "deposit_tab",
@@ -67,13 +71,13 @@
   "refund_amount",
   "refund_status",
   "hailing_tab",
+  "hailing_dashboard_section",
+  "hailing_dashboard_html",
   "hailing_section",
   "hailing_status",
   "column_break_hailing",
   "total_hailing_trips",
-  "average_hailing_rating",
-  "hailing_dashboard_section",
-  "hailing_dashboard_html"
+  "average_hailing_rating"
  ],
  "fields": [
   {
@@ -433,50 +437,59 @@
    "label": "Hailing"
   },
   {
-    "collapsible": 1,
-    "fieldname": "hailing_section",
-    "fieldtype": "Section Break",
-    "label": "Hailing Service"
-   },
-   {
-    "default": "Offline",
-    "fieldname": "hailing_status",
-    "fieldtype": "Select",
-    "label": "Hailing Status",
-    "options": "Offline\nAvailable\nEn Route\nBusy"
-   },
-   {
-    "fieldname": "column_break_hailing",
-    "fieldtype": "Column Break"
-   },
-   {
-    "default": "0",
-    "fieldname": "total_hailing_trips",
-    "fieldtype": "Int",
-    "label": "Total Hailing Trips",
-    "read_only": 1
-   },
-   {
-    "fieldname": "average_hailing_rating",
-    "fieldtype": "Float",
-    "label": "Average Hailing Rating",
-    "precision": "2",
-    "read_only": 1
-   },
-   {
-    "fieldname": "hailing_dashboard_section",
-    "fieldtype": "Section Break",
-    "label": "Ride Hailing Dashboard"
-   },
-   {
-    "fieldname": "hailing_dashboard_html",
-    "fieldtype": "HTML",
-    "label": "Hailing Dashboard"
-   }
+   "collapsible": 1,
+   "fieldname": "hailing_section",
+   "fieldtype": "Section Break",
+   "label": "Hailing Service"
+  },
+  {
+   "default": "Offline",
+   "fieldname": "hailing_status",
+   "fieldtype": "Select",
+   "label": "Hailing Status",
+   "options": "Offline\nAvailable\nEn Route\nBusy"
+  },
+  {
+   "fieldname": "column_break_hailing",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "total_hailing_trips",
+   "fieldtype": "Int",
+   "label": "Total Hailing Trips",
+   "read_only": 1
+  },
+  {
+   "fieldname": "average_hailing_rating",
+   "fieldtype": "Float",
+   "label": "Average Hailing Rating",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "fieldname": "hailing_dashboard_section",
+   "fieldtype": "Section Break",
+   "label": "Ride Hailing Dashboard"
+  },
+  {
+   "fieldname": "hailing_dashboard_html",
+   "fieldtype": "HTML",
+   "label": "Hailing Dashboard"
+  },
+  {
+   "fieldname": "section_break_sfln",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_rdaa",
+   "fieldtype": "Column Break"
+  }
  ],
+ "image_field": "driver_photo",
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-12-22 15:55:15.144892",
+ "modified": "2025-12-25 21:39:50.150202",
  "modified_by": "Administrator",
  "module": "Tuktuk Management",
  "name": "TukTuk Driver",
