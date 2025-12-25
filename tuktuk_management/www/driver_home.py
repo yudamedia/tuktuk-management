@@ -23,11 +23,17 @@ def get_context(context):
                                fields=["name", "driver_name", "current_deposit_balance", "left_to_target"],
                                limit=1)
         
+        # Get hailing_status from driver record
+        hailing_status = "Offline"
         if tuktuk_driver:
             driver = tuktuk_driver[0]
             context.driver_name = driver.driver_name
             context.current_deposit_balance = driver.current_deposit_balance or 0
             context.left_to_target = driver.left_to_target or 0
+            
+            # Fetch hailing_status from TukTuk Driver document
+            driver_doc = frappe.get_doc("TukTuk Driver", driver.name)
+            hailing_status = driver_doc.get("hailing_status", "Offline")
         else:
             context.driver_name = "Driver"
             context.current_deposit_balance = 0
@@ -44,7 +50,8 @@ def get_context(context):
             "left_to_target": context.left_to_target,
             "target_progress": dashboard_data.get("target_progress", 0),
             "tuktuk": dashboard_data.get("tuktuk"),
-            "consecutive_misses": dashboard_data.get("tuktuk_driver", {}).get("consecutive_misses", 0)
+            "consecutive_misses": dashboard_data.get("tuktuk_driver", {}).get("consecutive_misses", 0),
+            "hailing_status": hailing_status
         })
         
     except frappe.Redirect:

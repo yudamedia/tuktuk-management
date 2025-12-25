@@ -520,3 +520,404 @@ body {
         padding: 0;
     }
 }
+
+/* ============================================
+   HAILING AVAILABILITY TOGGLE STYLES
+   ============================================ */
+
+/* Hailing Toggle Card Base Styles */
+.hailing-toggle-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: var(--shadow);
+    border: 2px solid transparent;
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+/* Online State - Green theme */
+.hailing-toggle-card.online {
+    border-color: var(--success-color);
+    background: linear-gradient(135deg, #f0fff4, #e6ffed);
+}
+
+/* Offline State - Gray theme */
+.hailing-toggle-card.offline {
+    border-color: #adb5bd;
+    background: linear-gradient(135deg, #ffffff, #f8f9fa);
+}
+
+/* Toggle Container - Main flex layout */
+.hailing-toggle-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+}
+
+/* Status Info Section */
+.hailing-status-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+}
+
+/* Hailing Icon */
+.hailing-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #f8f9fa;
+    transition: all 0.3s ease;
+}
+
+.hailing-toggle-card.online .hailing-icon {
+    background-color: #d4edda;
+    color: var(--success-color);
+}
+
+.hailing-toggle-card.offline .hailing-icon {
+    background-color: #e9ecef;
+    color: #6c757d;
+}
+
+/* Status Text */
+.hailing-status-text {
+    flex: 1;
+}
+
+.hailing-label {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    margin-bottom: 4px;
+}
+
+.hailing-status-value {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.hailing-toggle-card.online .hailing-status-value {
+    color: var(--success-color);
+}
+
+.hailing-toggle-card.offline .hailing-status-value {
+    color: #6c757d;
+}
+
+/* ============================================
+   iOS-STYLE TOGGLE SWITCH
+   ============================================ */
+
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 60px;
+    height: 34px;
+    flex-shrink: 0;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    border-radius: 34px;
+    transition: all 0.4s ease;
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 26px;
+    width: 26px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    border-radius: 50%;
+    transition: all 0.4s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Checked state */
+.toggle-switch input:checked + .toggle-slider {
+    background-color: var(--success-color);
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+    transform: translateX(26px);
+}
+
+/* Focus state for accessibility */
+.toggle-switch input:focus + .toggle-slider {
+    box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.2);
+}
+
+/* Disabled state */
+.toggle-switch input:disabled + .toggle-slider {
+    cursor: not-allowed;
+    opacity: 0.5;
+    background-color: #dee2e6;
+}
+
+/* Hover effect (desktop only) */
+@media (hover: hover) and (pointer: fine) {
+    .toggle-switch input:not(:disabled) + .toggle-slider:hover {
+        opacity: 0.9;
+    }
+}
+
+/* ============================================
+   LOADING OVERLAY
+   ============================================ */
+
+.hailing-loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    z-index: 10;
+}
+
+.hailing-loading-overlay span {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.hailing-loading-overlay .spinner {
+    width: 24px;
+    height: 24px;
+    border-width: 3px;
+    margin: 0;
+}
+
+/* ============================================
+   ERROR MESSAGE
+   ============================================ */
+
+.hailing-error-message {
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-top: 12px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.hailing-error-message:before {
+    content: "⚠️";
+    font-size: 1rem;
+}
+
+/* ============================================
+   WARNING MESSAGE
+   ============================================ */
+
+.hailing-warning {
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+    color: #856404;
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-top: 12px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-align: center;
+}
+
+/* ============================================
+   SUCCESS MESSAGE (for temporary feedback)
+   ============================================ */
+
+.hailing-success-message {
+    background-color: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-top: 12px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.hailing-success-message:before {
+    content: "✓";
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+/* ============================================
+   RESPONSIVE STYLES
+   ============================================ */
+
+/* Mobile Small Screens */
+@media (max-width: 480px) {
+    .hailing-toggle-card {
+        padding: 16px;
+    }
+    
+    .hailing-toggle-container {
+        gap: 12px;
+    }
+    
+    .hailing-icon {
+        width: 40px;
+        height: 40px;
+    }
+    
+    .hailing-icon svg {
+        width: 24px;
+        height: 24px;
+    }
+    
+    .hailing-status-text {
+        min-width: 0;
+    }
+    
+    .hailing-label {
+        font-size: 0.75rem;
+    }
+    
+    .hailing-status-value {
+        font-size: 1rem;
+    }
+    
+    .toggle-switch {
+        width: 54px;
+        height: 30px;
+    }
+    
+    .toggle-slider:before {
+        height: 22px;
+        width: 22px;
+        left: 4px;
+        bottom: 4px;
+    }
+    
+    .toggle-switch input:checked + .toggle-slider:before {
+        transform: translateX(24px);
+    }
+}
+
+/* Tablet and Desktop */
+@media (min-width: 768px) {
+    .hailing-toggle-card {
+        max-width: 768px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+
+/* Fade in animation for messages */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.hailing-error-message,
+.hailing-success-message {
+    animation: fadeIn 0.3s ease;
+}
+
+/* Pulse animation for loading */
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.hailing-toggle-card.loading {
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* ============================================
+   ACCESSIBILITY IMPROVEMENTS
+   ============================================ */
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .hailing-toggle-card {
+        border-width: 3px;
+    }
+    
+    .toggle-slider {
+        border: 2px solid currentColor;
+    }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    .hailing-toggle-card,
+    .toggle-slider,
+    .toggle-slider:before,
+    .hailing-icon {
+        transition: none;
+    }
+    
+    .hailing-error-message,
+    .hailing-success-message {
+        animation: none;
+    }
+}
+
+/* Dark mode support (future enhancement) */
+@media (prefers-color-scheme: dark) {
+    .hailing-toggle-card {
+        background: #1a1a1a;
+        color: #f0f0f0;
+    }
+    
+    .hailing-toggle-card.offline {
+        background: linear-gradient(135deg, #2a2a2a, #1a1a1a);
+    }
+    
+    .hailing-loading-overlay {
+        background: rgba(26, 26, 26, 0.95);
+    }
+}

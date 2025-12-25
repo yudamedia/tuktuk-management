@@ -721,6 +721,7 @@ def start_tuktuk_rental(tuktuk_name):
 
 # ===== UTILITY FUNCTIONS =====
 
+@frappe.whitelist()
 def get_current_tuktuk_driver():
     """Get current logged-in tuktuk driver document"""
     if frappe.session.user == "Guest":
@@ -731,15 +732,36 @@ def get_current_tuktuk_driver():
         frappe.throw(_("Access denied - TukTuk Driver role required"), frappe.PermissionError)
     
     # Get driver details
-    tuktuk_driver = frappe.get_all("TukTuk Driver", 
+    tuktuk_driver = frappe.get_all("TukTuk Driver",
                            filters={"user_account": frappe.session.user},
-                           fields=["name", "driver_name"],
+                           fields=["name"],
                            limit=1)
-    
+
     if not tuktuk_driver:
         frappe.throw(_("TukTuk driver record not found"))
-    
+
+    # Return full document
     return frappe.get_doc("TukTuk Driver", tuktuk_driver[0].name)
+
+@frappe.whitelist()
+def get_driver_hailing_status():
+    """Get current hailing status for logged-in driver"""
+    try:
+        tuktuk_driver = get_current_tuktuk_driver()
+        
+        return {
+            "success": True,
+            "driver_id": tuktuk_driver.name,
+            "hailing_status": tuktuk_driver.get("hailing_status", "Offline"),
+            "assigned_tuktuk": tuktuk_driver.assigned_tuktuk or None
+        }
+    except Exception as e:
+        frappe.log_error(f"Driver hailing status error: {str(e)}")
+        return {
+            "success": False,
+            "message": str(e),
+            "hailing_status": "Offline"
+        }
 
 @frappe.whitelist()
 def update_tuktuk_driver_phone(new_phone):

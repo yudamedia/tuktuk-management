@@ -1,117 +1,126 @@
 # left_to_target Atomic Update Fix
 
 ## Problem
-When transactions occur outside operating hours (before 6:00 AM), the `current_balance` field gets updated but the `left_to_target` field does not, causing a discrepancy. This is because:
+When transactions occur, the `current_balance` field gets updated but the `left_to_target` field can end up with stale values, causing a discrepancy. This happens due to two issues:
 
-1. Transactions outside operating hours are marked as "Failed" 
-2. The `current_balance` is updated atomically via SQL
-3. The `left_to_target` field is NOT updated atomically, leading to stale values
+1. **Original Issue:** Transactions outside operating hours had `current_balance` updated atomically but `left_to_target` was not updated
+2. **Stale Value Bug (Dec 24, 2025):** Even when both fields were updated, using TWO separate SQL statements caused `left_to_target` to use the OLD `current_balance` value instead of the NEW one
+
+### Examples of Affected Drivers
+- DRV-112181: Discrepancy between `current_balance` and `left_to_target`
+- DRV-112187: Similar discrepancy
 
 ## Solution
-Implemented atomic SQL updates for `left_to_target` alongside every `current_balance` update to ensure both fields stay synchronized.
+Use a **single atomic SQL statement** that updates both `current_balance` and `left_to_target` together, with `left_to_target` calculated using the NEW `current_balance` value: `(current_balance + %s)`
 
 ## Technical Implementation
 
-### Formula
+### Correct Formula (Single Atomic Update)
 ```sql
-left_to_target = GREATEST(0, 
-    COALESCE(NULLIF(daily_target, 0), global_daily_target) - current_balance
-)
+UPDATE `tabTukTuk Driver`
+SET current_balance = current_balance + %s,
+    left_to_target = GREATEST(0,
+        COALESCE(NULLIF(daily_target, 0), %s) - (current_balance + %s)
+    )
+WHERE name = %s
 ```
 
 **Key Points:**
 - `NULLIF(daily_target, 0)` treats 0 as NULL (drivers with 0 target use global target)
 - `COALESCE` falls back to `global_daily_target` if driver's target is NULL or 0
 - `GREATEST(0, ...)` prevents negative values when target is exceeded
+- **CRITICAL:** Uses `(current_balance + %s)` to calculate with the NEW balance, not the old one
 - `global_daily_target` is passed as a parameter (not subquery) because TukTuk Settings is a Single DocType with no physical row in the database
+- **Single SQL statement** ensures atomicity and prevents stale value bugs
 
 ### Locations Updated
 
-#### 1. `mpesa_confirmation()` (Line ~360)
-**Context:** M-Pesa payment confirmation endpoint
+#### 1. `process_regular_driver_payment()` (Line ~130)
+**Context:** M-Pesa payment confirmation endpoint for regular drivers
+**Status:** ✅ **CORRECT** - Uses single atomic update with NEW balance
 ```python
-if target_contribution > 0 and transaction_type not in ['Adjustment', 'Driver Repayment']:
-    global_target = settings.global_daily_target or 0
-    
-    # Update current_balance
-    frappe.db.sql("""
-        UPDATE `tabTukTuk Driver`
-        SET current_balance = current_balance + %s
-        WHERE name = %s
-    """, (target_contribution, driver_name))
-    
-    # Update left_to_target atomically
-    frappe.db.sql("""
-        UPDATE `tabTukTuk Driver`
-        SET left_to_target = GREATEST(0, 
-            COALESCE(NULLIF(daily_target, 0), %s) - current_balance
-        )
-        WHERE name = %s
-    """, (global_target, driver_name))
-```
-
-#### 2. `process_uncaptured_payment()` - Send Share (Line ~655)
-**Context:** Processing uncaptured payments with driver share
-```python
-if target_contribution > 0:
-    global_target = settings.global_daily_target or 0
-    
-    frappe.db.sql("""
-        UPDATE `tabTukTuk Driver`
-        SET current_balance = current_balance + %s
-        WHERE name = %s
-    """, (target_contribution, driver))
-    
-    frappe.db.sql("""
-        UPDATE `tabTukTuk Driver`
-        SET left_to_target = GREATEST(0, 
-            COALESCE(NULLIF(daily_target, 0), %s) - current_balance
-        )
-        WHERE name = %s
-    """, (global_target, driver))
-```
-
-#### 3. `process_uncaptured_payment()` - Deposit Share (Line ~740)
-**Context:** Processing uncaptured payments as balance deposit
-```python
-old_balance = driver_doc.current_balance
 global_target = settings.global_daily_target or 0
 
 frappe.db.sql("""
     UPDATE `tabTukTuk Driver`
-    SET current_balance = current_balance + %s
+    SET current_balance = current_balance + %s,
+        left_to_target = GREATEST(0,
+            COALESCE(NULLIF(daily_target, 0), %s) - (current_balance + %s)
+        )
     WHERE name = %s
-""", (amount, driver))
-
-frappe.db.sql("""
-    UPDATE `tabTukTuk Driver`
-    SET left_to_target = GREATEST(0, 
-        COALESCE(NULLIF(daily_target, 0), %s) - current_balance
-    )
-    WHERE name = %s
-""", (global_target, driver))
+""", (target_contribution, global_target, target_contribution, driver_doc.name))
 ```
 
-#### 4. `add_missed_transaction_*()` (Line ~2045)
-**Context:** Manual recovery function for missed transactions
+#### 2. `process_uncaptured_payment()` - Send Share (Line ~1028)
+**Context:** Processing uncaptured payments with driver share
+**Status:** ✅ **FIXED (Dec 24, 2025)** - Now uses single atomic update
 ```python
 if target_contribution > 0:
-    old_balance = driver.current_balance
     global_target = settings.global_daily_target or 0
-    
+    # Single atomic SQL update for both fields (prevents stale value bug)
     frappe.db.sql("""
         UPDATE `tabTukTuk Driver`
-        SET current_balance = current_balance + %s
+        SET current_balance = current_balance + %s,
+            left_to_target = GREATEST(0,
+                COALESCE(NULLIF(daily_target, 0), %s) - (current_balance + %s)
+            )
         WHERE name = %s
-    """, (target_contribution, driver_name))
-    
-    frappe.db.sql("""
-        UPDATE `tabTukTuk Driver`
-        SET left_to_target = GREATEST(0, 
-            COALESCE(NULLIF(daily_target, 0), %s) - current_balance
+    """, (target_contribution, global_target, target_contribution, driver))
+```
+
+#### 3. `process_uncaptured_payment()` - Deposit Share (Line ~1107)
+**Context:** Processing uncaptured payments as balance deposit
+**Status:** ✅ **FIXED (Dec 24, 2025)** - Now uses single atomic update
+```python
+old_balance = driver_doc.current_balance
+global_target = settings.global_daily_target or 0
+# Single atomic SQL update for both fields (prevents stale value bug)
+frappe.db.sql("""
+    UPDATE `tabTukTuk Driver`
+    SET current_balance = current_balance + %s,
+        left_to_target = GREATEST(0,
+            COALESCE(NULLIF(daily_target, 0), %s) - (current_balance + %s)
         )
-        WHERE name = %s
-    """, (global_target, driver_name))
+    WHERE name = %s
+""", (amount, global_target, amount, driver))
+```
+
+#### 4. `sunny_id_payment_handler.py` - `handle_sunny_id_payment()` (Line ~148)
+**Context:** Sunny ID payment processing
+**Status:** ✅ **CORRECT** - Uses single atomic update with NEW balance
+```python
+global_target = settings.global_daily_target or 0
+
+# Single atomic SQL update for ALL fields (prevents race condition)
+frappe.db.sql("""
+    UPDATE `tabTukTuk Driver`
+    SET
+        current_balance = current_balance + %s,
+        left_to_target = GREATEST(0,
+            COALESCE(NULLIF(daily_target, 0), %s) - (current_balance + %s)
+        ),
+        current_deposit_balance = current_deposit_balance + %s
+    WHERE name = %s
+""", (target_reduction, global_target, target_reduction, deposited_amount, driver_data.name))
+```
+
+#### 5. `update_driver_payment_atomic()` (Line ~3897)
+**Context:** Utility function for atomic payment updates
+**Status:** ✅ **CORRECT** - Uses single atomic update with NEW balance
+```python
+global_target = settings.global_daily_target or 0
+
+# Single atomic SQL update for ALL payment-related fields
+frappe.db.sql("""
+    UPDATE `tabTukTuk Driver`
+    SET
+        current_balance = current_balance + %s,
+        left_to_target = GREATEST(0,
+            COALESCE(NULLIF(daily_target, 0), %s) - (current_balance + %s)
+        ),
+        current_deposit_balance = current_deposit_balance + %s
+    WHERE name = %s
+""", (target_contribution, global_target, target_contribution, deposit_amount, driver_name))
 ```
 
 ## Test Results
@@ -178,9 +187,22 @@ print(f"Expected: {(driver.daily_target or settings.global_daily_target) - drive
 - `BALANCE_QUICK_REFERENCE.md` - Quick reference commands
 - `DEPLOYMENT_REPORT.md` - Deployment status and test results
 
-## Date Implemented
-December 8, 2025
+## Changelog
+
+### December 24, 2025 - Critical Bug Fix
+**Issue:** Stale value bug discovered in 3 locations causing discrepancies for drivers like DRV-112181 and DRV-112187
+
+**Root Cause:** Using TWO separate SQL UPDATE statements caused `left_to_target` to calculate with OLD `current_balance` instead of NEW value
+
+**Fixed Locations:**
+1. `process_uncaptured_payment()` - Send Share (Line ~1028)
+2. `process_uncaptured_payment()` - Deposit Share (Line ~1107)
+
+**Solution:** Combined both updates into a single atomic SQL statement using `(current_balance + %s)` to reference the NEW balance
+
+### December 8, 2025 - Initial Implementation
+Original atomic update fix for `left_to_target` synchronization
 
 ## Status
-✅ **DEPLOYED AND TESTED**
+✅ **DEPLOYED AND TESTED** (Updated Dec 24, 2025)
 

@@ -1027,20 +1027,15 @@ def process_uncaptured_payment(driver, tuktuk, transaction_id, customer_phone, a
             # ATOMIC UPDATE FIX: Use SQL UPDATE to prevent race conditions
             if target_contribution > 0:
                 global_target = settings.global_daily_target or 0
+                # Single atomic SQL update for both fields (prevents stale value bug)
                 frappe.db.sql("""
                     UPDATE `tabTukTuk Driver`
-                    SET current_balance = current_balance + %s
+                    SET current_balance = current_balance + %s,
+                        left_to_target = GREATEST(0,
+                            COALESCE(NULLIF(daily_target, 0), %s) - (current_balance + %s)
+                        )
                     WHERE name = %s
-                """, (target_contribution, driver))
-                
-                # Also update left_to_target atomically
-                frappe.db.sql("""
-                    UPDATE `tabTukTuk Driver`
-                    SET left_to_target = GREATEST(0, 
-                        COALESCE(NULLIF(daily_target, 0), %s) - current_balance
-                    )
-                    WHERE name = %s
-                """, (global_target, driver))
+                """, (target_contribution, global_target, target_contribution, driver))
             
             # Commit before sending B2C payment
             frappe.db.commit()
@@ -1112,20 +1107,15 @@ def process_uncaptured_payment(driver, tuktuk, transaction_id, customer_phone, a
             # ATOMIC UPDATE FIX: Use SQL UPDATE to prevent race conditions
             old_balance = driver_doc.current_balance
             global_target = settings.global_daily_target or 0
+            # Single atomic SQL update for both fields (prevents stale value bug)
             frappe.db.sql("""
                 UPDATE `tabTukTuk Driver`
-                SET current_balance = current_balance + %s
+                SET current_balance = current_balance + %s,
+                    left_to_target = GREATEST(0,
+                        COALESCE(NULLIF(daily_target, 0), %s) - (current_balance + %s)
+                    )
                 WHERE name = %s
-            """, (amount, driver))
-            
-            # Also update left_to_target atomically
-            frappe.db.sql("""
-                UPDATE `tabTukTuk Driver`
-                SET left_to_target = GREATEST(0, 
-                    COALESCE(NULLIF(daily_target, 0), %s) - current_balance
-                )
-                WHERE name = %s
-            """, (global_target, driver))
+            """, (amount, global_target, amount, driver))
             
             frappe.db.commit()
             
@@ -3118,191 +3108,6 @@ def force_battery_alert(vehicle_name):
         frappe.throw(f"Failed to send battery alert: {str(e)}")
 
 # ===== TRANSACTION RECOVERY FUNCTIONS =====
-
-@frappe.whitelist()
-def add_missed_transaction_TL176BJ1M3():
-    """
-    Add missed transaction TL176BJ1M3 from 01/12/2025 at 15:30:53
-    Transaction details:
-    - Amount: 400 KES
-    - Account: 025 (TukTuk 025)
-    - Driver: DRV-112010
-    - Customer Phone: 0723526737
-    """
-    import hashlib
-    
-    try:
-        frappe.flags.ignore_permissions = True
-        
-        # Transaction details from Safaricom
-        transaction_id = "TL176BJ1M3"
-        amount = 400.0
-        account_number = "025"
-        customer_phone = "0723526737"
-        transaction_time = "2025-12-01 15:30:53"
-        
-        # Check if transaction already exists
-        existing = frappe.db.exists("TukTuk Transaction", {"transaction_id": transaction_id})
-        if existing:
-            frappe.msgprint(f"❌ Transaction {transaction_id} already exists!")
-            frappe.log_error("Transaction Already Exists", 
-                           f"Transaction {transaction_id} already exists in the system")
-            return {"success": False, "message": "Transaction already exists"}
-        
-        # Get TukTuk
-        tuktuk_name = frappe.db.get_value("TukTuk Vehicle", {"mpesa_account": account_number}, "name")
-        if not tuktuk_name:
-            frappe.msgprint(f"❌ TukTuk not found for account: {account_number}")
-            return {"success": False, "message": f"TukTuk not found for account: {account_number}"}
-        
-        frappe.msgprint(f"✅ Found TukTuk: {tuktuk_name}")
-        
-        # Get assigned driver
-        driver_name = frappe.db.get_value("TukTuk Driver", {"assigned_tuktuk": tuktuk_name}, "name")
-        if not driver_name:
-            frappe.msgprint(f"❌ No driver assigned to tuktuk: {tuktuk_name}")
-            return {"success": False, "message": f"No driver assigned to tuktuk: {tuktuk_name}"}
-        
-        frappe.msgprint(f"✅ Found Driver: {driver_name}")
-        
-        # Get driver document for calculations
-        driver = frappe.get_doc("TukTuk Driver", driver_name)
-        settings = frappe.get_single("TukTuk Settings")
-        
-        # Calculate shares
-        percentage = driver.fare_percentage or settings.global_fare_percentage
-        target = driver.daily_target or settings.global_daily_target
-        
-        # Check if target sharing is enabled
-        driver_target_override = getattr(driver, 'target_sharing_override', 'Follow Global')
-        if driver_target_override == 'Enable':
-            target_sharing_enabled = True
-        elif driver_target_override == 'Disable':
-            target_sharing_enabled = False
-        else:
-            target_sharing_enabled = getattr(settings, 'enable_target_sharing', 1)
-        
-        # Calculate driver share and target contribution
-        if target_sharing_enabled and driver.current_balance >= target:
-            driver_share = amount  # 100% to driver when target met
-            target_contribution = 0
-        else:
-            driver_share = amount * (percentage / 100)
-            target_contribution = amount - driver_share
-        
-        frappe.msgprint(f"💰 Amount: {amount} KES")
-        frappe.msgprint(f"💵 Driver Share: {driver_share} KES")
-        frappe.msgprint(f"🎯 Target Contribution: {target_contribution} KES")
-        
-        # Hash customer phone for privacy (same method used in transactions)
-        hashed_phone = hashlib.sha256(customer_phone.encode()).hexdigest()
-        
-        # Create the transaction
-        transaction = frappe.get_doc({
-            "doctype": "TukTuk Transaction",
-            "transaction_id": transaction_id,
-            "transaction_type": "Payment",
-            "tuktuk": tuktuk_name,
-            "driver": driver_name,
-            "amount": amount,
-            "driver_share": driver_share,
-            "target_contribution": target_contribution,
-            "customer_phone": hashed_phone,
-            "timestamp": transaction_time,
-            "payment_status": "Completed",
-            "b2c_payment_sent": 0  # Not sent yet, will trigger now
-        })
-        
-        transaction.insert(ignore_permissions=True)
-        frappe.msgprint(f"✅ Transaction created: {transaction.name}")
-        
-        # ATOMIC UPDATE FIX: Use SQL UPDATE to prevent race conditions
-        if target_contribution > 0:
-            old_balance = driver.current_balance
-            global_target = settings.global_daily_target or 0
-            frappe.db.sql("""
-                UPDATE `tabTukTuk Driver`
-                SET current_balance = current_balance + %s
-                WHERE name = %s
-            """, (target_contribution, driver_name))
-            
-            # Also update left_to_target atomically
-            frappe.db.sql("""
-                UPDATE `tabTukTuk Driver`
-                SET left_to_target = GREATEST(0, 
-                    COALESCE(NULLIF(daily_target, 0), %s) - current_balance
-                )
-                WHERE name = %s
-            """, (global_target, driver_name))
-            
-            new_balance = frappe.db.get_value("TukTuk Driver", driver_name, "current_balance")
-            frappe.msgprint(f"✅ Driver balance updated: {old_balance} → {new_balance}")
-        
-        # Commit the transaction creation
-        frappe.db.commit()
-        
-        # Now trigger B2C payment to driver
-        frappe.msgprint(f"🚀 Triggering B2C payment to driver...")
-        frappe.msgprint(f"   Driver: {driver.driver_name}")
-        frappe.msgprint(f"   Phone: {driver.mpesa_number}")
-        frappe.msgprint(f"   Amount: {driver_share} KES")
-        
-        # Send payment to driver
-        payment_success = send_mpesa_payment(driver.mpesa_number, driver_share, "FARE")
-        
-        if payment_success:
-            # Update transaction to mark B2C as sent
-            frappe.db.set_value("TukTuk Transaction", transaction.name, 
-                              "b2c_payment_sent", 1, update_modified=False)
-            frappe.db.commit()
-            frappe.msgprint(f"✅ B2C payment sent successfully!")
-            frappe.msgprint(f"   Check Error Log for Conversation ID")
-        else:
-            frappe.msgprint(f"⚠️ B2C payment failed - transaction recorded but payment not sent")
-            frappe.msgprint(f"   Check Error Log for details")
-            # Add comment to transaction
-            transaction.add_comment('Comment', 
-                                  f'Manual transaction recovery: B2C payment failed on initial attempt')
-            transaction.save(ignore_permissions=True)
-            frappe.db.commit()
-        
-        result_message = f"""
-        ✅ TRANSACTION RECOVERY COMPLETE
-        =====================================
-        Transaction ID: {transaction_id}
-        Amount: {amount} KES
-        Driver Share: {driver_share} KES
-        Target Contribution: {target_contribution} KES
-        Driver: {driver.driver_name} ({driver_name})
-        TukTuk: {tuktuk_name}
-        B2C Payment: {'SUCCESS' if payment_success else 'FAILED - retry manually'}
-        =====================================
-        """
-        
-        frappe.msgprint(result_message)
-        frappe.log_error("Transaction Recovery Success", result_message)
-        
-        return {
-            "success": True,
-            "message": "Transaction recovered successfully",
-            "transaction_id": transaction_id,
-            "transaction_name": transaction.name,
-            "amount": amount,
-            "driver_share": driver_share,
-            "target_contribution": target_contribution,
-            "b2c_payment_sent": payment_success
-        }
-        
-    except Exception as e:
-        frappe.db.rollback()
-        error_msg = f"Transaction recovery failed: {str(e)}"
-        frappe.msgprint(f"❌ {error_msg}")
-        frappe.log_error("Transaction Recovery Error", error_msg)
-        import traceback
-        frappe.log_error("Transaction Recovery Traceback", traceback.format_exc())
-        return {"success": False, "message": error_msg}
-    finally:
-        frappe.flags.ignore_permissions = False
 
 # ===== BALANCE RECONCILIATION FUNCTIONS =====
 

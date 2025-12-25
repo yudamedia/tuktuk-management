@@ -6,6 +6,44 @@
 {% if error %}
 <div class="alert alert-danger">{{ error }}</div>
 {% else %}
+<!-- Hailing Availability Toggle Card -->
+<div class="card hailing-toggle-card" id="hailing-availability-card">
+    <div class="hailing-toggle-container">
+        <div class="hailing-status-info">
+            <div class="hailing-icon" id="hailing-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                    <circle cx="12" cy="10" r="3"></circle>
+                </svg>
+            </div>
+            <div class="hailing-status-text">
+                <div class="hailing-label">Hailing Status</div>
+                <div class="hailing-status-value" id="hailing-status-text">{{ hailing_status or "Offline" }}</div>
+            </div>
+        </div>
+
+        <!-- iOS-style Toggle Switch -->
+        <label class="toggle-switch">
+            <input type="checkbox" id="hailing-toggle"
+                   {% if hailing_status == "Available" %}checked{% endif %}
+                   {% if not tuktuk %}disabled{% endif %}>
+            <span class="toggle-slider"></span>
+        </label>
+    </div>
+
+    <div class="hailing-loading-overlay" id="hailing-loading" style="display: none;">
+        <div class="spinner"></div><span>Updating...</span>
+    </div>
+
+    <div class="hailing-error-message" id="hailing-error" style="display: none;"></div>
+
+    {% if not tuktuk %}
+    <div class="hailing-warning">
+        <span>⚠️ You need an assigned TukTuk to go online for hailing</span>
+    </div>
+    {% endif %}
+</div>
+
 <!-- Quick Stats -->
 <div class="grid grid-2">
     <div class="stat-card">
