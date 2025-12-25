@@ -35,6 +35,13 @@ frappe.ui.form.on('TukTuk Driver', {
         
         // Handle deposit field dependencies
         handle_deposit_dependencies(frm);
+        
+        // Show account status indicator
+        if (frm.doc.user_account) {
+            frm.dashboard.add_indicator(__('Has User Account'), 'green');
+        } else {
+            frm.dashboard.add_indicator(__('No User Account'), 'orange');
+        }
     },
     
     driver_first_name: function(frm) {
@@ -841,35 +848,7 @@ function view_login_details(frm) {
     }
 }
 
-// Update the main refresh function to include account management
-frappe.ui.form.on('TukTuk Driver', {
-    refresh: function(frm) {
-        // Set driver name if not set
-        if (!frm.doc.driver_name) {
-            set_driver_name(frm);
-        }
-        
-        // Add custom buttons and indicators for existing records
-        if (!frm.doc.__islocal) {
-            setup_custom_buttons(frm);
-            setup_indicators(frm);
-            setup_deposit_indicators(frm);
-            setup_account_management_buttons(frm); // Add this line
-        }
-        
-        // Handle deposit field dependencies
-        handle_deposit_dependencies(frm);
-        
-        // Show account status indicator
-        if (frm.doc.user_account) {
-            frm.dashboard.add_indicator(__('Has User Account'), 'green');
-        } else {
-            frm.dashboard.add_indicator(__('No User Account'), 'orange');
-        }
-    }
-});
-
-// Add this to tuktuk_management/public/js/tuktuk_driver_list.js
+// tuktuk_management/public/js/tuktuk_driver_list.js
 // Enhanced list view for driver account management
 
 frappe.listview_settings['TukTuk Driver'] = {
