@@ -424,7 +424,116 @@ frappe.listview_settings['TukTuk Driver'] = {
                     }
                 });
             });
-            
+
+            // Add "Reconcile Target Left" button (checks left_to_target calculation)
+            listview.page.add_menu_item(__('Reconcile Target Left'), function() {
+                frappe.call({
+                    method: 'tuktuk_management.api.balance_reconciliation.check_balance_discrepancies',
+                    args: { auto_fix: false },
+                    freeze: true,
+                    freeze_message: __('Checking target calculations...'),
+                    callback: function(r) {
+                        if (r.message) {
+                            const result = r.message;
+                            const has_issues = result.discrepancies_found > 0;
+
+                            let html = `
+                                <div style="padding: 10px;">
+                                    <p><strong>Total Drivers Checked:</strong> ${result.total_drivers_checked}</p>
+                                    <p><strong>Discrepancies Found:</strong>
+                                        <span style="color: ${has_issues ? 'red' : 'green'}; font-weight: bold;">
+                                            ${result.discrepancies_found}
+                                        </span>
+                                    </p>
+                                    <p><strong>Total Error Amount:</strong> KSH ${flt(result.total_error_amount, 2).toLocaleString()}</p>
+                                    <p style="font-size: 0.9em; color: #666; margin-top: 10px;">
+                                        <em>This check validates that left_to_target = max(0, target - current_balance)</em>
+                                    </p>
+                            `;
+
+                            if (has_issues && result.details && result.details.length > 0) {
+                                html += `
+                                    <hr style="margin: 15px 0;">
+                                    <h5>Affected Drivers:</h5>
+                                    <table class="table table-bordered table-sm" style="font-size: 0.9em;">
+                                        <thead>
+                                            <tr>
+                                                <th>Driver</th>
+                                                <th>Balance</th>
+                                                <th>Expected Left</th>
+                                                <th>Actual Left</th>
+                                                <th>Error</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                `;
+
+                                result.details.forEach(d => {
+                                    const error_color = Math.abs(d.error) > 0.01 ? 'red' : 'green';
+                                    html += `
+                                        <tr>
+                                            <td>${d.driver_name}</td>
+                                            <td>KSH ${flt(d.current_balance, 2).toLocaleString()}</td>
+                                            <td>KSH ${flt(d.expected_left_to_target, 2).toLocaleString()}</td>
+                                            <td>KSH ${flt(d.actual_left_to_target, 2).toLocaleString()}</td>
+                                            <td style="color: ${error_color}; font-weight: bold;">
+                                                KSH ${flt(d.error, 2).toLocaleString()}
+                                            </td>
+                                        </tr>
+                                    `;
+                                });
+
+                                html += `
+                                        </tbody>
+                                    </table>
+                                `;
+                            }
+
+                            html += `</div>`;
+
+                            let d = new frappe.ui.Dialog({
+                                title: __('Target Left Reconciliation Report'),
+                                fields: [
+                                    {
+                                        fieldtype: 'HTML',
+                                        options: html
+                                    }
+                                ],
+                                primary_action_label: has_issues ? __('Auto-Fix All Errors') : __('Close'),
+                                primary_action: function() {
+                                    if (has_issues) {
+                                        frappe.confirm(
+                                            __('Fix left_to_target for all {0} driver(s) automatically?', [result.discrepancies_found]),
+                                            function() {
+                                                frappe.call({
+                                                    method: 'tuktuk_management.api.balance_reconciliation.fix_all_discrepancies',
+                                                    freeze: true,
+                                                    freeze_message: __('Fixing discrepancies...'),
+                                                    callback: function(fix_r) {
+                                                        if (fix_r.message) {
+                                                            frappe.msgprint({
+                                                                title: __('Target Left Reconciliation Complete'),
+                                                                message: __('Fixed {0} driver(s)', [fix_r.message.discrepancies_fixed]),
+                                                                indicator: 'green'
+                                                            });
+                                                            listview.refresh();
+                                                            d.hide();
+                                                        }
+                                                    }
+                                                });
+                                            }
+                                        );
+                                    } else {
+                                        d.hide();
+                                    }
+                                }
+                            });
+                            d.show();
+                        }
+                    }
+                });
+            });
+
             // Add bulk account creation menu items
             listview.page.add_menu_item(__('Create All Driver Accounts'), function() {
                 frappe.confirm(
