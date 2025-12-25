@@ -1507,7 +1507,8 @@ def reset_daily_targets_with_deposit():
         f"Starting daily target reset for date: {today}\n"
         f"Last reset was on: {last_reset_date or 'Never'}\n"
         f"Global daily target: {settings.global_daily_target or 0}\n"
-        f"Target sharing enabled: {getattr(settings, 'enable_target_sharing', 1)}",
+        f"Target sharing enabled: {getattr(settings, 'enable_target_sharing', 1)}\n"
+        f"Processing: Regular drivers (assigned only) and ALL substitute drivers",
         "Target Reset - Started"
     )
     
@@ -1642,6 +1643,26 @@ def reset_daily_targets_with_deposit():
                 "Target Reset - Driver Error"
             )
     
+    # Reset substitute drivers - ALL substitutes regardless of assignment status
+    substitute_drivers = frappe.get_all("TukTuk Substitute Driver",
+                                       fields=["name", "first_name", "last_name", "assigned_tuktuk", "status"])
+    
+    substitute_processed_count = 0
+    
+    for substitute in substitute_drivers:
+        try:
+            substitute_doc = frappe.get_doc("TukTuk Substitute Driver", substitute.name)
+            # Call the substitute driver's reset method which handles no-rollover logic
+            substitute_doc.reset_daily_targets()
+            substitute_processed_count += 1
+            
+        except Exception as e:
+            frappe.log_error(
+                f"Failed to reset targets for substitute driver {substitute.name}: {str(e)}\n"
+                f"Driver Name: {substitute.get('first_name', 'Unknown')} {substitute.get('last_name', '')}",
+                "Target Reset - Substitute Driver Error"
+            )
+    
     # Update the last reset date in settings
     frappe.db.set_value("TukTuk Settings", "TukTuk Settings", "last_daily_reset_date", today)
     frappe.db.commit()
@@ -1649,9 +1670,11 @@ def reset_daily_targets_with_deposit():
     # Log completion summary
     frappe.log_error(
         f"Daily target reset completed for {today}:\n"
-        f"Total Drivers Processed: {processed_count}\n"
+        f"Regular Drivers Processed: {processed_count}\n"
         f"Drivers Terminated: {terminated_count}\n"
-        f"Total Drivers Found: {len(drivers)}",
+        f"Total Regular Drivers Found: {len(drivers)}\n"
+        f"Substitute Drivers Processed: {substitute_processed_count}\n"
+        f"Total Substitute Drivers Found: {len(substitute_drivers)}",
         "Target Reset - Completed"
     )
 
