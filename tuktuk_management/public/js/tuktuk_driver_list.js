@@ -473,7 +473,7 @@ frappe.listview_settings['TukTuk Driver'] = {
     },
     
     // Enhanced list view settings
-    add_fields: ["assigned_tuktuk", "current_balance", "consecutive_misses", "deposit_required", "current_deposit_balance"],
+    add_fields: ["assigned_tuktuk", "current_balance", "consecutive_misses", "deposit_required", "current_deposit_balance", "hailing_status"],
     
     get_indicator: function(doc) {
         // Simple indicator based on tuktuk assignment status
@@ -500,6 +500,21 @@ frappe.listview_settings['TukTuk Driver'] = {
             } else {
                 return `<span class="text-warning">${value}/3</span>`;
             }
+        },
+        
+        hailing_status: function(value, df, options, doc) {
+            const status = value || 'Offline';
+            let badgeClass = 'badge-secondary';
+            
+            if (status === 'Available') {
+                badgeClass = 'badge-success';
+            } else if (status === 'En Route') {
+                badgeClass = 'badge-warning';
+            } else if (status === 'Busy') {
+                badgeClass = 'badge-danger';
+            }
+            
+            return `<span class="badge ${badgeClass}">${status}</span>`;
         }
     }
 };
