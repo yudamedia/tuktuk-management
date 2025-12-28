@@ -268,6 +268,8 @@ def get_tuktuk_driver_dashboard_data():
         return {
             "tuktuk_driver": {
                 "name": tuktuk_driver.driver_name,
+                "driver_first_name": tuktuk_driver.driver_first_name,
+                "sunny_id": tuktuk_driver.sunny_id,
                 "current_balance": tuktuk_driver.current_balance,
                 "consecutive_misses": tuktuk_driver.consecutive_misses,
                 "mpesa_number": tuktuk_driver.mpesa_number
