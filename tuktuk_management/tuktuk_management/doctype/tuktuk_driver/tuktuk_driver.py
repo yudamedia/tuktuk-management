@@ -53,7 +53,12 @@ class TukTukDriver(Document):
 
         settings = frappe.get_single("TukTuk Settings")
         target = flt(self.daily_target or settings.global_daily_target)
-        current = flt(self.current_balance or 0)
+
+        # CRITICAL FIX: Always fetch current_balance from database to avoid stale in-memory values
+        # This prevents race conditions where atomic SQL payment updates happen while a driver
+        # object is loaded in memory. Without this, calling .save() would overwrite correct
+        # SQL-calculated left_to_target values with stale calculations.
+        current = flt(frappe.db.get_value("TukTuk Driver", self.name, "current_balance") or 0)
 
         # Countdown stops at zero (doesn't go negative)
         self.left_to_target = max(0, target - current)

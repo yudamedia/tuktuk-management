@@ -232,17 +232,8 @@ translate_app = True
 # Login hooks for automatic redirect
 # on_session_creation = "tuktuk_management.api.driver_auth.on_session_creation"
 
+# Workspace removed from fixtures - now managed as Custom workspace via UI
 fixtures = [
-    {
-        "doctype": "Workspace",
-        "filters": [
-            [
-                "name",
-                "in",
-                ["Tuktuk Management"]
-            ]
-        ]
-    },
     {
         "doctype": "Dashboard Chart",
         "filters": [

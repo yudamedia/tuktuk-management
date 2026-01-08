@@ -264,9 +264,13 @@ def get_tuktuk_driver_dashboard_data():
             target_progress = min((tuktuk_driver.current_balance / daily_target) * 100, 100)
         else:
             target_progress = 0
-        
+
+        # Calculate left to target based on today's contribution (not accumulated balance)
+        left_to_target = max(0, daily_target - today_target_contribution)
+
         return {
             "tuktuk_driver": {
+                "driver_id": tuktuk_driver.name,
                 "name": tuktuk_driver.driver_name,
                 "driver_first_name": tuktuk_driver.driver_first_name,
                 "sunny_id": tuktuk_driver.sunny_id,
@@ -281,6 +285,7 @@ def get_tuktuk_driver_dashboard_data():
             "today_target_contribution": today_target_contribution,
             "daily_target": daily_target,
             "target_progress": target_progress,
+            "left_to_target": left_to_target,
             "today_date": format_date(today(), "dd MMM yyyy"),
             "operating_hours": {
                 "start": settings.operating_hours_start,

@@ -189,6 +189,34 @@ print(f"Expected: {(driver.daily_target or settings.global_daily_target) - drive
 
 ## Changelog
 
+### January 5, 2026 - Race Condition Fix (before_save Hook)
+**Issue:** Ongoing discrepancies still occurring despite atomic SQL fixes. Root cause identified: The `before_save()` hook was using stale in-memory values to recalculate `left_to_target`, overwriting correct SQL-calculated values.
+
+**Root Cause:**
+When a driver document is loaded into memory early in the day and atomic SQL payment updates happen to the database, the in-memory object remains stale. When any code later calls `.save()` on that object (e.g., for tuktuk assignment, termination, etc.), the `update_left_to_target()` hook would calculate using the OLD in-memory `current_balance` and overwrite the correct database values.
+
+**Example Scenario:**
+1. 10:00 AM: Load driver (balance = 100, left = 900)
+2. Throughout day: Atomic SQL payments (DB now: balance = 800, left = 200)
+3. 5:00 PM: Assign driver to new tuktuk → calls `.save()`
+4. Hook calculates: `left_to_target = 1000 - 100 = 900` (using stale value)
+5. Database overwritten: left = 200 → 900 ❌ DISCREPANCY CREATED
+
+**Fixed Location:**
+`tuktuk_management/tuktuk_management/doctype/tuktuk_driver/tuktuk_driver.py:61`
+
+**Solution:**
+Modified `update_left_to_target()` hook to ALWAYS fetch `current_balance` from database instead of using in-memory value:
+```python
+# OLD (stale):
+current = flt(self.current_balance or 0)
+
+# NEW (always fresh):
+current = flt(frappe.db.get_value("TukTuk Driver", self.name, "current_balance") or 0)
+```
+
+This ensures that no matter how old the in-memory driver object is, the hook will always use the most current database value when recalculating `left_to_target`.
+
 ### December 24, 2025 - Critical Bug Fix
 **Issue:** Stale value bug discovered in 3 locations causing discrepancies for drivers like DRV-112181 and DRV-112187
 
@@ -204,5 +232,5 @@ print(f"Expected: {(driver.daily_target or settings.global_daily_target) - drive
 Original atomic update fix for `left_to_target` synchronization
 
 ## Status
-✅ **DEPLOYED AND TESTED** (Updated Dec 24, 2025)
+✅ **DEPLOYED AND TESTED** (Updated Jan 5, 2026)
 

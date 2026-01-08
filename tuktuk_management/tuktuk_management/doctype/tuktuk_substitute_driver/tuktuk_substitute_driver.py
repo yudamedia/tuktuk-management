@@ -26,13 +26,20 @@ class TukTukSubstituteDriver(Document):
     
     def before_save(self):
         """Actions before saving the document"""
-        # If assigned_tuktuk changed, update assignment_date
-        if self.has_value_changed('assigned_tuktuk') and self.assigned_tuktuk:
-            self.assignment_date = now_datetime()
-            self.status = "On Assignment"
-        elif not self.assigned_tuktuk:
-            self.status = "Active"
-            self.assignment_date = None
+        # Only auto-update status if assigned_tuktuk changed AND status wasn't manually set to Inactive
+        if self.has_value_changed('assigned_tuktuk'):
+            if self.assigned_tuktuk:
+                # Driver assigned to a vehicle
+                self.assignment_date = now_datetime()
+                # Only set to "On Assignment" if status is not manually set to "Inactive"
+                if self.status != "Inactive":
+                    self.status = "On Assignment"
+            else:
+                # Driver unassigned from vehicle
+                self.assignment_date = None
+                # Only set to "Active" if status is not manually set to "Inactive"
+                if self.status != "Inactive":
+                    self.status = "Active"
     
     def on_update(self):
         """Actions after document is updated"""
